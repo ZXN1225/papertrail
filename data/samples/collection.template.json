@@ -1,0 +1,39 @@
+{
+  "is_template": true,
+  "publishable": false,
+  "collection_id": null,
+  "sku": {
+    "category": null,
+    "brand": null,
+    "family": null,
+    "manufacturer_part_number": null,
+    "region": "CN",
+    "revision": null,
+    "synthetic": null
+  },
+  "source": {
+    "url": null,
+    "document_version": null,
+    "observed_at": null,
+    "permission_evidence": null,
+    "locator": null
+  },
+  "facts": [],
+  "missing_fields": [],
+  "conflicts": [],
+  "offer": {
+    "merchant": null,
+    "listing_id": null,
+    "amount_minor": null,
+    "shipping_minor": null,
+    "tax_included": null,
+    "currency": "CNY",
+    "region": "CN",
+    "eligibility": null,
+    "condition": null,
+    "stock_status": "unknown",
+    "observed_at": null,
+    "expires_at": null
+  },
+  "review": {"status": "not_reviewed", "reviewer": null, "reviewed_at": null}
+}
