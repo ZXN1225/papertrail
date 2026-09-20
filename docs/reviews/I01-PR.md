@@ -11,7 +11,9 @@
 
 ## 验证与限制
 
-本机：13 项后端测试通过（真实 PostgreSQL 17.11）；9 项 E2E 通过（375/768/1440）；ruff、类型检查、Next 构建、契约生成、基础记录检查与依赖审计通过。Redis 在本机显式关闭，真实 Redis 成功连接由 CI 验证；CI 最终结果见 PR 检查与 docs/PROGRESS.md，不以配置文件存在冒充已运行。
+本机：13 项后端测试通过（真实 PostgreSQL 17.11）；9 项 E2E 通过（375/768/1440）；ruff、前端格式/类型、Next 构建、契约生成、基础记录检查与依赖审计通过。Redis 在本机显式关闭。
+
+[GitHub CI 完整运行](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35506174415) 全部通过，包括真实 PostgreSQL/Redis 联测、锁定安装、OpenAPI 重生成无差异、前端构建、依赖审计和浏览器测试。该链接记录实现提交 ed5b6ff 的验证；最终文档同步提交的状态见 PR 当前检查。没有运行本机 Compose；同一固定镜像在 CI 服务环境验证，不把两者混为一谈。
 
 没有真实目录/报价、会话保存、管理员写入、模型调用或正式推荐。V01 的 D01—D03 数据发布阻塞保留。尚未生产部署，不合并 PR，不提前进入 I02。
 
