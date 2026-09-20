@@ -36,6 +36,7 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       TEST_REDIS_URL: redis://127.0.0.1:6379/1
       LLM_PROVIDER: disabled
+      SESSION_SIGNING_SECRET: ci-only-session-key-not-for-any-deployment
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6

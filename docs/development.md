@@ -1,6 +1,6 @@
-# I01 本地运行与检查
+# 本地运行与检查（I02）
 
-本阶段提供可运行首页、只读状态 API、真实 PostgreSQL 基础迁移和 Redis 探测。没有会话、画像保存、商品业务表、推荐或模型调用；首页草稿刷新即清空。`ready=200` 只表示基础依赖可用，不表示数据已可推荐。
+本阶段提供三入口首页、状态 API、匿名会话、画像保存/版本历史、真实 PG 迁移和 Redis 探测。没有商品、推荐或模型调用。已保存需求固定 24 小时有效，未保存编辑刷新即丢失。`ready=200` 只表示基础依赖可用，不表示数据已可推荐。身份保护、删除与过期清理见 [会话设计](sessions.md)。
 
 ## 固定工具
 
@@ -53,11 +53,11 @@ pnpm --dir web dev
 - 存活：<http://127.0.0.1:8000/api/v1/health/live>。
 - 就绪：<http://127.0.0.1:8000/api/v1/health/ready>。
 
-Alembic `0001_baseline` 只创建迁移版本记录，不提前创建 T02 的商品/来源表。应用不会自动迁移；未迁移、版本不匹配、PG 失联或已配置 Redis 失联均返回 ready=503。数据库正常但未建商品目录时，平台状态为 `not_initialized`。
+Alembic `0001_baseline` 创建版本记录，`0002_sessions` 新增匿名身份、画像、revision 和限流表；仍不创建 T02 的商品/来源表。预览应用不会自动迁移；未迁移、版本不匹配、PG 失联或已配置 Redis 失联均返回 ready=503。升级 I01 后先运行 upgrade head，再重启 API/web。隔离 E2E 入口会自行迁移 test_* 数据库。
 
-前端只将固定的 GET `/api/v1/platform/status` 转发到本机 8000；若改端口，在启动 Next 的进程环境中设置服务端 `API_BASE_URL`。没有浏览器可控 URL 代理，也不向浏览器传数据库或模型凭据。`.env` 由后端加载，Next 不读取根目录密钥。
+前端将固定状态 GET 和白名单会话/画像 API 转发到本机 8000；若改端口，在启动 Next 的进程环境中设置服务端 `API_BASE_URL`。没有浏览器可控 URL 代理，也不向浏览器传数据库或模型凭据。`.env` 由后端加载，Next 不读取根目录密钥。写请求需要允许的精确 Origin/JSON；会话密钥不足 32 字符时会话服务返回 503。
 
-`APP_ENV=production` 必须提供 PG、Redis、至少 32 字符会话密钥、HTTPS 的 PUBLIC_BASE_URL/CORS_ALLOWED_ORIGINS；当前没有写 API，CORS 只允许 GET。生产部署、会话和管理员鉴权均须后续阶段实现。
+`APP_ENV=production` 必须提供 PG、Redis、至少 32 字符会话密钥、HTTPS 的 PUBLIC_BASE_URL/CORS_ALLOWED_ORIGINS。CORS 只允许配置来源、GET/POST/PATCH/DELETE 和明确头，带身份写入须匹配 CSRF。管理员写入和生产部署仍在后续阶段实现。开发 Redis 关闭时仍使用 PG 共享限流；默认 SESSION_WRITE_LIMIT=60 次/分钟/会话，可配置 1—600。
 
 ## 验证
 
@@ -93,7 +93,7 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 ```
 
-E2E 会启动后端和 Next 生产构建，要求 `.env`、PG 和迁移已准备好；本地可复用 8000/3000 上的服务，检查当前修改时须先重启旧进程。三种宽度各验证入口/草稿/刷新清空、网络错误/重试、键盘/无效预算共 9 项，读取真实 API。报告位于 web/playwright-report，截图位于 web/test-results（均不入库）。
+E2E 通过 tools.serve_e2e 启动独立 8001 后端与 3001 Next 生产构建，拒绝非 test_* 数据库且不复用预览服务。要求已有 test_computer 数据库和本地 `.env`（或 CI 的 TEST_DATABASE_URL/SESSION_SIGNING_SECRET），自动迁移该测试库。三个宽度共 15 项：三入口保存/恢复、跨标签冲突、新需求/删除/隔离、保存失败、网络重试/键盘。报告位于 web/playwright-report，截图位于 web/test-results（均不入库）。
 
 API 变化后依次导出 OpenAPI、生成 TypeScript 并一同提交。CI 重新生成后检查无差异，使用真正 PostgreSQL/Redis 服务、锁定安装和上述检查，浏览器报告保留 7 天。漏洞审计只反映当时已知数据库结果，不是全面安全认证。
 

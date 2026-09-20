@@ -65,7 +65,7 @@ export default function Home() {
       </main>
       <footer>
         <span>选机有据 · 让选择更有把握</span>
-        <span>基础工程预览 · 尚不提供购买清单</span>
+        <span>开发预览 · 尚不提供购买清单</span>
       </footer>
     </>
   );

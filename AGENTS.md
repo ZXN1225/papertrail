@@ -28,4 +28,6 @@
 - web 工作目录：`pnpm run api:generate`、`pnpm run format:check`、`pnpm run typecheck`、`pnpm run build`、`pnpm test:e2e`（需迁移后的数据库，先安装 Playwright Chromium）。
 - 依赖审计：backend 的 `uv run --frozen pip-audit --progress-spinner off`；web 的 `pnpm audit --audit-level moderate`。
 
+I02：E2E 通过 tools.serve_e2e 强制 test_* 数据库和独立 8001/3001 端口，不复用用户预览。画像改动覆盖真实 PG 的身份/Origin/CSRF/版本冲突/过期/删除反例。会话设计与过期清理命令见 `docs/sessions.md`；数据库迁移后同步 Dependencies 的 SCHEMA_REVISION。
+
 启动与环境前置见 `docs/development.md`。CI 使用真实 PG/Redis、锁定安装并核对 OpenAPI 生成差异。详细验收见 `docs/EXECUTION_PLAN.md`、`docs/research/I01-acceptance.md`。

@@ -1,33 +1,29 @@
 # 项目进度
 
-更新日期：2026-09-20。当前交付：步骤 03 / I01。分支：codex/i01-engineering-foundation；起点：01d2966。最终提交以 git log -1 为准。
+更新日期：2026-09-20。当前交付：步骤 04 / I02 + T11 基础。分支：codex/i02-sessions-profiles；起点：f108a2f。最终提交以 git log -1 为准。
 
 ## 本轮成果与边界
 
-- 用户已确认 V01 并授权继续一步；本轮仅工程基础，不进入 I02/T02。
-- FastAPI 三个 GET 接口、严格生产配置、依赖状态/请求 ID；Next 中文三入口、页面草稿、空数据与故障重试。
-- Python/Node/uv/pnpm 及完整依赖锁定；OpenAPI 导出、前端类型生成、固定镜像与 Actions SHA 的 CI。
-- Alembic 0001_baseline 只建立版本记录，不创建商品/画像业务表。真实发布 SKU=0、报价=0、data_version=null，LLM disabled。
-- 本机便携 PostgreSQL 17.11 可运行，未注册 Windows 服务；本机无可用 Docker/WSL 发行版，Redis 显式关闭。Compose 提供完整开发环境，CI 验证真实 PG/Redis。
-- 开发说明见 development.md，验收见 research/I01-acceptance.md；PROJECT_SPEC 原文未修改。
+- 用户已确认 I01，授权继续一个步骤。完成匿名身份、24 小时需求保存、revision 历史、资源隔离、并发冲突、新需求/删除与过期清理入口。
+- 0002_sessions 新增会话、画像、历史和共享限流表；服务集中校验严格整数分、用途/费用范围及模式条件。切换设备保留通用约束、清除不适用条件。
+- HttpOnly/SameSite/生产 Secure 与 __Host- cookie；签名与摘要存储；精确 Origin、CSRF、JSON、16 KiB 请求上限；PG 原子共享限流，配置的 Redis 故障时拒绝写入。
+- 首页可保存和刷新恢复；跨标签冲突不自动覆盖，失败不显示已保存；开始新需求/删除通过真实 API 清除旧画像。
+- 没有商品表、真实 SKU/报价、推荐、管理员写接口或模型调用。T11 的 Agent 状态机、自由约束/锁定 SKU 等在 P5 扩展；不是本轮已完成的能力。
+- 文档：sessions.md、development.md、research/I02-acceptance.md；PROJECT_SPEC 原文保留。
 
-## 验证
+## 验证记录
 
-- 本机后端 13 项测试通过，包含真实 PG 空库、迁移/重复升级/回滚/重升、PG/Redis 故障、生产配置拒绝、CORS；未把 Redis 成功连接算作本机实测。
-- Playwright 9 项通过：375/768/1440 三种宽度，真实 API 三入口与草稿/刷新清空、网络错误/重试、键盘与无效预算。桌面和手机截图已目视检查。
-- ruff 检查/格式、前端格式/类型/生产构建、OpenAPI 导出/生成、基础文件/来源记录检查、git diff --check 均通过。pip-audit 和 pnpm audit 未检出已知漏洞。
-- 本地配置值与跟踪文件比对通过；随机开发凭据、.env、数据库与下载二进制均未入库。
-- 第三方 Starlette 测试客户端有 httpx 与 AnyIO 弃用警告，未掩盖；不影响当前测试。
-- [GitHub CI 首次完整验证](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35506174415) 全部通过：锁定安装、真实 PG/Redis 后端集成、迁移、OpenAPI 无差异、前端构建、审计和浏览器 E2E。该运行对应实现提交 ed5b6ff；文档更新后仍以 PR 当前提交检查为准。
+- 本机真实 PG 后端 30 项通过：原基础测试 + 严格金额、cookie、CSRF/Origin、隔离/伪造/过期、快照/保留字段、切换模式、并发 2/409、删除、限流、Redis 故障拒绝。第三方客户端仍有两项已知弃用警告，未隐藏。
+- 真实 API 浏览器 15 项通过，375/768/1440；桌面与手机截图已检查。测试入口强制 test_* 库和独立 3001/8001，不写用户预览数据库。TEST-I02 场景记录 synthetic=true；不接触真实商品索引。
+- 最终本机复验：ruff 检查/格式、前端格式/类型/生产构建、OpenAPI/生成类型、基础与来源记录检查均通过；pip-audit/pnpm audit 未检出已知漏洞。首次浏览器失败来自名称不够精确同时匹配两个按钮/Next 播报节点，修正定位后全量通过，没有删除断言。
+- GitHub CI 待本轮 PR 触发验证；本机 Redis 显式关闭，完整真实 Redis 成功连接以 CI 为准。
 
-## Git 与审阅
+## Git 与接续
 
-本轮开始时 #1/#2 均 OPEN，工作区干净；未合并。[I01 PR #3](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/pull/3) 以 codex/v01-source-feasibility 为 base，只审查本轮增量。实现提交 ed5b6ff，后续文档同步提交以 git log 为准。未来按 #1→#2→#3 顺序核对，调整 base 或在 squash 后重放增量。
+开始时工作区干净，#1/#2/#3 均 OPEN，未合并。本轮从 f108a2f 创建独立分支，PR base 为 codex/i01-engineering-foundation，只审阅第 4 步增量。合并仍需用户另行授权，后续按顺序核对 base/diff。
 
-本机预览已启动于 http://127.0.0.1:3000，API 为 8000，便携 PG 为 55432。进程 PID 保存在忽略入库的 .local/preview-pids.json；电脑重启后按 development.md 重新启动。该预览仅监听本机，不是正式部署。
+预览继续使用本机 3000/8000 与便携 PG 55432；重启和升级先运行 alembic upgrade head。PID 文件在 .local/preview-pids.json（忽略入库）。测试使用 3001/8001，禁止复用可能过期的预览进程。
 
 ## 下一轮（必须等待确认）
 
-步骤 04 / I02 + T11：匿名会话身份、HttpOnly/SameSite/生产 Secure、CSRF/Origin、画像保存/revision、跨会话资源隔离、并发冲突、新对话隔离；不接模型。现在首页草稿不保存，不是已经完成该步骤。
-
-D01 来源使用权限、D02 精确身份/BIOS、D03 真实人工报价仍阻塞后续数据发布；I01 不解除这些条件。没有生产部署或真实推荐验收。
+步骤 05 / T02：商品精确 SKU、来源、事实、证据、报价关系与领域迁移，完善数据字典/约束/测试。D01 使用权限、D02 精确身份/BIOS、D03 真实报价仍未解除；不通过虚构商品补齐。后续生产配置、网关限流、周期过期清理、备份恢复仍在对应阶段落实。本轮停止，不自动进入 T02。

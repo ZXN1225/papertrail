@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
-  use: { baseURL: "http://127.0.0.1:3000", trace: "retain-on-failure" },
+  use: { baseURL: "http://127.0.0.1:3001", trace: "retain-on-failure" },
   projects: [375, 768, 1440].map((width) => ({
     name: `chromium-${width}`,
     use: { browserName: "chromium", viewport: { width, height: 1000 } },
@@ -13,15 +13,16 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "uv run --directory ../backend --frozen uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000",
-      url: "http://127.0.0.1:8000/api/v1/health/ready",
-      reuseExistingServer: !process.env.CI,
+        "uv run --directory ../backend --frozen python -m tools.serve_e2e",
+      url: "http://127.0.0.1:8001/api/v1/health/ready",
+      reuseExistingServer: false,
       timeout: 30000,
     },
     {
-      command: "pnpm start",
-      url: "http://127.0.0.1:3000",
-      reuseExistingServer: !process.env.CI,
+      command: "pnpm start --port 3001",
+      url: "http://127.0.0.1:3001",
+      env: { API_BASE_URL: "http://127.0.0.1:8001" },
+      reuseExistingServer: false,
       timeout: 60000,
     },
   ],

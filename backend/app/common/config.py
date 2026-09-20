@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:3000"
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     llm_provider: Literal["disabled"] = "disabled"
+    session_write_limit: int = Field(default=60, ge=1, le=600)
 
     @field_validator("database_url")
     @classmethod

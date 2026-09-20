@@ -1,11 +1,9 @@
-# 后端 · I01
+# 后端 · I02
 
-Python 3.12.14 / FastAPI / Pydantic v2 / SQLAlchemy 2 / Alembic，精确依赖见 pyproject.toml 与 uv.lock。启动、迁移和测试见 [开发指南](../docs/development.md)。
+Python/FastAPI/PG 版本与锁文件沿用 I01。启动与验证见 [开发指南](../docs/development.md)，本轮设计见 [会话与画像](../docs/sessions.md)。
 
-三个只读接口：/api/v1/health/live、/api/v1/health/ready、/api/v1/platform/status。ready 校验真实 PG 和迁移版本；Redis 配置后成为必要依赖。生产缺关键配置拒绝启动。迁移只建立版本基线，业务表在后续步骤实施。
+除健康/平台状态外，现已提供匿名会话、画像创建/读取/PATCH、历史快照、重置和删除 API。app/profiles/service.py 是共享领域服务，HTTP 仅处理输入和身份边界；未来 Agent 必须复用。预算严格整数分，事务内锁定会话并校验 expected_revision，追加不可覆盖的快照；用户不可指定 owner。
 
-app/common 放配置、依赖和响应契约，app/main.py 组装应用。LLM 当前必须 disabled，管理员写路由未开放。预算/兼容/评分未来进入共享领域服务，路由和 Agent 不各写一套算法。
+0002_sessions 从基线新增会话/画像/限流表，尚无商品/证据表。ready 要求当前 revision。cookie/CSRF/Origin/请求体限制、PG 多实例写限流与 Redis 故障拒绝见会话设计；LLM disabled，管理员写路由未开放。
 
-本目录运行 `uv run --frozen python -m tools.test_local`，需本机 development 配置、test_computer 库和创建测试数据库权限。外部测试环境显式设置 TEST_DATABASE_URL/TEST_REDIS_URL 后运行 pytest；未提供测试库时会跳过集成。tools.export_openapi 导出契约，前端须同步生成类型。
-
-未来模块包括 catalog/components/laptops、pricing、compatibility、recommendation、comparison、agent、knowledge、sources、admin、jobs。采集/索引/长运行在 worker；本轮没有开放这些能力。
+本目录 `uv run --frozen python -m tools.test_local` 使用本机 development 配置和独立测试库；CI 设置 TEST_DATABASE_URL/TEST_REDIS_URL 后运行 pytest。没有 TEST_DATABASE_URL 则跳过集成，不能报完整通过。tools.export_openapi 导出后须同步前端类型；tools.cleanup_sessions 删除已过期会话并级联历史。tools.serve_e2e 只接受 test_* 数据库并绑定 8001，不用于生产。

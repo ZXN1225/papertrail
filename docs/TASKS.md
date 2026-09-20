@@ -7,7 +7,7 @@
 | T01 | README、AGENTS、ADR、计划、台账、模板与骨架 | 无 | 执行计划步骤 01 | done |
 | V01 | 四类来源各 5 样本或失败证据、运行时版本核验 | T01、用户确认 | 步骤 02 / 规格 §9.2；报告见 research/V01-source-feasibility.md | done |
 | I01 | 前后端、PG/Redis、配置、CI、健康检查、锁文件 | V01 | 步骤 03；research/I01-acceptance.md | done |
-| I02 | 会话身份、权限与请求保护 | I01 | 步骤 04 | todo |
+| I02 | 会话身份、权限与请求保护 | I01 | 步骤 04；research/I02-acceptance.md | done |
 | T02 | SKU/来源/证据 Schema 与领域首次迁移 | I01、V01 | 步骤 05 / §8 | todo |
 | T03 | 人工导入、预览、审核、事务发布 | T02、I02 | 步骤 06 / §9 | todo |
 | T04 | 目录查询与前端只读列表、规格适配器 | T03 | 步骤 07 | todo |
@@ -17,7 +17,7 @@
 | T08 | 笔记本过滤与分项评分 | T04、T05 | 步骤 10 / §12 | todo |
 | T09 | PC 有界求解 | T05、T07 | 步骤 11 / §12 | todo |
 | T10 | 快照保存、修订、比较、导出 | T08、T09、T11 | 步骤 12 | todo |
-| T11 | 画像 patch、revision 与会话状态 | I02 | 步骤 04；P5 扩充 / §6 | todo |
+| T11 | 画像 patch、revision 与会话状态 | I02 | 步骤 04 基础完成；Agent 状态机在 P5 扩充 / §6 | done |
 | T12 | 工具协议、Harness、模型适配 | T10、T11 | 步骤 13 / §6—7 | todo |
 | T13 | 审核手册摄取、BM25、引用 | T03 | 步骤 14 / §10 | todo |
 | T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13 | todo |

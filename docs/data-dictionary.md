@@ -1,6 +1,6 @@
 # 核心数据语义草案
 
-依据规格 §6—12；P2 将转为强类型 Schema、PG 约束与测试。本文目前不是已部署数据库说明。
+依据规格 §6—12；商品/证据部分在 P2 转为强类型 Schema、PG 约束与测试。I02 已实现 anonymous_sessions（摘要/到期）、profiles（会话唯一/当前 revision）、profile_revisions（复合主键/JSONB 快照/来源/创建时间）、request_limits（摘要键/分钟窗口/计数），详见 [会话设计](sessions.md)。不代表商品表已实现或已生产部署。
 
 | 概念 | 语义 / 不变量 |
 |---|---|

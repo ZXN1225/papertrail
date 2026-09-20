@@ -3,12 +3,17 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.common.config import Settings
 from app.common.contracts import ErrorResponse, LiveResponse, PlatformStatus, ReadyResponse
 from app.common.dependencies import Dependencies
+from app.profiles.protection import WriteProtection
+from app.profiles.router import router as profile_router
+from app.profiles.service import DomainError
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -23,12 +28,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await app.state.dependencies.close()
 
     app = FastAPI(title="电脑推荐平台 API", version="0.1.0", lifespan=lifespan)
+    app.state.settings = settings
+    app.include_router(profile_router)
+    app.add_middleware(
+        WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins,
-        allow_methods=["GET"],
-        allow_headers=["Content-Type"],
-        allow_credentials=False,
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Content-Type", "X-CSRF-Token"],
+        allow_credentials=True,
     )
 
     @app.middleware("http")
@@ -38,6 +48,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["X-Request-ID"] = request.state.request_id
         response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.exception_handler(DomainError)
+    async def domain_error(request: Request, exc: DomainError):
+        headers = {"Retry-After": exc.details["retry_after"]} if exc.status == 429 else {}
+        return JSONResponse(
+            status_code=exc.status,
+            headers=headers,
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "details": exc.details,
+                    "request_id": request.state.request_id,
+                }
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError):
+        return await domain_error(
+            request, DomainError(422, "INVALID_REQUEST", "请求字段无效，请检查需求内容。")
+        )
+
+    @app.exception_handler(SQLAlchemyError)
+    async def database_failure(request: Request, exc: SQLAlchemyError):
+        return await domain_error(
+            request, DomainError(503, "DEPENDENCY_UNAVAILABLE", "暂时无法读取或保存，请稍后重试。")
+        )
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception):

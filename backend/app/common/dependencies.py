@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.common.config import Settings
 from app.common.contracts import DependencyChecks, ReadyResponse
 
-SCHEMA_REVISION = "0001_baseline"
+SCHEMA_REVISION = "0002_sessions"
 
 
 class Dependencies:

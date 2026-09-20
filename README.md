@@ -2,7 +2,7 @@
 
 面向中国大陆市场，以预算、用途和偏好为输入，逐步构建可追溯的笔记本精确 SKU 推荐与经过规则校验的 PC 装机清单。
 
-**当前步骤 03 / I01：前后端已可运行。首页支持台式机、笔记本、单零件三入口与页面内草稿；真实商品、报价、会话保存和推荐尚未开放。完成后等待用户确认 I02。**
+**当前步骤 04 / I02：匿名会话与需求保存已实现。三入口支持保存、刷新恢复、版本冲突提示、新需求与删除；真实商品、报价和推荐尚未开放。完成后等待用户确认 T02。**
 
 ## 本地运行
 
@@ -19,12 +19,12 @@ uv run --directory backend --frozen uvicorn app.main:create_app --factory --host
 
 另开终端执行 `pnpm --dir web dev`，访问 <http://127.0.0.1:3000>。本机已初始化便携 PG 和 `.env`，无需重新生成配置；新机器按开发指南选择 Compose 或便携 PG。
 
-页面读取真实 API，正常时显示“数据准备中”，异常时提供重试。草稿刷新即清空。无需模型密钥；ready=200 只表示基础依赖正常，不代表可推荐。
+页面读取真实 API，正常时显示“数据准备中”，异常时提供重试。已保存需求在同一浏览器会话中可恢复，固定 24 小时有效；未保存编辑仍会在刷新时丢失。无需模型密钥；ready=200 只表示基础依赖正常，不代表可推荐。[会话与版本设计](docs/sessions.md) 说明隔离、删除、限流和过期清理。
 
 ## 文档与验证
 
 - [完整执行计划](docs/EXECUTION_PLAN.md)、[任务台账](docs/TASKS.md)、[进度与验证记录](docs/PROGRESS.md)。
-- [I01 验收](docs/research/I01-acceptance.md)、[PR 说明](docs/reviews/I01-PR.md)、[版本矩阵](docs/runtime-matrix.md)。
+- [I02 验收](docs/research/I02-acceptance.md)、[本轮 PR 说明](docs/reviews/I02-PR.md)、[版本矩阵](docs/runtime-matrix.md)；I01 记录保留于历史文档。
 - [来源可行性核验](docs/research/V01-source-feasibility.md)、[人工报价路径](docs/manual-offer-workflow.md)。D01—D03 仍阻塞真实数据发布。
 - [原始规格](docs/PROJECT_SPEC.md)、[架构决策](docs/adr/README.md)、[数据字典](docs/data-dictionary.md)、[来源登记](docs/data-sources.md)、[API 边界](docs/api-contract.md)、[生成的 OpenAPI](docs/openapi.json)。
 

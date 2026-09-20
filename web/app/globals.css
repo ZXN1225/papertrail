@@ -707,3 +707,79 @@ footer {
     transition: none !important;
   }
 }
+
+.profile-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.choice-fields {
+  border: 0;
+  padding: 0;
+  margin: 20px 0;
+  min-width: 0;
+}
+.choice-fields legend {
+  font-size: 11px;
+  color: #56635a;
+  margin-bottom: 9px;
+}
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+.check-grid label,
+.form-grid .inline-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.check-grid input,
+.inline-check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--green);
+}
+.text-input {
+  padding-left: 12px;
+}
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 20px;
+}
+.session-actions button {
+  color: var(--green);
+  border: 0;
+  background: transparent;
+  padding: 5px 0;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.profile-error {
+  border: 1px solid #d8b9a0;
+  padding: 14px;
+  border-radius: 6px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #7c3d20;
+  overflow-wrap: anywhere;
+}
+.profile-error p {
+  margin: 0 0 7px;
+}
+button:disabled {
+  opacity: 0.6;
+}
+@media (max-width: 850px) {
+  .check-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
