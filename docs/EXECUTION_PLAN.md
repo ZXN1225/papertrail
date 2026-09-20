@@ -2,7 +2,7 @@
 
 ## 本轮范围与推进方式
 
-以用户明确要求为边界：第一步是规划和基础文件，不执行附件 §19.4 示例提示词中的整个 P0/P1。本轮完成 T01。阶段编号 P0—P7 保留原规格定义；下面的“步骤”是便于逐次确认的交付单元，一个阶段可以分多轮。
+以用户明确要求为边界：第一步是规划和基础文件，不执行附件 §19.4 示例提示词中的整个 P0/P1。当前已推进至步骤 03 / I01，实际结果见 PROGRESS.md。阶段编号 P0—P7 保留原规格定义；下面的“步骤”是便于逐次确认的交付单元，一个阶段可以分多轮。
 
 每轮固定流程：读取进度 → 写本轮验收 → 实现 → 运行相关检查 → 更新台账与 PR → 汇报结果与限制 → 等待用户确认。未完成的外部条件保持未完成，不能用模拟数据抵消真实数据验收。
 
@@ -38,7 +38,7 @@
 
 - 浏览器 → FastAPI → 共享领域服务 → PostgreSQL；Agent 只能通过受控工具使用同一服务。
 - Redis 用于缓存/限流；采集、索引和长运行任务在 worker；任务租约与 outbox 防止半发布。
-- 拟用 Python 3.12、FastAPI/Pydantic v2、SQLAlchemy 2/Alembic、Next.js/React/TypeScript/Tailwind、pnpm/uv。它们是附件中的选型，当前未安装或验证为兼容组合。
+- 使用 Python 3.12、FastAPI/Pydantic v2、SQLAlchemy 2/Alembic、Next.js/React/TypeScript/Tailwind、pnpm/uv。I01 已安装、锁定并验证基础组合，精确版本与环境边界见 runtime-matrix.md。
 - 步骤 02 查询官方支持信息，步骤 03 实际锁定 Python/Node/pnpm/uv、全部依赖和容器版本。提交锁文件；CI 用锁定安装。没有锁文件前不宣称可复现应用构建。
 - BM25 先行；pgvector、重排与多 Agent 均需后续对照评估，MVP 不提前加入。
 

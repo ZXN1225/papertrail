@@ -27,3 +27,5 @@ data/indexes/
 backups/
 .DS_Store
 Thumbs.db
+.local/
+*.tsbuildinfo

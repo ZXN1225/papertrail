@@ -1,4 +1,26 @@
-# V01 运行时与依赖候选矩阵
+# 运行时与依赖矩阵
+
+## I01 实装（2026-09-20）
+
+| 层 | 锁定版本 / 验证 |
+|---|---|
+| 工具 | Python 3.12.14（uv 管理）、Node 24.19.0、uv 0.12.10、pnpm 11.19.0 |
+| API | FastAPI 0.141.1、Pydantic 2.13.5、pydantic-settings 2.15.0、Uvicorn 0.53.0 |
+| 数据访问 | SQLAlchemy 2.0.54、Alembic 1.20.0、psycopg 3.3.6、redis Python 8.1.0 |
+| 前端 | Next 16.3.5、React/React DOM 19.3.0、TS 5.9.3、Tailwind 4.3.3、PostCSS 8.5.28 |
+| 验证 | pytest 9.1.1、ruff 0.16.8、pip-audit 2.10.1、Playwright 1.63.0、openapi-typescript 7.13.0、Prettier 3.9.8 |
+| PG | 17.11；本机 EDB Windows 17.11-3 便携包；Compose/CI 为官方 17.11-bookworm 镜像 |
+| Redis | 8.2.9-bookworm；Compose/CI 同一官方摘要，本机显式关闭 |
+
+包元数据已由 PyPI/npm 实际查询和安装核验；Python 完整依赖见 backend/uv.lock，前端见 web/pnpm-lock.yaml。TS 采用 5.9.3 满足 openapi-typescript 的 ^5.x peer 约束。Compose/CI 中的摘要是 Docker Hub 对应标签核验的不可变镜像引用；Actions 也固定完整提交 SHA。开发服务器与 CI 均使用 frozen 安装。
+
+本机真实 PG 已完成空库、重复升级、回滚与重新升级。Windows 缺 Docker/WSL 发行版，因此没有本机 Redis 成功连接或 Compose 启动成绩；CI 的实际状态见 PROGRESS.md/PR。API 的同步 psycopg 探测通过线程执行，避免 Windows Proactor 与异步驱动不兼容。
+
+本轮 pip-audit 和 pnpm audit 未检出已知漏洞，只代表查询时已知漏洞库结果。第三方测试客户端仍有两项弃用警告（Starlette httpx/AnyIO），不影响测试成功，未隐藏警告；未来升级时处理。依赖许可各自保留；Redis 8 使用 RSALv2/SSPLv1/AGPLv3 多许可，生产部署需落实选项与履约，不以 BSD 假设发布。
+
+以下为 V01 的历史候选记录；“本轮未安装”等表述只指当时，不覆盖以上 I01 实测。
+
+## V01 候选记录
 
 核验日期：2026-09-20。以下区分本机实测、官方支持说明、项目选择。官方文档可能滚动更新；页面版本提示只是候选，不是已解析安装成功或安全审计结论。I01 重新查包元数据/安全公告并提交完整锁文件，不能直接把 latest 写进部署命令。
 

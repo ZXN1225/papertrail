@@ -1,39 +1,30 @@
 # 项目进度
 
-更新日期：2026-09-20。当前交付：步骤 02 / V01。分支：codex/v01-source-feasibility；起点：8aa9a17（第一步提交）。最终提交以 git log -1 为准。
+更新日期：2026-09-20。当前交付：步骤 03 / I01。分支：codex/i01-engineering-foundation；起点：01d2966。最终提交以 git log -1 为准。
 
-## 已完成与本轮边界
+## 本轮成果与边界
 
-- T01 完成记录保留于 Git 历史；用户已确认继续第二步。
-- V01：4 类来源核验，5 个 AMD CPU 规格页样本；ASUS 自动通道条款限制；Lenovo 5 个精确详情探测失败；京东价格 API/授权未落实。
-- 交付来源可行性报告、4 来源/12 探测研究记录、人工报价工作流、运行时候选矩阵和研究记录检查。
-- V01 按“每源 5 样本或明确失败证据”验收；不等于四类来源接通。D01—D03 仍阻塞真实数据发布。
-- 当前已发布 SKU=0、报价=0、数据版本=无。没有爬虫、模型连接、Provider、服务或迁移；I01 尚未开始。
+- 用户已确认 V01 并授权继续一步；本轮仅工程基础，不进入 I02/T02。
+- FastAPI 三个 GET 接口、严格生产配置、依赖状态/请求 ID；Next 中文三入口、页面草稿、空数据与故障重试。
+- Python/Node/uv/pnpm 及完整依赖锁定；OpenAPI 导出、前端类型生成、固定镜像与 Actions SHA 的 CI。
+- Alembic 0001_baseline 只建立版本记录，不创建商品/画像业务表。真实发布 SKU=0、报价=0、data_version=null，LLM disabled。
+- 本机便携 PostgreSQL 17.11 可运行，未注册 Windows 服务；本机无可用 Docker/WSL 发行版，Redis 显式关闭。Compose 提供完整开发环境，CI 验证真实 PG/Redis。
+- 开发说明见 development.md，验收见 research/I01-acceptance.md；PROJECT_SPEC 原文未修改。
 
-## 验证记录
+## 验证
 
-- python scripts/check_foundation.py：通过，19 个基础文件、2 个模板与安全默认配置。
-- python scripts/check_source_review.py：通过，4 类来源、12 次探测；全部关闭发布与自动导入。
-- 内存变异检查：7 项全部被拒绝（发布误标、来源发布开启、授权误标、CPU 样本不足、失败证据缺失、伪造 HTTP 状态、失败页面当事实）；未修改原始研究记录。
-- git diff --check：通过；PROJECT_SPEC.md 与上一轮无差异；提交前另检查暂存补丁。
-- 未运行依赖解析、前后端构建、PG 迁移、业务/UI 测试；它们属于尚未开始的 I01。网页访问和记录校验不是应用集成测试。
-
-## 环境核验（本轮实测）
-
-- Python 3.11.9、Node v24.19.0、pnpm 11.19.0、uv 0.12.10；PATH 未找到 docker/psql（不等于证明未安装）。
-- 官方文档支持范围已核验；保留 Python 3.12、Node 24 LTS、Next 16、PG17 等候选，详见 runtime-matrix.md。
-- 未安装任何依赖；精确补丁/镜像摘要/锁文件、实际组合兼容性在 I01 验证。
-- 网页工具可能返回索引文本或空正文；记录检查日期，不伪造原站 HTTP 状态/原文哈希/发布时间。
-- 仓库原始 PROJECT_SPEC.md 未修改。
+- 本机后端 13 项测试通过，包含真实 PG 空库、迁移/重复升级/回滚/重升、PG/Redis 故障、生产配置拒绝、CORS；未把 Redis 成功连接算作本机实测。
+- Playwright 9 项通过：375/768/1440 三种宽度，真实 API 三入口与草稿/刷新清空、网络错误/重试、键盘与无效预算。桌面和手机截图已目视检查。
+- ruff、前端类型/构建、OpenAPI 导出/生成、基础文件/来源记录检查、git diff --check、依赖审计按最终提交再次记录。
+- 第三方 Starlette 测试客户端有 httpx 与 AnyIO 弃用警告，未掩盖；不影响当前测试。
+- GitHub CI 尚待 PR 触发核验；不得把 workflow 文件存在记为远程通过。
 
 ## Git 与审阅
 
-本轮开始时 gh pr view 1 确认 PR #1 仍 OPEN、mergedAt=null；工作区干净。未自动合并。
-本轮 PR 以 codex/t01-project-foundation 为 base，只审查第二步增量；用户决定合并时先处理 #1，再核对/调整本轮 base 到 main。若 squash 造成提交关系变化，需核对 diff 并重放增量，避免重复提交第一步内容。
-PR 正文与依赖说明见 reviews/V01-PR.md，远程最终状态以 GitHub 为准。
+本轮开始时 #1/#2 均 OPEN，工作区干净；未合并。I01 PR 以 codex/v01-source-feasibility 为 base，只审查本轮增量。未来按 #1→#2→I01 顺序核对，调整 base 或在 squash 后重放增量。PR 说明见 reviews/I01-PR.md，最终状态以 GitHub 为准。
 
-## 下一轮（等待用户确认）
+## 下一轮（必须等待确认）
 
-步骤 03 / I01：准备 Python 3.12 与真实 PostgreSQL/Redis 环境，创建 FastAPI/Next.js、锁定依赖、开发配置、基础迁移、健康接口、首页三入口及空数据状态、CI；验证构建与空库迁移。仅做工程基础，不自动推进 I02 会话鉴权或数据导入。
+步骤 04 / I02 + T11：匿名会话身份、HttpOnly/SameSite/生产 Secure、CSRF/Origin、画像保存/revision、跨会话资源隔离、并发冲突、新对话隔离；不接模型。现在首页草稿不保存，不是已经完成该步骤。
 
-真实数据并行前置仍是 D01 来源允许用途、D02 精确 SKU/BIOS、D03 人工报价；这些不阻塞 I01，但 T03/T04/T05 不能绕过。每轮完成后等待用户确认。
+D01 来源使用权限、D02 精确身份/BIOS、D03 真实人工报价仍阻塞后续数据发布；I01 不解除这些条件。没有生产部署或真实推荐验收。

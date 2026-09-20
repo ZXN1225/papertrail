@@ -22,4 +22,10 @@
 - 根目录：`python scripts/check_source_review.py`（仅研究记录一致性，不验证来源授权）
 - 根目录：`git diff --check`
 
-后端 pytest/ruff、前端类型/构建、数据库集成和 E2E 入口在 P1 实现后才登记，不以占位命令声称可用。详细验收见 `docs/EXECUTION_PLAN.md`。
+- backend 工作目录：`uv run --frozen ruff check .`、`uv run --frozen ruff format --check .`
+- backend 工作目录：`uv run --frozen python -m tools.test_local`（需本机 development 配置、真实 PG 与 test_computer 库）；外部测试环境设置 TEST_DATABASE_URL/TEST_REDIS_URL 后用 `uv run --frozen pytest -q`。未提供测试库会跳过集成，不能算完整通过。
+- backend 工作目录：`uv run --frozen python -m tools.export_openapi`
+- web 工作目录：`pnpm run api:generate`、`pnpm run format:check`、`pnpm run typecheck`、`pnpm run build`、`pnpm test:e2e`（需迁移后的数据库，先安装 Playwright Chromium）。
+- 依赖审计：backend 的 `uv run --frozen pip-audit --progress-spinner off`；web 的 `pnpm audit --audit-level moderate`。
+
+启动与环境前置见 `docs/development.md`。CI 使用真实 PG/Redis、锁定安装并核对 OpenAPI 生成差异。详细验收见 `docs/EXECUTION_PLAN.md`、`docs/research/I01-acceptance.md`。

@@ -1,9 +1,11 @@
-# 后端边界（待实现）
+# 后端 · I01
 
-计划 FastAPI / Pydantic v2、SQLAlchemy 2 / Alembic、PostgreSQL、Redis；Python 3.12 基线。P1 核验并锁定版本，创建 pyproject.toml、uv.lock 和可运行入口。目前没有服务代码，不提供虚假启动命令。
+Python 3.12.14 / FastAPI / Pydantic v2 / SQLAlchemy 2 / Alembic，精确依赖见 pyproject.toml 与 uv.lock。启动、迁移和测试见 [开发指南](../docs/development.md)。
 
-预定模块：common（配置/数据库/认证/日志）、catalog/components/laptops（SKU 与规格）、pricing、compatibility、recommendation、comparison、agent（Harness/工具/回答契约）、knowledge、sources、admin、jobs。
+三个只读接口：/api/v1/health/live、/api/v1/health/ready、/api/v1/platform/status。ready 校验真实 PG 和迁移版本；Redis 配置后成为必要依赖。生产缺关键配置拒绝启动。迁移只建立版本基线，业务表在后续步骤实施。
 
-兼容与评分为显式输入的纯函数。路由只负责认证、参数校验与服务调用。表单和 Agent 不各写一套推荐算法。worker 处理采集/索引/长任务，不阻塞 HTTP。
+app/common 放配置、依赖和响应契约，app/main.py 组装应用。LLM 当前必须 disabled，管理员写路由未开放。预算/兼容/评分未来进入共享领域服务，路由和 Agent 不各写一套算法。
 
-P1 配置 unit/integration/contracts 测试目录；集成使用真实 PostgreSQL。产品运行时流程在 app/agent/skills，开发工具技能另在根 .agents/skills，按需要再建立。
+本目录运行 `uv run --frozen python -m tools.test_local`，需本机 development 配置、test_computer 库和创建测试数据库权限。外部测试环境显式设置 TEST_DATABASE_URL/TEST_REDIS_URL 后运行 pytest；未提供测试库时会跳过集成。tools.export_openapi 导出契约，前端须同步生成类型。
+
+未来模块包括 catalog/components/laptops、pricing、compatibility、recommendation、comparison、agent、knowledge、sources、admin、jobs。采集/索引/长运行在 worker；本轮没有开放这些能力。
