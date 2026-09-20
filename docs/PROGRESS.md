@@ -16,13 +16,14 @@
 - 本机真实 PG 后端 30 项通过：原基础测试 + 严格金额、cookie、CSRF/Origin、隔离/伪造/过期、快照/保留字段、切换模式、并发 2/409、删除、限流、Redis 故障拒绝。第三方客户端仍有两项已知弃用警告，未隐藏。
 - 真实 API 浏览器 15 项通过，375/768/1440；桌面与手机截图已检查。测试入口强制 test_* 库和独立 3001/8001，不写用户预览数据库。TEST-I02 场景记录 synthetic=true；不接触真实商品索引。
 - 最终本机复验：ruff 检查/格式、前端格式/类型/生产构建、OpenAPI/生成类型、基础与来源记录检查均通过；pip-audit/pnpm audit 未检出已知漏洞。首次浏览器失败来自名称不够精确同时匹配两个按钮/Next 播报节点，修正定位后全量通过，没有删除断言。
-- GitHub CI 待本轮 PR 触发验证；本机 Redis 显式关闭，完整真实 Redis 成功连接以 CI 为准。
+- [完整 GitHub CI](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35533228341) 已通过（实现提交 be36091）：30 项后端、15 项 E2E、真实 PG/Redis、锁定安装、契约无差异、格式/类型/构建和审计均通过。本机 Redis 显式关闭，成功连接证据来自 CI。后续文档提交以 PR 当前检查为准。
+- 暂存补丁与 git diff --check 通过；本机随机凭据与跟踪文件比对通过，.env/.local/数据库未入库。
 
 ## Git 与接续
 
-开始时工作区干净，#1/#2/#3 均 OPEN，未合并。本轮从 f108a2f 创建独立分支，PR base 为 codex/i01-engineering-foundation，只审阅第 4 步增量。合并仍需用户另行授权，后续按顺序核对 base/diff。
+开始时工作区干净，#1/#2/#3 均 OPEN，未合并。本轮从 f108a2f 创建独立分支，[PR #4](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/pull/4) base 为 codex/i01-engineering-foundation，只审阅第 4 步增量。实现提交 be36091，最终文档提交以 git log 为准。合并仍需用户另行授权，后续按顺序核对 base/diff。
 
-预览继续使用本机 3000/8000 与便携 PG 55432；重启和升级先运行 alembic upgrade head。PID 文件在 .local/preview-pids.json（忽略入库）。测试使用 3001/8001，禁止复用可能过期的预览进程。
+本机预览已升级到 0002_sessions 并启动于 http://127.0.0.1:3000，API 8000 的 ready=200，便携 PG 55432；无生产部署。重启和升级先运行 alembic upgrade head。PID 文件在 .local/preview-pids.json（忽略入库）。测试使用 3001/8001，禁止复用可能过期的预览进程。
 
 ## 下一轮（必须等待确认）
 

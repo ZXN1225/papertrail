@@ -7,7 +7,6 @@
 | GET /health/live | 200 alive，不依赖数据库 |
 | GET /health/ready | 200 ready 或 503 not_ready，checks.database/redis 表示依赖状态 |
 | GET /platform/status | 正常时 200 foundation/not_initialized、recommendation_available=false、data_version=null；依赖异常 503 标准错误 |
-
 | POST /sessions | 首次签发匿名身份，已有有效 cookie 则复用；返回 expires_at/csrf_token/profile |
 | GET /sessions/current | 恢复当前会话和最新画像；不存在/过期为 404，不自动创建 |
 | POST /sessions/reset | 校验 CSRF，事务内删除旧内容并创建空会话，旧 cookie 立即失效 |

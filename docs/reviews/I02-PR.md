@@ -12,7 +12,9 @@
 
 ## 验证
 
-本机真实 PostgreSQL：30 项后端、15 项浏览器流程通过（375/768/1440）。检查覆盖严格金额、身份/Origin/CSRF、跨会话 404、历史、模式切换、并发、过期/删除、限流与故障。截图已检查。最终 CI/格式/类型/构建/审计结果见 PR 检查与 docs/PROGRESS.md；不以 workflow 文件存在冒充通过。
+本机真实 PostgreSQL：30 项后端、15 项浏览器流程通过（375/768/1440）。检查覆盖严格金额、身份/Origin/CSRF、跨会话 404、历史、模式切换、并发、过期/删除、限流与故障。截图已检查；格式、类型、构建、契约生成、记录检查与审计通过。
+
+[完整 CI 运行](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35533228341) 全部通过，真实 PostgreSQL/Redis 下 30 项后端与 15 项 E2E 均成功，契约重生成无差异，依赖审计未检出已知漏洞。该运行对应实现提交 be36091；文档同步后的状态以 PR 当前检查为准。
 
 测试使用 synthetic=true 的 TEST-I02 场景，未导入商品或报价。本机无 Redis 成功连接验证，完整 PG/Redis 由 CI 实测。
 
