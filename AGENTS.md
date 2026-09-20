@@ -19,6 +19,7 @@
 
 ## 当前有效检查
 - 根目录：`python scripts/check_foundation.py`
+- 根目录：`python scripts/check_source_review.py`（仅研究记录一致性，不验证来源授权）
 - 根目录：`git diff --check`
 
 后端 pytest/ruff、前端类型/构建、数据库集成和 E2E 入口在 P1 实现后才登记，不以占位命令声称可用。详细验收见 `docs/EXECUTION_PLAN.md`。
