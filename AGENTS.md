@@ -31,3 +31,5 @@
 I02：E2E 通过 tools.serve_e2e 强制 test_* 数据库和独立 8001/3001 端口，不复用用户预览。画像改动覆盖真实 PG 的身份/Origin/CSRF/版本冲突/过期/删除反例。会话设计与过期清理命令见 `docs/sessions.md`；数据库迁移后同步 Dependencies 的 SCHEMA_REVISION。
 
 启动与环境前置见 `docs/development.md`。CI 使用真实 PG/Redis、锁定安装并核对 OpenAPI 生成差异。详细验收见 `docs/EXECUTION_PLAN.md`、`docs/research/I01-acceptance.md`。
+
+T03：管理 API/CLI 复用 app/ingestion/service.py；独立管理员 Bearer，未配置禁用。synthetic 导入只接受 APP_ENV=test 与 test_* 库。预览/审核/发布绑定内容哈希和父版本；保留冻结历史，不直接修改已发布目录。导入命令、outbox 和真实资料阻塞见 docs/manual-imports.md；原始 token 不放命令参数或 Git。

@@ -530,7 +530,8 @@ def test_openapi_documents_records_without_exposing_import_routes():
     ).openapi()
     assert "CatalogOffer" in schema["components"]["schemas"]
     assert "CatalogSKU" in schema["components"]["schemas"]
-    assert not any("imports" in path or "catalog" in path for path in schema["paths"])
+    assert "/api/v1/catalog/products" not in schema["paths"]
+    assert "/api/v1/admin/imports" in schema["paths"]
 
 
 @pytest.mark.integration

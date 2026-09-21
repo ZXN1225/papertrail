@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.common.config import Settings
 from app.common.contracts import DependencyChecks, ReadyResponse
 
-SCHEMA_REVISION = "0003_catalog"
+SCHEMA_REVISION = "0004_imports"
 
 
 class Dependencies:

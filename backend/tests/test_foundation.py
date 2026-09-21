@@ -30,7 +30,9 @@ def test_live_is_independent_but_ready_requires_database():
         assert response.json()["error"]["code"] == "DEPENDENCY_UNAVAILABLE"
         assert response.headers["X-Request-ID"] == response.json()["error"]["request_id"]
         assert response.headers["Cache-Control"] == "no-store"
-        assert client.post("/api/v1/admin/imports").status_code == 404
+        response = client.post("/api/v1/admin/imports")
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "ADMIN_DISABLED"
 
 
 def test_database_outage_is_503_and_does_not_leak_credentials():

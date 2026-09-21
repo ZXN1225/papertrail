@@ -2,7 +2,7 @@
 
 面向中国大陆市场，以预算、用途和偏好为输入，逐步构建可追溯的笔记本精确 SKU 推荐与经过规则校验的 PC 装机清单。
 
-**当前步骤 05 / T02：商品、来源、证据、事实与报价的 13 张领域表和强类型契约已实现。三入口与需求保存继续可用；真实商品、报价和推荐尚未开放。完成后等待用户确认 T03。**
+**当前步骤 06 / T03：人工导入、预览、审核、原子发布与通知重试的功能已实现。真实样本仍待授权资料验收；公开目录、报价选择和推荐尚未开放。本轮结束后等待确认。**
 
 ## 本地运行
 
@@ -24,7 +24,8 @@ uv run --directory backend --frozen uvicorn app.main:create_app --factory --host
 ## 文档与验证
 
 - [完整执行计划](docs/EXECUTION_PLAN.md)、[任务台账](docs/TASKS.md)、[进度与验证记录](docs/PROGRESS.md)。
-- [T02 模型与关系图](docs/catalog-model.md)、[T02 验收](docs/research/T02-acceptance.md)、[本轮 PR 说明](docs/reviews/T02-PR.md)、[版本矩阵](docs/runtime-matrix.md)；前轮记录保留于历史文档。
+- [人工导入操作与边界](docs/manual-imports.md)、[流程演示结果](docs/reviews/T03-demo.md)、[T03 验收](docs/research/T03-acceptance.md)、[本轮 PR 说明](docs/reviews/T03-PR.md)。
+- [商品模型](docs/catalog-model.md)、[版本矩阵](docs/runtime-matrix.md)；前轮记录保留于历史文档。
 - [来源可行性核验](docs/research/V01-source-feasibility.md)、[人工报价路径](docs/manual-offer-workflow.md)。D01—D03 仍阻塞真实数据发布。
 - [原始规格](docs/PROJECT_SPEC.md)、[架构决策](docs/adr/README.md)、[数据字典](docs/data-dictionary.md)、[来源登记](docs/data-sources.md)、[API 边界](docs/api-contract.md)、[生成的 OpenAPI](docs/openapi.json)。
 
@@ -36,7 +37,7 @@ Agent 后续负责理解需求、调用受控工具和解释证据；价格、�
 
 | 目录 | 当前职责 |
 |---|---|
-| backend/ | FastAPI、配置、依赖检查、Alembic 基线和测试 |
+| backend/ | FastAPI、会话与导入领域服务、PG 迁移、管理员 CLI 和测试 |
 | web/ | 中文首页、草稿、生成的 API 类型、浏览器测试 |
 | deploy/ | 开发 PG/Redis Compose；生产部署留待 P7 |
 | scripts/ | 记录检查、开发配置生成、便携 PG 启动 |

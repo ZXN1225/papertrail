@@ -13,6 +13,8 @@ from app.catalog.contracts import RECORD_MODELS
 from app.common.config import Settings
 from app.common.contracts import ErrorResponse, LiveResponse, PlatformStatus, ReadyResponse
 from app.common.dependencies import Dependencies
+from app.ingestion.auth import AdminProtection
+from app.ingestion.router import router as import_router
 from app.profiles.protection import WriteProtection
 from app.profiles.router import router as profile_router
 from app.profiles.service import DomainError
@@ -44,6 +46,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.openapi = record_openapi
     app.include_router(profile_router)
+    app.include_router(import_router)
+    app.add_middleware(AdminProtection, settings=settings)
     app.add_middleware(
         WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])
     )
@@ -51,7 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.origins,
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "X-CSRF-Token"],
+        allow_headers=["Content-Type", "X-CSRF-Token", "Authorization"],
         allow_credentials=True,
     )
 
@@ -145,7 +149,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     }
                 },
             )
-        # Catalog schema/imports arrive in T02-T04. This describes capability, not catalog counts.
+        # Public catalog arrives in T04. This describes capability, not import/version counts.
         return PlatformStatus()
 
     return app

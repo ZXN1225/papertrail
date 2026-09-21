@@ -1,6 +1,6 @@
 # API 交付边界
 
-**I01 健康/状态接口及 I02 会话/画像接口已实现，其余为后续计划。** 服务代码导出 [OpenAPI](openapi.json)，前端类型由契约生成；本文只记录边界，不维护第二份完整 Schema。
+**I01 健康/状态、I02 会话/画像与 T03 管理员导入接口已实现，其余为后续计划。** 服务代码导出 [OpenAPI](openapi.json)，前端类型由契约生成；本文只记录边界，不维护第二份完整 Schema。
 
 | 已实现接口（均带 /api/v1 前缀） | 语义 |
 |---|---|
@@ -16,7 +16,17 @@
 | GET /profiles/{id}/revisions/{revision} | 当前会话的不可变历史快照 |
 | PATCH /profiles/{id} | expected_revision + patch；保留未修改字段，冲突 409，不自动覆盖 |
 
-0003_catalog 在会话表基础上建立空商品/证据领域表；not_initialized 描述未具备目录能力。OpenAPI components.schemas 中的 Catalog* 是 T02 记录契约，尚无导入/目录端点。ready 不是可推荐状态。生产缺关键配置启动失败；开发 Redis 未配置时返回 disabled。
+0004_imports 在商品/证据领域表基础上建立版本发布表；not_initialized 描述公开目录能力尚未开放。Catalog*、Import* 等契约由服务生成。ready 不是可推荐状态。生产缺关键配置启动失败；开发 Redis 未配置时返回 disabled。
+
+| 管理员接口（/api/v1/admin 前缀） | 语义 |
+|---|---|
+| POST /imports/preview | 不持久化的逐行验证、差异、冲突与发布门禁预览 |
+| POST /imports | 幂等暂存，含快照哈希、问题与检查点 |
+| GET /imports/{id} | 恢复持久任务与预览 |
+| POST /imports/{id}/review | 绑定内容哈希/父版本、说明与事实选择；批准或拒绝 |
+| POST /imports/{id}/publish | 批准后重验，原子追加并切换版本；重试返回原版本 |
+
+管理接口使用独立 HTTP Bearer，不接受普通会话 cookie；未配置 503，无凭据/错误凭据 401。写请求 JSON、最多 1 MiB/500 行，管理员每分钟 30 次；浏览器校验 Origin。CLI 共用同一服务；操作规范与单管理员、人工整批等边界见 [manual-imports.md](manual-imports.md)。公开目录 API 仍未提供。
 
 会话写接口要求 application/json、精确 Origin；除首次 bootstrap 外还要求 X-CSRF-Token 与 cookie 匹配。JSON 请求体最大 16 KiB，超限 413；非 JSON 415；来源/CSRF 拒绝 403。服务从 cookie 推导 owner，输入额外字段（如 owner_id）422。预算为严格整数分，范围 1—1,000,000,000；不接收浮点数、字符串或布尔值。画像字段、模式切换和来源元数据边界见 [会话设计](sessions.md)。
 

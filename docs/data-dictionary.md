@@ -23,3 +23,5 @@
 关系主线：source → document → evidence → spec_fact → SKU；listing → offer_snapshot → recommendation_item；recommendation 保存画像、数据/规则/评分/报价版本。会话状态、公开知识、长期偏好分离，MVP 不实现自动长期记忆。
 
 MVP 组合：单 CPU/主板/电源/机箱、一套内存、1 SSD、0/1 GPU，散热按包装证据区分自带与单购。内存套装数与条数分开。单零件查询无整机背景时返回“未检查整机”。
+
+T03 已实现人工导入的任务快照/问题、管理员审核、冻结 dataset_versions、独立 dataset_pointers、类型化 canonical_specs、publication_outbox 和幂等 dataset_notifications。参考 [事务发布语义](manual-imports.md)。外部原文下载/存储、来源撤销和商品元数据修订、外部知识索引仍未实现；通知 delivered 仅表示写入持久通知表。

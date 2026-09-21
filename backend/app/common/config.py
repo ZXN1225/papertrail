@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     llm_provider: Literal["disabled"] = "disabled"
     session_write_limit: int = Field(default=60, ge=1, le=600)
+    admin_auth_config: SecretStr = SecretStr("")
 
     @field_validator("database_url")
     @classmethod
