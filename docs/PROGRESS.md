@@ -16,11 +16,14 @@
 - 本机真实 PostgreSQL：94 项后端通过，无跳过。覆盖 I02 会话回归，以及升级/重复升级/降级/重建保留画像、有效证据链、重复精确身份、地区/配置差异、错 SKU 证据、无来源、单位/类别、缺失值、费用、时间和合成隔离。第三方测试客户端两项弃用警告保留。
 - 真实 API 浏览器 15 项通过，375/768/1440；本轮未改变界面布局。测试使用独立 test_* 库和 3001/8001，未复用用户预览。商品测试记录均 synthetic=true、TEST-*。
 - ruff 检查/格式、前端格式/类型/生产构建、OpenAPI/类型生成通过。pip-audit 与 pnpm audit 未检出已知漏洞。
-- 本机 Redis 显式关闭；完整 PG/Redis 的本轮 CI 结果待推送后记录，不以旧轮 CI 代替。
+- [本轮完整 CI](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35577363494) 已通过（实现提交 02bb622），包含真实 PG/Redis、94 项后端、15 项浏览器回归、锁定安装、契约生成无差异及依赖审计。本机 Redis 显式关闭，成功连接验证来自 CI。文档提交后的最终结果以 PR 当前检查为准。
+- 基础与来源记录一致性检查、git diff --check 通过；.env/.local/数据库与依赖目录未入库。记录一致性检查不等于来源授权。
 
 ## Git 与接续
 
-本轮基于 I02 已确认内容，保护中断前已有改动。#1—#4 仍 OPEN、未合并；T02 的 PR base 为 codex/i02-sessions-profiles，只审查第 5 步增量。未合并、未生产部署。
+本轮基于 I02 已确认内容，保护中断前已有改动。#1—#4 仍 OPEN、未合并；[PR #5](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/pull/5) base 为 codex/i02-sessions-profiles，只审查第 5 步增量。实现提交 02bb622；未合并、未生产部署。
+
+本地开发库已升级到 0003_catalog，确认 13 张领域表合计 0 行。首页 http://127.0.0.1:3000 返回 200；API 8000 ready=200、recommendation_available=false，/openapi.json 包含 13 个 Catalog schemas；/docs 可查看模型。预览进程后台运行，PID 位于忽略入库的 .local/preview-pids.json；重启按 development.md 操作。
 
 ## 下一轮（必须等待确认）
 

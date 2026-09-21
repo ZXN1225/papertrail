@@ -4,7 +4,7 @@
 
 0003_catalog 为冻结、自包含迁移，保留 I02 会话表；ready 要求新版本。OpenAPI Catalog* schemas 与前端类型同步，无新增目录或导入端点。详细字段、ER 图、约束和实现边界见 docs/catalog-model.md。
 
-本机真实 PG 后端 94 项通过，含升级/重复升级/降级重建后画像保留及负面约束；真实 API 浏览器 15 项通过。ruff、格式、类型、生产构建、契约生成及依赖审计通过。测试使用 test_* 库及 synthetic=true/TEST-* 记录，无真实数据导入。本轮 CI 结果在推送后记录。
+本机真实 PG 后端 94 项通过，含升级/重复升级/降级重建后画像保留及负面约束；真实 API 浏览器 15 项通过。ruff、格式、类型、生产构建、契约生成及依赖审计通过。测试使用 test_* 库及 synthetic=true/TEST-* 记录，无真实数据导入。[本轮完整 CI](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35577363494) 已通过（实现提交 02bb622），真实 PG/Redis 下 94 项后端、15 项 E2E 及全部检查成功；文档提交后的最终状态以 PR 当前检查为准。
 
 base 为 codex/i02-sessions-profiles（PR #4），起点 f7dc2b2；前四轮尚未合并，只评审本轮增量。没有生产部署、合并、数据发布、当前报价选择、预算或推荐能力。来源许可/精确资料/真实报价阻塞保持；配置指纹生成和导入/审核/发布在 T03，报价服务在 T05。
 
