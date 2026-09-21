@@ -17,6 +17,7 @@ class WriteProtection:
                 "/api/v1/profiles",
                 "/api/v1/compatibility",
                 "/api/v1/recommendations",
+                "/api/v1/agent",
             )
         )
         if scope["type"] != "http" or not private or scope["method"] in {"GET", "HEAD", "OPTIONS"}:

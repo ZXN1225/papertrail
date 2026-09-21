@@ -2441,6 +2441,97 @@
         }
       }
     },
+    "/api/v1/agent/preview": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Preview",
+        "operationId": "preview_agent_run",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPreviewResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "summary": "Live",
@@ -2518,6 +2609,107 @@
   },
   "components": {
     "schemas": {
+      "AgentPreviewRequest": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Profile Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Profile Revision"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "profile_id",
+          "profile_revision",
+          "message"
+        ],
+        "title": "AgentPreviewRequest"
+      },
+      "AgentPreviewResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "clarifying",
+              "partial",
+              "failed",
+              "timed_out",
+              "provider_disabled"
+            ],
+            "title": "Status"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Profile Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "tool_calls_used": {
+            "type": "integer",
+            "title": "Tool Calls Used"
+          },
+          "decision_rounds_used": {
+            "type": "integer",
+            "title": "Decision Rounds Used"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ToolObservation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "pending_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Question"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "profile_id",
+          "profile_revision",
+          "tool_calls_used",
+          "decision_rounds_used",
+          "observations"
+        ],
+        "title": "AgentPreviewResponse"
+      },
       "CatalogPage": {
         "properties": {
           "items": {
@@ -5570,6 +5762,91 @@
           "excerpt_hash"
         ],
         "title": "SourceReference"
+      },
+      "ToolObservation": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "search_catalog",
+              "get_product_facts",
+              "get_offers",
+              "rank_laptops",
+              "solve_pc_builds",
+              "check_compatibility"
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "partial",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Data"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Fields"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "deduplicated": {
+            "type": "boolean",
+            "title": "Deduplicated",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "data",
+          "evidence_ids",
+          "missing_fields"
+        ],
+        "title": "ToolObservation"
       },
       "CatalogAlias": {
         "additionalProperties": false,

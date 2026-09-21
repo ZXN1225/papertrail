@@ -397,6 +397,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_agent_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -452,6 +469,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentPreviewRequest */
+        AgentPreviewRequest: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Profile Revision */
+            profile_revision: number;
+            /** Message */
+            message: string;
+        };
+        /** AgentPreviewResponse */
+        AgentPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "clarifying" | "partial" | "failed" | "timed_out" | "provider_disabled";
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Profile Revision */
+            profile_revision: number;
+            /** Tool Calls Used */
+            tool_calls_used: number;
+            /** Decision Rounds Used */
+            decision_rounds_used: number;
+            /** Observations */
+            observations: components["schemas"]["ToolObservation"][];
+            /** Pending Question */
+            pending_question?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
         /** CatalogPage */
         CatalogPage: {
             /** Items */
@@ -1529,6 +1583,36 @@ export interface components {
             locator: string;
             /** Excerpt Hash */
             excerpt_hash: string;
+        };
+        /** ToolObservation */
+        ToolObservation: {
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "search_catalog" | "get_product_facts" | "get_offers" | "rank_laptops" | "solve_pc_builds" | "check_compatibility";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial" | "error";
+            /** Data */
+            data: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Missing Fields */
+            missing_fields: string[];
+            /** Data Version */
+            data_version?: string | null;
+            /** Error Code */
+            error_code?: string | null;
+            /**
+             * Deduplicated
+             * @default false
+             */
+            deduplicated: boolean;
         };
         /** CatalogAlias */
         CatalogAlias: {
@@ -4036,6 +4120,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_agent_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPreviewResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Entity */

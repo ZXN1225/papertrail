@@ -18,7 +18,7 @@
 | T09 | PC 有界求解 | T05、T07 | 步骤 11 / §12；research/T09-acceptance.md | done |
 | T10 | 快照保存、修订、比较、导出 | T08、T09、T11 | 步骤 12；research/T10-acceptance.md | done |
 | T11 | 画像 patch、revision 与会话状态 | I02 | 步骤 04 基础完成；Agent 状态机在 P5 扩充 / §6 | done |
-| T12 | 工具协议、Harness、模型适配 | T10、T11 | 步骤 13 / §6—7 | todo |
+| T12 | 工具协议、Harness、模型适配 | T10、T11 | 步骤 13 / §6—7；research/T12-acceptance.md | done |
 | T13 | 审核手册摄取、BM25、引用 | T03 | 步骤 14 / §10 | todo |
 | T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13 | todo |
 | T15 | PC/笔记本/单零件界面、后台、E2E | T10、T14 | 步骤 15 | todo |

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic.json_schema import models_json_schema
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.agent.router import router as agent_router
 from app.catalog.contracts import RECORD_MODELS
 from app.catalog.read_service import CatalogReadService
 from app.catalog.router import router as catalog_router
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(catalog_router)
     app.include_router(compatibility_router)
     app.include_router(recommendation_router)
+    app.include_router(agent_router)
     app.add_middleware(AdminProtection, settings=settings)
     app.add_middleware(
         WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])
