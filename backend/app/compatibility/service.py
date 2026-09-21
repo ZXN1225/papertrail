@@ -2,12 +2,13 @@
 # ruff: noqa: E501
 
 import re
+from math import ceil
 
 from app.compatibility.contracts import RuleResult
 from app.profiles.service import DomainError
 
 RULE_VERSION = "compat-v1"
-UNEXECUTED = ["C004", "C005", "C006", "C007", "C008", "C009", "C010", "C011", "C012"]
+UNEXECUTED = []
 
 
 def _normalized(value):
@@ -42,11 +43,12 @@ class CompatibilityService:
         return candidates[0] if len(candidates) == 1 else None
 
     @staticmethod
-    def _result(rule_id, status, message, facts=(), **details):
+    def _result(rule_id, status, message, facts=(), blocking=True, **details):
         return RuleResult(
             rule_id=rule_id,
             status=status,
             message=message,
+            blocking=blocking,
             fact_ids=[fact["id"] for fact in facts if fact],
             details=details,
         ).model_dump()
@@ -201,18 +203,255 @@ class CompatibilityService:
             total_capacity_gib=total_capacity,
         )
 
+    def _c_simple(self, rule_id, products, required, comparator):
+        selected = [products.get(slot) for slot in required]
+        if any(item is None for item in selected):
+            return self._result(rule_id, "unknown", "缺少该规则所需零件。", missing_slots=required)
+        facts = [self._unconditional(item["facts"], key) for item, key in comparator["facts"]]
+        if any(fact is None for fact in facts):
+            return self._result(
+                rule_id,
+                "unknown",
+                "缺少该规则所需的已选择规格事实。",
+                missing_fields=[key for _, key in comparator["facts"]],
+            )
+        values = [fact["value"] for fact in facts]
+        passed, details = comparator["check"](*values)
+        return self._result(
+            rule_id,
+            "pass" if passed else "fail",
+            comparator["pass"] if passed else comparator["fail"],
+            facts,
+            **details,
+        )
+
+    def _additional(self, products):
+        def text_set(value):
+            return {_normalized(v) for v in value.split(",")} if isinstance(value, str) else set()
+
+        rules = []
+        rules.append(
+            self._c_simple(
+                "C004",
+                products,
+                ["motherboard", "case"],
+                {
+                    "facts": [
+                        (products.get("motherboard"), "form_factor"),
+                        (products.get("case"), "supported_form_factors"),
+                    ],
+                    "check": lambda board, case: (
+                        _normalized(board) in text_set(case),
+                        {"board_form_factor": board, "case_supported": case},
+                    ),
+                    "pass": "主板外形受机箱支持。",
+                    "fail": "机箱不支持主板外形。",
+                },
+            )
+        )
+        rules.append(
+            self._c_simple(
+                "C006",
+                products,
+                ["cpu", "cooler"],
+                {
+                    "facts": [
+                        (products.get("cpu"), "socket"),
+                        (products.get("cooler"), "supported_sockets"),
+                    ],
+                    "check": lambda socket, cooler: (
+                        _normalized(socket) in text_set(cooler),
+                        {"socket": socket, "cooler_supported": cooler},
+                    ),
+                    "pass": "散热器扣具支持 CPU socket。",
+                    "fail": "散热器扣具不支持 CPU socket。",
+                },
+            )
+        )
+        rules.append(
+            self._c_simple(
+                "C007",
+                products,
+                ["psu", "case"],
+                {
+                    "facts": [
+                        (products.get("psu"), "form_factor"),
+                        (products.get("case"), "supported_psu_form_factors"),
+                    ],
+                    "check": lambda psu, case: (
+                        _normalized(psu) in text_set(case),
+                        {"psu_form_factor": psu, "case_supported": case},
+                    ),
+                    "pass": "电源外形受机箱支持。",
+                    "fail": "机箱不支持电源外形。",
+                },
+            )
+        )
+        rules.append(
+            self._c_simple(
+                "C005",
+                products,
+                ["gpu", "case"],
+                {
+                    "facts": [
+                        (products.get("gpu"), "length_mm"),
+                        (products.get("case"), "max_gpu_length_mm"),
+                    ],
+                    "check": lambda gpu, case: (
+                        isinstance(gpu, int) and isinstance(case, int) and gpu <= case,
+                        {"gpu_length_mm": gpu, "case_max_gpu_length_mm": case},
+                    ),
+                    "pass": "显卡长度受当前机箱布局支持。",
+                    "fail": "显卡长度超过当前机箱限制。",
+                },
+            )
+        )
+        rules.append(
+            self._c_simple(
+                "C009",
+                products,
+                ["storage", "motherboard"],
+                {
+                    "facts": [
+                        (products.get("storage"), "interface"),
+                        (products.get("motherboard"), "supported_storage_interfaces"),
+                    ],
+                    "check": lambda storage, board: (
+                        _normalized(storage) in text_set(board),
+                        {"storage_interface": storage, "board_supported": board},
+                    ),
+                    "pass": "存储协议受主板支持。",
+                    "fail": "主板不支持该存储协议。",
+                },
+            )
+        )
+        rules.append(
+            self._c_simple(
+                "C010",
+                products,
+                ["cpu", "motherboard"],
+                {
+                    "facts": [
+                        (products.get("cpu"), "integrated_graphics"),
+                        (products.get("motherboard"), "video_output_count"),
+                    ],
+                    "check": lambda igpu, outputs: (
+                        bool(igpu) and isinstance(outputs, int) and outputs > 0,
+                        {"integrated_graphics": igpu, "video_output_count": outputs},
+                    ),
+                    "pass": "无独显时 CPU 核显与主板输出可用。",
+                    "fail": "无独显时没有已核验的可用显示输出。",
+                },
+            )
+        )
+        return rules
+
+    def _c008(self, products):
+        cpu, psu = products.get("cpu"), products.get("psu")
+        gpu = products.get("gpu")
+        if not cpu or not psu:
+            return self._result("C008", "unknown", "缺少 CPU 或电源，无法检查功率与连接器。")
+        facts = [
+            self._unconditional(cpu["facts"], "max_power_w"),
+            self._unconditional(psu["facts"], "rated_power_w"),
+        ]
+        if gpu:
+            facts += [
+                self._unconditional(gpu["facts"], "board_power_w"),
+                self._unconditional(gpu["facts"], "required_pcie_connector_count"),
+                self._unconditional(psu["facts"], "pcie_connector_count"),
+            ]
+        if any(fact is None or not isinstance(fact["value"], int) for fact in facts):
+            return self._result("C008", "unknown", "缺少精确功率或 PCIe 连接器事实。")
+        cpu_power, psu_power = facts[0]["value"], facts[1]["value"]
+        gpu_power, required_connectors, available_connectors = (
+            (0, 0, 0) if not gpu else (facts[2]["value"], facts[3]["value"], facts[4]["value"])
+        )
+        required_power = ceil((cpu_power + gpu_power + 75) * 1.25)
+        passed = psu_power >= required_power and available_connectors >= required_connectors
+        return self._result(
+            "C008",
+            "pass" if passed else "fail",
+            "电源功率和连接器满足保守估算。" if passed else "电源功率或 PCIe 连接器不足。",
+            facts,
+            required_power_w=required_power,
+            rated_power_w=psu_power,
+            required_pcie_connectors=required_connectors,
+            available_pcie_connectors=available_connectors,
+        )
+
+    def _c011(self, products, requirements):
+        if not requirements:
+            return self._result(
+                "C011", "warning", "没有明确的 Wi-Fi、USB 或扩展槽硬需求。", blocking=False
+            )
+        board = products.get("motherboard")
+        if not board:
+            return self._result("C011", "unknown", "缺少主板，无法检查明确硬需求。")
+        key_map = {"wifi": "wifi", "usb_ports": "usb_port_count", "pcie_slots": "pcie_slot_count"}
+        facts = {name: self._unconditional(board["facts"], key_map[name]) for name in requirements}
+        if any(fact is None for fact in facts.values()):
+            return self._result(
+                "C011",
+                "unknown",
+                "缺少明确硬需求对应的主板规格事实。",
+                missing_requirements=list(requirements),
+            )
+        passed = all(
+            (
+                facts[name]["value"] is value
+                if isinstance(value, bool)
+                else isinstance(facts[name]["value"], int) and facts[name]["value"] >= value
+            )
+            for name, value in requirements.items()
+        )
+        return self._result(
+            "C011",
+            "pass" if passed else "fail",
+            "主板满足明确硬需求。" if passed else "主板不满足明确硬需求。",
+            list(facts.values()),
+            requirements=requirements,
+        )
+
+    def _c012(self, products):
+        required = {"cpu", "motherboard", "memory", "storage", "psu", "case"}
+        missing = sorted(required - set(products))
+        if missing:
+            return self._result("C012", "unknown", "清单缺少必要零件。", missing_slots=missing)
+        cpu = products["cpu"]
+        bundled = self._unconditional(cpu["facts"], "includes_cooler")
+        if bundled is None:
+            return self._result("C012", "unknown", "缺少 CPU 是否自带散热器的包装事实。")
+        if bundled["value"] is False and "cooler" not in products:
+            return self._result("C012", "fail", "CPU 不含散热器且清单未提供散热器。", [bundled])
+        return self._result(
+            "C012", "pass", "必要零件和散热器状态完整。", [bundled], bundled_cooler=bundled["value"]
+        )
+
     def check(self, request):
         products, version = self._load(request)
-        results = [
-            self._c001(products),
-            self._c002(products, request.bios_version),
-            self._c003(products),
-        ]
+        results = (
+            [
+                self._c001(products),
+                self._c002(products, request.bios_version),
+                self._c003(products),
+            ]
+            + self._additional(products)
+            + [
+                self._c008(products),
+                self._c011(products, request.hard_requirements),
+                self._c012(products),
+            ]
+        )
+        failures = any(result["status"] == "fail" for result in results)
+        unknowns = any(result["blocking"] and result["status"] == "unknown" for result in results)
         return {
             "rule_version": RULE_VERSION,
             "status": "incompatible"
-            if any(result["status"] == "fail" for result in results)
-            else "needs_verification",
+            if failures
+            else "needs_verification"
+            if unknowns
+            else "validated",
             "results": results,
             "unexecuted_rule_ids": UNEXECUTED,
             "data_version": version,

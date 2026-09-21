@@ -13,8 +13,9 @@ from pydantic import (
 
 from app.common.contracts import Contract
 
-Slot = Literal["cpu", "motherboard", "memory"]
+Slot = Literal["cpu", "motherboard", "gpu", "memory", "storage", "psu", "case", "cooler"]
 RuleStatus = Literal["pass", "fail", "unknown", "warning"]
+RequirementName = Literal["wifi", "usb_ports", "pcie_slots"]
 
 
 class CompatibilityItem(Contract):
@@ -24,8 +25,9 @@ class CompatibilityItem(Contract):
 
 
 class CompatibilityRequest(Contract):
-    items: Annotated[list[CompatibilityItem], Field(min_length=1, max_length=3)]
+    items: Annotated[list[CompatibilityItem], Field(min_length=1, max_length=8)]
     bios_version: Annotated[StrictStr, Field(min_length=1, max_length=50)] | None = None
+    hard_requirements: dict[RequirementName, StrictInt | StrictBool] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def slots_are_unique(self):
@@ -38,7 +40,20 @@ class CompatibilityRequest(Contract):
 
 
 class RuleResult(Contract):
-    rule_id: Literal["C001", "C002", "C003"]
+    rule_id: Literal[
+        "C001",
+        "C002",
+        "C003",
+        "C004",
+        "C005",
+        "C006",
+        "C007",
+        "C008",
+        "C009",
+        "C010",
+        "C011",
+        "C012",
+    ]
     rule_version: Literal["compat-v1"] = "compat-v1"
     status: RuleStatus
     blocking: StrictBool = True
@@ -49,10 +64,8 @@ class RuleResult(Contract):
 
 class CompatibilityReport(Contract):
     rule_version: Literal["compat-v1"] = "compat-v1"
-    status: Literal["incompatible", "needs_verification"]
+    status: Literal["validated", "incompatible", "needs_verification"]
     results: list[RuleResult]
-    unexecuted_rule_ids: list[
-        Literal["C004", "C005", "C006", "C007", "C008", "C009", "C010", "C011", "C012"]
-    ]
+    unexecuted_rule_ids: list[str] = []
     data_version: UUID
     generated_at: AwareDatetime

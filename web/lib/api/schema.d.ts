@@ -355,7 +355,7 @@ export interface components {
              * Slot
              * @enum {string}
              */
-            slot: "cpu" | "motherboard" | "memory";
+            slot: "cpu" | "motherboard" | "gpu" | "memory" | "storage" | "psu" | "case" | "cooler";
             /**
              * Sku Id
              * Format: uuid
@@ -379,11 +379,14 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "incompatible" | "needs_verification";
+            status: "validated" | "incompatible" | "needs_verification";
             /** Results */
             results: components["schemas"]["RuleResult"][];
-            /** Unexecuted Rule Ids */
-            unexecuted_rule_ids: ("C004" | "C005" | "C006" | "C007" | "C008" | "C009" | "C010" | "C011" | "C012")[];
+            /**
+             * Unexecuted Rule Ids
+             * @default []
+             */
+            unexecuted_rule_ids: string[];
             /**
              * Data Version
              * Format: uuid
@@ -401,6 +404,10 @@ export interface components {
             items: components["schemas"]["CompatibilityItem"][];
             /** Bios Version */
             bios_version?: string | null;
+            /** Hard Requirements */
+            hard_requirements?: {
+                [key: string]: number | boolean;
+            };
         };
         /** DependencyChecks */
         DependencyChecks: {
@@ -1061,7 +1068,7 @@ export interface components {
              * Rule Id
              * @enum {string}
              */
-            rule_id: "C001" | "C002" | "C003";
+            rule_id: "C001" | "C002" | "C003" | "C004" | "C005" | "C006" | "C007" | "C008" | "C009" | "C010" | "C011" | "C012";
             /**
              * Rule Version
              * @default compat-v1

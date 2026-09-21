@@ -2099,7 +2099,12 @@
             "enum": [
               "cpu",
               "motherboard",
-              "memory"
+              "gpu",
+              "memory",
+              "storage",
+              "psu",
+              "case",
+              "cooler"
             ],
             "title": "Slot"
           },
@@ -2135,6 +2140,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "validated",
               "incompatible",
               "needs_verification"
             ],
@@ -2149,21 +2155,11 @@
           },
           "unexecuted_rule_ids": {
             "items": {
-              "type": "string",
-              "enum": [
-                "C004",
-                "C005",
-                "C006",
-                "C007",
-                "C008",
-                "C009",
-                "C010",
-                "C011",
-                "C012"
-              ]
+              "type": "string"
             },
             "type": "array",
-            "title": "Unexecuted Rule Ids"
+            "title": "Unexecuted Rule Ids",
+            "default": []
           },
           "data_version": {
             "type": "string",
@@ -2181,7 +2177,6 @@
         "required": [
           "status",
           "results",
-          "unexecuted_rule_ids",
           "data_version",
           "generated_at"
         ],
@@ -2194,7 +2189,7 @@
               "$ref": "#/components/schemas/CompatibilityItem"
             },
             "type": "array",
-            "maxItems": 3,
+            "maxItems": 8,
             "minItems": 1,
             "title": "Items"
           },
@@ -2210,6 +2205,27 @@
               }
             ],
             "title": "Bios Version"
+          },
+          "hard_requirements": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "wifi",
+                "usb_ports",
+                "pcie_slots"
+              ]
+            },
+            "type": "object",
+            "title": "Hard Requirements"
           }
         },
         "additionalProperties": false,
@@ -4174,7 +4190,16 @@
             "enum": [
               "C001",
               "C002",
-              "C003"
+              "C003",
+              "C004",
+              "C005",
+              "C006",
+              "C007",
+              "C008",
+              "C009",
+              "C010",
+              "C011",
+              "C012"
             ],
             "title": "Rule Id"
           },

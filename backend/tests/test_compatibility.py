@@ -81,8 +81,8 @@ def check(products, cpu, board, memory, **extra):
 def test_all_core_rules_pass_but_remaining_rules_require_verification():
     products, cpu, board, memory = fixture()
     report = check(products, cpu, board, memory, bios_version="2.10")
-    assert [item["status"] for item in report["results"]] == ["pass", "pass", "pass"]
-    assert report["status"] == "needs_verification" and "C012" in report["unexecuted_rule_ids"]
+    assert [item["status"] for item in report["results"][:3]] == ["pass", "pass", "pass"]
+    assert report["status"] == "needs_verification"
 
 
 @pytest.mark.parametrize(
@@ -104,3 +104,43 @@ def test_same_socket_does_not_bypass_bios_unknown_or_too_old():
     old = check(products, cpu, board, memory, bios_version="2.9")
     assert unknown["results"][1]["status"] == "unknown"
     assert old["results"][1]["status"] == "fail" and old["status"] == "incompatible"
+
+
+def test_power_connectors_requirements_and_missing_cooler_are_not_waived():
+    products, cpu, board, memory = fixture()
+    psu, case, storage = uuid4(), uuid4(), uuid4()
+    products[str(cpu)]["facts"] += [fact("max_power_w", 120), fact("includes_cooler", False)]
+    products[str(board)]["facts"] += [
+        fact("wifi", True),
+        fact("usb_port_count", 8),
+        fact("pcie_slot_count", 2),
+    ]
+    version = products[str(cpu)]["data_version"]
+    products[str(psu)] = {
+        "id": psu,
+        "category": "psu",
+        "data_version": version,
+        "facts": [fact("rated_power_w", 400), fact("pcie_connector_count", 0)],
+    }
+    products[str(case)] = {"id": case, "category": "case", "data_version": version, "facts": []}
+    products[str(storage)] = {
+        "id": storage,
+        "category": "storage",
+        "data_version": version,
+        "facts": [],
+    }
+    request = CompatibilityRequest(
+        items=[
+            {"slot": "cpu", "sku_id": cpu},
+            {"slot": "motherboard", "sku_id": board},
+            {"slot": "memory", "sku_id": memory},
+            {"slot": "psu", "sku_id": psu},
+            {"slot": "case", "sku_id": case},
+            {"slot": "storage", "sku_id": storage},
+        ],
+        bios_version="2.10",
+        hard_requirements={"wifi": True, "usb_ports": 9},
+    )
+    report = CompatibilityService(Catalog(products)).check(request)
+    results = {item["rule_id"]: item["status"] for item in report["results"]}
+    assert results["C008"] == "pass" and results["C011"] == "fail" and results["C012"] == "fail"
