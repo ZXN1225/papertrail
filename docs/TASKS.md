@@ -23,6 +23,7 @@
 | T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13；research/T14-acceptance.md | done |
 | T15 | PC/笔记本/单零件界面、后台、E2E | T10、T14 | 步骤 15；research/T15-acceptance.md | done |
 | T16 | 金标评估、部署、恢复演练（A/B 分轮） | T15 | 步骤 16—17 / §16—17；research/T16-A-acceptance.md | in_progress |
+| T17 | 京东来源授权门禁与受控接入 | 用户确认京东为主要来源 | research/T17-jd-source-gate.md | blocked |
 
 详细交付、失败反例和确认点见 [完整执行计划](EXECUTION_PLAN.md)。跨任务接口变动先更新契约；一个 PR 聚焦一个可审查结果，不将所有阶段合并成一次提交。
 

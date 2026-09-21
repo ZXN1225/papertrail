@@ -1,0 +1,21 @@
+{
+  "record_kind": "source_gate_not_catalog",
+  "source_id": "jd_public_product_page",
+  "canonical_url": "https://www.jd.com/",
+  "checked_on": "2026-09-21",
+  "access_method": "public_page_research_only",
+  "permission_status": "restricted_pending_written_authorization",
+  "automated_ingestion_enabled": false,
+  "publication_enabled": false,
+  "public_display": false,
+  "excerpt_storage": false,
+  "allowed_fields": [],
+  "robots_outcome": "tool_error_not_permission",
+  "terms_evidence": [
+    "https://help.jd.com/user/issue/945-4583.html",
+    "https://help.jd.com/user/notice/detail-5d60c91bbd8e06f75b5d6160.html",
+    "https://help.jd.com/user/issue/965-3892.html"
+  ],
+  "release_condition": "written authorization or current API agreement explicitly permits requested read, storage, and public display scope",
+  "publishable": false
+}
