@@ -17,11 +17,11 @@
 - 本机真实 PostgreSQL：129 项后端通过，无跳过。覆盖 I02/T02 回归，以及迁移升级/回退、预览无写入、CLI/HTTP 完整流程、幂等/并发、审核冲突选择、旧版本保留、故障回滚、通知租约重试、权限/Origin/体积/限流、单位换算、测试命名空间与未发布引用隔离。第三方测试客户端两项弃用警告保留。
 - 真实 API 浏览器 15 项通过，375/768/1440；本轮未改变用户页面。测试固定 3001/8001 和独立 test_* 库，未复用预览；导入样例均 synthetic=true、TEST-*。
 - ruff 检查/格式、前端格式/类型/生产构建、OpenAPI/类型生成、基础与来源记录一致性检查、git diff --check 通过。pip-audit 与 pnpm audit 未检出已知漏洞；来源检查不等于来源授权。
-- 本地开发库已升至 0004_imports，dataset_versions=0；本机 Redis 显式关闭。完整 PG/Redis 的本轮 CI 待推送后记录，不使用旧轮 CI 代替。
+- [本轮完整 CI](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/actions/runs/35601771742) 已通过（实现提交 42b19a7），包含真实 PG/Redis、129 项后端、15 项浏览器回归、锁定安装、契约生成无差异及依赖审计。本地开发库已升至 0004_imports、dataset_versions=0；本机 Redis 显式关闭。文档提交后的最终结果以 PR 当前检查为准。
 
 ## Git 与接续
 
-本轮基于 T02 已确认内容，保护中断前已有改动。#1—#5 仍 OPEN、未合并；T03 的 PR base 为 codex/t02-evidence-data-model，只审查第 6 步增量。未合并、未生产部署。
+本轮基于 T02 已确认内容，保护中断前已有改动。#1—#5 仍 OPEN、未合并；[PR #6](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/pull/6) base 为 codex/t02-evidence-data-model，只审查第 6 步增量。实现提交 42b19a7；未合并、未生产部署。
 
 本地开发库已升级到 0004_imports，确认没有数据版本。首页 http://127.0.0.1:3000、API 8000 与 /docs 的最终重启验证在 PR 前完成；预览 PID 位于忽略入库的 .local/preview-pids.json。管理认证保持未配置，预览不接受导入。
 
