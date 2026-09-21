@@ -24,7 +24,7 @@
 
 ## Git 与接续
 
-本轮基于 T03 已确认内容，保护中断前已有改动。#1—#6 仍 OPEN、未合并；步骤 07 的 PR 以 #6 为 base，只审查本轮增量。未合并、未生产部署。
+本轮基于 T03 已确认内容，保护中断前已有改动。#1—#6 仍 OPEN、未合并；[PR #7](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/pull/7) 以 #6 为 base，只审查本轮增量。实现提交 74ada19；未合并、未生产部署。
 
 本地开发库已升级到 0004_imports，确认没有数据版本。首页 http://127.0.0.1:3000、API 8000 与 /docs 的最终重启验证在 PR 前完成；预览 PID 位于忽略入库的 .local/preview-pids.json。管理认证保持未配置，预览不接受导入。
 
