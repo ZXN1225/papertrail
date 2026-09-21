@@ -295,6 +295,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recommendations/pc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pc */
+        post: operations["solve_pc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -795,6 +812,124 @@ export interface components {
             /** Expected Revision */
             expected_revision: number;
             patch: components["schemas"]["ProfilePatch"];
+        };
+        /** PcCandidate */
+        PcCandidate: {
+            /** Items */
+            items: components["schemas"]["PcCandidateItem"][];
+            /** Total Minor */
+            total_minor: number;
+            /** Score */
+            score: number;
+            /** Evidence Coverage */
+            evidence_coverage: number;
+            compatibility: components["schemas"]["CompatibilityReport"];
+            /**
+             * Data Version
+             * Format: uuid
+             */
+            data_version: string;
+        };
+        /** PcCandidateItem */
+        PcCandidateItem: {
+            /**
+             * Slot
+             * @enum {string}
+             */
+            slot: "cpu" | "motherboard" | "gpu" | "memory" | "storage" | "psu" | "case" | "cooler";
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /** Offer Id */
+            offer_id: string | null;
+            /** Owned */
+            owned: boolean;
+            /** Total Minor */
+            total_minor: number | null;
+        };
+        /**
+         * PcFixedItem
+         * @description A confirmed exact SKU which the solver must retain.
+         */
+        PcFixedItem: {
+            /**
+             * Slot
+             * @enum {string}
+             */
+            slot: "cpu" | "motherboard" | "gpu" | "memory" | "storage" | "psu" | "case" | "cooler";
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+        };
+        /** PcSolveRequest */
+        PcSolveRequest: {
+            /**
+             * Region
+             * @default CN
+             */
+            region: string;
+            /** Budget Minor */
+            budget_minor: number;
+            /**
+             * Require Gpu
+             * @default false
+             */
+            require_gpu: boolean;
+            /** Bios Version */
+            bios_version?: string | null;
+            /** Excluded Brands */
+            excluded_brands?: string[];
+            /** Locked Items */
+            locked_items?: components["schemas"]["PcFixedItem"][];
+            /** Existing Items */
+            existing_items?: components["schemas"]["PcFixedItem"][];
+            /** Hard Requirements */
+            hard_requirements?: {
+                [key: string]: number | boolean;
+            };
+        };
+        /** PcSolveResponse */
+        PcSolveResponse: {
+            /**
+             * Score Version
+             * @default pc-score-v1
+             * @constant
+             */
+            score_version: "pc-score-v1";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "no_candidates" | "incomplete_search";
+            /**
+             * Search Status
+             * @enum {string}
+             */
+            search_status: "complete" | "time_limit" | "no_published_catalog";
+            /** Candidates */
+            candidates: components["schemas"]["PcCandidate"][];
+            /** Explored Count */
+            explored_count: number;
+            /** Pruned Count */
+            pruned_count: number;
+            /** Candidate Pool Version */
+            candidate_pool_version: string | null;
+            /**
+             * Optimality Proven
+             * @default false
+             * @constant
+             */
+            optimality_proven: false;
+            /** Blocking Constraints */
+            blocking_constraints: string[];
+            /** Missing Data */
+            missing_data: string[];
+            /** Relaxation Options */
+            relaxation_options: string[];
         };
         /** PlatformStatus */
         PlatformStatus: {
@@ -3417,6 +3552,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LaptopRankResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    solve_pc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PcSolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PcSolveResponse"];
                 };
             };
             /** @description Unprocessable Entity */

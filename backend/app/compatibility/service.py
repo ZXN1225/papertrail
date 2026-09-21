@@ -249,25 +249,33 @@ class CompatibilityService:
                 },
             )
         )
-        rules.append(
-            self._c_simple(
-                "C006",
-                products,
-                ["cpu", "cooler"],
-                {
-                    "facts": [
-                        (products.get("cpu"), "socket"),
-                        (products.get("cooler"), "supported_sockets"),
-                    ],
-                    "check": lambda socket, cooler: (
-                        _normalized(socket) in text_set(cooler),
-                        {"socket": socket, "cooler_supported": cooler},
-                    ),
-                    "pass": "散热器扣具支持 CPU socket。",
-                    "fail": "散热器扣具不支持 CPU socket。",
-                },
-            )
+        bundled = (
+            self._unconditional(products["cpu"]["facts"], "includes_cooler")
+            if products.get("cpu")
+            else None
         )
+        if "cooler" not in products and bundled and bundled["value"] is True:
+            rules.append(self._result("C006", "pass", "CPU 包装含散热器。", [bundled]))
+        else:
+            rules.append(
+                self._c_simple(
+                    "C006",
+                    products,
+                    ["cpu", "cooler"],
+                    {
+                        "facts": [
+                            (products.get("cpu"), "socket"),
+                            (products.get("cooler"), "supported_sockets"),
+                        ],
+                        "check": lambda socket, cooler: (
+                            _normalized(socket) in text_set(cooler),
+                            {"socket": socket, "cooler_supported": cooler},
+                        ),
+                        "pass": "散热器扣具支持 CPU socket。",
+                        "fail": "散热器扣具不支持 CPU socket。",
+                    },
+                )
+            )
         rules.append(
             self._c_simple(
                 "C007",
@@ -287,25 +295,32 @@ class CompatibilityService:
                 },
             )
         )
-        rules.append(
-            self._c_simple(
-                "C005",
-                products,
-                ["gpu", "case"],
-                {
-                    "facts": [
-                        (products.get("gpu"), "length_mm"),
-                        (products.get("case"), "max_gpu_length_mm"),
-                    ],
-                    "check": lambda gpu, case: (
-                        isinstance(gpu, int) and isinstance(case, int) and gpu <= case,
-                        {"gpu_length_mm": gpu, "case_max_gpu_length_mm": case},
-                    ),
-                    "pass": "显卡长度受当前机箱布局支持。",
-                    "fail": "显卡长度超过当前机箱限制。",
-                },
+        if "gpu" not in products:
+            rules.append(
+                self._result(
+                    "C005", "warning", "未选择独立显卡，无需检查显卡尺寸。", blocking=False
+                )
             )
-        )
+        else:
+            rules.append(
+                self._c_simple(
+                    "C005",
+                    products,
+                    ["gpu", "case"],
+                    {
+                        "facts": [
+                            (products.get("gpu"), "length_mm"),
+                            (products.get("case"), "max_gpu_length_mm"),
+                        ],
+                        "check": lambda gpu, case: (
+                            isinstance(gpu, int) and isinstance(case, int) and gpu <= case,
+                            {"gpu_length_mm": gpu, "case_max_gpu_length_mm": case},
+                        ),
+                        "pass": "显卡长度受当前机箱布局支持。",
+                        "fail": "显卡长度超过当前机箱限制。",
+                    },
+                )
+            )
         rules.append(
             self._c_simple(
                 "C009",

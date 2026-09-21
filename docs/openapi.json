@@ -2018,6 +2018,67 @@
         }
       }
     },
+    "/api/v1/recommendations/pc": {
+      "post": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Pc",
+        "operationId": "solve_pc",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PcSolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PcSolveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "summary": "Live",
@@ -3300,6 +3361,322 @@
           "patch"
         ],
         "title": "PatchRequest"
+      },
+      "PcCandidate": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PcCandidateItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_minor": {
+            "type": "integer",
+            "title": "Total Minor"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "evidence_coverage": {
+            "type": "number",
+            "title": "Evidence Coverage"
+          },
+          "compatibility": {
+            "$ref": "#/components/schemas/CompatibilityReport"
+          },
+          "data_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total_minor",
+          "score",
+          "evidence_coverage",
+          "compatibility",
+          "data_version"
+        ],
+        "title": "PcCandidate"
+      },
+      "PcCandidateItem": {
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "cpu",
+              "motherboard",
+              "gpu",
+              "memory",
+              "storage",
+              "psu",
+              "case",
+              "cooler"
+            ],
+            "title": "Slot"
+          },
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          },
+          "offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Id"
+          },
+          "owned": {
+            "type": "boolean",
+            "title": "Owned"
+          },
+          "total_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Minor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slot",
+          "sku_id",
+          "offer_id",
+          "owned",
+          "total_minor"
+        ],
+        "title": "PcCandidateItem"
+      },
+      "PcFixedItem": {
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "cpu",
+              "motherboard",
+              "gpu",
+              "memory",
+              "storage",
+              "psu",
+              "case",
+              "cooler"
+            ],
+            "title": "Slot"
+          },
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slot",
+          "sku_id"
+        ],
+        "title": "PcFixedItem",
+        "description": "A confirmed exact SKU which the solver must retain."
+      },
+      "PcSolveRequest": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region",
+            "default": "CN"
+          },
+          "budget_minor": {
+            "type": "integer",
+            "maximum": 1000000000.0,
+            "minimum": 1.0,
+            "title": "Budget Minor"
+          },
+          "require_gpu": {
+            "type": "boolean",
+            "title": "Require Gpu",
+            "default": false
+          },
+          "bios_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bios Version"
+          },
+          "excluded_brands": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Excluded Brands"
+          },
+          "locked_items": {
+            "items": {
+              "$ref": "#/components/schemas/PcFixedItem"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Locked Items"
+          },
+          "existing_items": {
+            "items": {
+              "$ref": "#/components/schemas/PcFixedItem"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Existing Items"
+          },
+          "hard_requirements": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "wifi",
+                "usb_ports",
+                "pcie_slots"
+              ]
+            },
+            "type": "object",
+            "title": "Hard Requirements"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "budget_minor"
+        ],
+        "title": "PcSolveRequest"
+      },
+      "PcSolveResponse": {
+        "properties": {
+          "score_version": {
+            "type": "string",
+            "const": "pc-score-v1",
+            "title": "Score Version",
+            "default": "pc-score-v1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_candidates",
+              "incomplete_search"
+            ],
+            "title": "Status"
+          },
+          "search_status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "time_limit",
+              "no_published_catalog"
+            ],
+            "title": "Search Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/PcCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "explored_count": {
+            "type": "integer",
+            "title": "Explored Count"
+          },
+          "pruned_count": {
+            "type": "integer",
+            "title": "Pruned Count"
+          },
+          "candidate_pool_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Pool Version"
+          },
+          "optimality_proven": {
+            "type": "boolean",
+            "const": false,
+            "title": "Optimality Proven",
+            "default": false
+          },
+          "blocking_constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blocking Constraints"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Data"
+          },
+          "relaxation_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relaxation Options"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "search_status",
+          "candidates",
+          "explored_count",
+          "pruned_count",
+          "candidate_pool_version",
+          "blocking_constraints",
+          "missing_data",
+          "relaxation_options"
+        ],
+        "title": "PcSolveResponse"
       },
       "PlatformStatus": {
         "properties": {

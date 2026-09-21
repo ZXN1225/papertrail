@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, Request
 from app.catalog.read_service import CatalogReadService
 from app.common.contracts import ErrorResponse
 from app.profiles.router import Service as ProfileService
-from app.recommendation.contracts import LaptopRankRequest, LaptopRankResponse
+from app.recommendation.contracts import (
+    LaptopRankRequest,
+    LaptopRankResponse,
+    PcSolveRequest,
+    PcSolveResponse,
+)
+from app.recommendation.pc_solver import PcSolver
 from app.recommendation.service import LaptopRanker
 
 router = APIRouter(
@@ -23,9 +29,21 @@ async def ranker_for(request: Request, _: ProfileService):
     )
 
 
+async def pc_solver_for(request: Request, _: ProfileService):
+    return PcSolver(
+        CatalogReadService(request.app.state.dependencies.engine, request.app.state.settings)
+    )
+
+
 Ranker = Annotated[LaptopRanker, Depends(ranker_for)]
+Solver = Annotated[PcSolver, Depends(pc_solver_for)]
 
 
 @router.post("/laptops", response_model=LaptopRankResponse, operation_id="rank_laptops")
 async def laptops(body: LaptopRankRequest, ranker: Ranker):
     return await asyncio.to_thread(ranker.rank, body)
+
+
+@router.post("/pc", response_model=PcSolveResponse, operation_id="solve_pc")
+async def pc(body: PcSolveRequest, solver: Solver):
+    return await asyncio.to_thread(solver.solve, body)
