@@ -261,6 +261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/compatibility/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check */
+        post: operations["check_compatibility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -331,6 +348,59 @@ export interface components {
             generated_at: string;
             /** Empty Reason */
             empty_reason?: "no_published_catalog" | null;
+        };
+        /** CompatibilityItem */
+        CompatibilityItem: {
+            /**
+             * Slot
+             * @enum {string}
+             */
+            slot: "cpu" | "motherboard" | "memory";
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+        };
+        /** CompatibilityReport */
+        CompatibilityReport: {
+            /**
+             * Rule Version
+             * @default compat-v1
+             * @constant
+             */
+            rule_version: "compat-v1";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "incompatible" | "needs_verification";
+            /** Results */
+            results: components["schemas"]["RuleResult"][];
+            /** Unexecuted Rule Ids */
+            unexecuted_rule_ids: ("C004" | "C005" | "C006" | "C007" | "C008" | "C009" | "C010" | "C011" | "C012")[];
+            /**
+             * Data Version
+             * Format: uuid
+             */
+            data_version: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CompatibilityRequest */
+        CompatibilityRequest: {
+            /** Items */
+            items: components["schemas"]["CompatibilityItem"][];
+            /** Bios Version */
+            bios_version?: string | null;
         };
         /** DependencyChecks */
         DependencyChecks: {
@@ -984,6 +1054,38 @@ export interface components {
              * @enum {string}
              */
             action: "add" | "unchanged" | "invalid";
+        };
+        /** RuleResult */
+        RuleResult: {
+            /**
+             * Rule Id
+             * @enum {string}
+             */
+            rule_id: "C001" | "C002" | "C003";
+            /**
+             * Rule Version
+             * @default compat-v1
+             * @constant
+             */
+            rule_version: "compat-v1";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "fail" | "unknown" | "warning";
+            /**
+             * Blocking
+             * @default true
+             */
+            blocking: boolean;
+            /** Message */
+            message: string;
+            /** Fact Ids */
+            fact_ids: string[];
+            /** Details */
+            details: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
         };
         /** SessionResponse */
         SessionResponse: {
@@ -3121,6 +3223,66 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    check_compatibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompatibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompatibilityReport"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

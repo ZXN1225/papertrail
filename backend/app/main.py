@@ -16,6 +16,7 @@ from app.catalog.router import router as catalog_router
 from app.common.config import Settings
 from app.common.contracts import ErrorResponse, LiveResponse, PlatformStatus, ReadyResponse
 from app.common.dependencies import Dependencies
+from app.compatibility.router import router as compatibility_router
 from app.ingestion.auth import AdminProtection
 from app.ingestion.router import router as import_router
 from app.profiles.protection import WriteProtection
@@ -51,6 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profile_router)
     app.include_router(import_router)
     app.include_router(catalog_router)
+    app.include_router(compatibility_router)
     app.add_middleware(AdminProtection, settings=settings)
     app.add_middleware(
         WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])

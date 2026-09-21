@@ -10,7 +10,7 @@ class WriteProtection:
 
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "")
-        private = path.startswith(("/api/v1/sessions", "/api/v1/profiles"))
+        private = path.startswith(("/api/v1/sessions", "/api/v1/profiles", "/api/v1/compatibility"))
         if scope["type"] != "http" or not private or scope["method"] in {"GET", "HEAD", "OPTIONS"}:
             return await self.app(scope, receive, send)
         headers = Headers(scope=scope)

@@ -1886,6 +1886,77 @@
         }
       }
     },
+    "/api/v1/compatibility/check": {
+      "post": {
+        "tags": [
+          "Compatibility"
+        ],
+        "summary": "Check",
+        "operationId": "check_compatibility",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompatibilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompatibilityReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "summary": "Live",
@@ -2020,6 +2091,133 @@
           "generated_at"
         ],
         "title": "CatalogPage"
+      },
+      "CompatibilityItem": {
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "cpu",
+              "motherboard",
+              "memory"
+            ],
+            "title": "Slot"
+          },
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slot",
+          "sku_id"
+        ],
+        "title": "CompatibilityItem"
+      },
+      "CompatibilityReport": {
+        "properties": {
+          "rule_version": {
+            "type": "string",
+            "const": "compat-v1",
+            "title": "Rule Version",
+            "default": "compat-v1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "incompatible",
+              "needs_verification"
+            ],
+            "title": "Status"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "unexecuted_rule_ids": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "C004",
+                "C005",
+                "C006",
+                "C007",
+                "C008",
+                "C009",
+                "C010",
+                "C011",
+                "C012"
+              ]
+            },
+            "type": "array",
+            "title": "Unexecuted Rule Ids"
+          },
+          "data_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Version"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "results",
+          "unexecuted_rule_ids",
+          "data_version",
+          "generated_at"
+        ],
+        "title": "CompatibilityReport"
+      },
+      "CompatibilityRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityItem"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Items"
+          },
+          "bios_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bios Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CompatibilityRequest"
       },
       "DependencyChecks": {
         "properties": {
@@ -3968,6 +4166,69 @@
           "action"
         ],
         "title": "RowPreview"
+      },
+      "RuleResult": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "enum": [
+              "C001",
+              "C002",
+              "C003"
+            ],
+            "title": "Rule Id"
+          },
+          "rule_version": {
+            "type": "string",
+            "const": "compat-v1",
+            "title": "Rule Version",
+            "default": "compat-v1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unknown",
+              "warning"
+            ],
+            "title": "Status"
+          },
+          "blocking": {
+            "type": "boolean",
+            "title": "Blocking",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rule_id",
+          "status",
+          "message",
+          "fact_ids",
+          "details"
+        ],
+        "title": "RuleResult"
       },
       "SessionResponse": {
         "properties": {

@@ -12,7 +12,7 @@
 | T03 | 人工导入、预览、审核、事务发布 | T02、I02 | 步骤 06 / §9；research/T03-acceptance.md；功能通过，真实样本待 D01—D03 | blocked |
 | T04 | 目录查询与前端只读列表、规格适配器 | T03 | 步骤 07 / research/T04-T05-acceptance.md | done |
 | T05 | 报价快照、人工 Provider、总价函数 | T02 | 步骤 07 / research/T04-T05-acceptance.md | done |
-| T06 | CPU/主板/内存 C001—C003 | T03 | 步骤 08 / §11 | todo |
+| T06 | CPU/主板/内存 C001—C003 | T03 | 步骤 08 / research/T06-acceptance.md | done |
 | T07 | C004—C012 与完整报告聚合 | T06 | 步骤 09 / §11 | todo |
 | T08 | 笔记本过滤与分项评分 | T04、T05 | 步骤 10 / §12 | todo |
 | T09 | PC 有界求解 | T05、T07 | 步骤 11 / §12 | todo |
