@@ -36,6 +36,21 @@ test("published catalog has an honest empty state without test products", async 
   ).toBeVisible();
 });
 
+test("saved demand can start a bounded agent run and shows its verified empty result", async ({
+  page,
+}) => {
+  await open(page);
+  await saved(page);
+  await page.getByRole("button", { name: "开始核对", exact: true }).click();
+  await expect(page.getByText("运行状态：provider_disabled")).toBeVisible();
+  await expect(
+    page.getByText("模型服务尚未配置，未生成推荐结论。"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("目前没有可展示的已验证候选。请在资料发布后重新核对。"),
+  ).toBeVisible();
+});
+
 test("save, restore, patch and all three device modes through real API", async ({
   page,
 }, testInfo) => {

@@ -10,6 +10,7 @@ import {
   type ProfileSnapshot,
   type SessionState,
 } from "@/lib/api/client";
+import { AgentPanel } from "@/components/agent-panel";
 
 type Mode = ProfileInput["mode"];
 const modes: { id: Mode; title: string; hint: string; icon: string }[] = [
@@ -523,7 +524,7 @@ export function Planner() {
             </button>
           </fieldset>
           <p className="draft-note">
-            匿名保存至会话创建后 24 小时，同一浏览器可恢复。尚未开放商品推荐。
+            匿名保存至会话创建后 24 小时，同一浏览器可恢复。
           </p>
           {session && (
             <p className="draft-note">
@@ -608,6 +609,7 @@ export function Planner() {
           )}
         </aside>
       </div>
+      <AgentPanel profile={saved} session={session} />
     </section>
   );
 }

@@ -4,12 +4,17 @@ const allowed = new Map([
   [
     "GET",
     new RegExp(
-      `^(sessions/current|profiles/${uuid}(/revisions/[0-9]+)?|catalog/products(/${uuid}(/offers)?)?)$`,
+      `^(sessions/current|profiles/${uuid}(/revisions/[0-9]+)?|catalog/products(/${uuid}(/offers)?)?|agent/runs/${uuid}(/events)?)$`,
     ),
   ],
-  ["POST", /^(sessions|sessions\/reset|profiles|catalog\/price-quotes)$/],
+  [
+    "POST",
+    new RegExp(
+      `^(sessions|sessions/reset|profiles|catalog/price-quotes|agent/sessions|agent/sessions/${uuid}/runs|agent/runs/${uuid}/cancel)$`,
+    ),
+  ],
   ["PATCH", new RegExp(`^profiles/${uuid}$`)],
-  ["DELETE", /^sessions\/current$/],
+  ["DELETE", new RegExp(`^(sessions/current|agent/sessions/${uuid})$`)],
 ]);
 
 async function forward(
@@ -42,6 +47,7 @@ async function forward(
     "origin",
     "content-type",
     "x-csrf-token",
+    "last-event-id",
     "sec-fetch-site",
   ]) {
     const value = request.headers.get(key);

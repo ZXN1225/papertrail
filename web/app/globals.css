@@ -811,6 +811,69 @@ footer {
   margin: 0;
   min-width: 0;
 }
+.agent-panel {
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+  padding-top: 25px;
+  max-width: 720px;
+}
+.agent-panel h3,
+.agent-panel h4 {
+  margin: 0;
+  color: var(--ink);
+}
+.agent-panel > p {
+  margin: 11px 0 16px;
+  max-width: 620px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #56635a;
+}
+.agent-heading,
+.agent-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.agent-version {
+  color: #56635a;
+  font-size: 11px;
+}
+.agent-actions {
+  justify-content: flex-start;
+}
+.secondary-button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--green);
+  padding: 12px 15px;
+  font-size: 12px;
+}
+.agent-result {
+  border-left: 3px solid var(--green);
+  background: #f4f7f2;
+  margin-top: 18px;
+  padding: 16px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.agent-result h4 {
+  margin-top: 10px;
+  font-size: 15px;
+}
+.agent-result p {
+  margin: 8px 0 0;
+}
+.agent-result small {
+  display: block;
+  margin-top: 12px;
+  color: #56635a;
+  overflow-wrap: anywhere;
+}
+.agent-unavailable {
+  color: #56635a;
+}
 .choice-fields {
   border: 0;
   padding: 0;

@@ -4,6 +4,15 @@ export type PlatformStatus = components["schemas"]["PlatformStatus"];
 export type ProfileInput = components["schemas"]["ProfileInput"];
 export type ProfileSnapshot = components["schemas"]["ProfileSnapshot"];
 export type SessionState = components["schemas"]["SessionResponse"];
+export type AgentSession = components["schemas"]["AgentSession"];
+export type AgentRun = components["schemas"]["AgentRun"];
+export type AgentEvent = {
+  event_id: number;
+  run_id: string;
+  revision: number;
+  type: string;
+  data: Record<string, unknown>;
+};
 
 export class ApiError extends Error {
   constructor(
