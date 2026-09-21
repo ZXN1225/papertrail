@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 
@@ -10,7 +11,14 @@ class WriteProtection:
 
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "")
-        private = path.startswith(("/api/v1/sessions", "/api/v1/profiles", "/api/v1/compatibility"))
+        private = path.startswith(
+            (
+                "/api/v1/sessions",
+                "/api/v1/profiles",
+                "/api/v1/compatibility",
+                "/api/v1/recommendations",
+            )
+        )
         if scope["type"] != "http" or not private or scope["method"] in {"GET", "HEAD", "OPTIONS"}:
             return await self.app(scope, receive, send)
         headers = Headers(scope=scope)

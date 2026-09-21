@@ -1957,6 +1957,67 @@
         }
       }
     },
+    "/api/v1/recommendations/laptops": {
+      "post": {
+        "tags": [
+          "Recommendations"
+        ],
+        "summary": "Laptops",
+        "operationId": "rank_laptops",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaptopRankRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaptopRankResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "summary": "Live",
@@ -2722,6 +2783,88 @@
         "title": "Issue"
       },
       "JsonValue": {},
+      "LaptopCandidate": {
+        "properties": {
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          },
+          "brand": {
+            "type": "string",
+            "title": "Brand"
+          },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "manufacturer_part_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer Part Number"
+          },
+          "offer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Offer Id"
+          },
+          "total_minor": {
+            "type": "integer",
+            "title": "Total Minor"
+          },
+          "score_lower": {
+            "type": "number",
+            "title": "Score Lower"
+          },
+          "score_upper": {
+            "type": "number",
+            "title": "Score Upper"
+          },
+          "evidence_coverage": {
+            "type": "number",
+            "title": "Evidence Coverage"
+          },
+          "missing_score_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "battery_life_hours",
+                "screen_quality",
+                "application_performance"
+              ]
+            },
+            "type": "array",
+            "title": "Missing Score Fields"
+          },
+          "data_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sku_id",
+          "brand",
+          "family",
+          "manufacturer_part_number",
+          "offer_id",
+          "total_minor",
+          "score_lower",
+          "score_upper",
+          "evidence_coverage",
+          "missing_score_fields",
+          "data_version"
+        ],
+        "title": "LaptopCandidate"
+      },
       "LaptopConstraints": {
         "properties": {
           "max_weight_g": {
@@ -2741,6 +2884,125 @@
         "additionalProperties": false,
         "type": "object",
         "title": "LaptopConstraints"
+      },
+      "LaptopRankRequest": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region",
+            "default": "CN"
+          },
+          "budget_minor": {
+            "type": "integer",
+            "maximum": 1000000000.0,
+            "minimum": 1.0,
+            "title": "Budget Minor"
+          },
+          "max_weight_g": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Weight G"
+          },
+          "min_memory_gib": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1024.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Memory Gib"
+          },
+          "excluded_brands": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Excluded Brands"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "budget_minor"
+        ],
+        "title": "LaptopRankRequest"
+      },
+      "LaptopRankResponse": {
+        "properties": {
+          "score_version": {
+            "type": "string",
+            "const": "laptop-score-v1",
+            "title": "Score Version",
+            "default": "laptop-score-v1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_candidates"
+            ],
+            "title": "Status"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/LaptopCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "blocking_constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blocking Constraints"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Data"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "candidates",
+          "blocking_constraints",
+          "missing_data",
+          "data_version"
+        ],
+        "title": "LaptopRankResponse"
       },
       "LiveResponse": {
         "properties": {

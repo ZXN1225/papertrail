@@ -278,6 +278,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recommendations/laptops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Laptops */
+        post: operations["rank_laptops"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -594,10 +611,82 @@ export interface components {
             blocking: boolean;
         };
         JsonValue: unknown;
+        /** LaptopCandidate */
+        LaptopCandidate: {
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /** Brand */
+            brand: string;
+            /** Family */
+            family: string;
+            /** Manufacturer Part Number */
+            manufacturer_part_number: string | null;
+            /**
+             * Offer Id
+             * Format: uuid
+             */
+            offer_id: string;
+            /** Total Minor */
+            total_minor: number;
+            /** Score Lower */
+            score_lower: number;
+            /** Score Upper */
+            score_upper: number;
+            /** Evidence Coverage */
+            evidence_coverage: number;
+            /** Missing Score Fields */
+            missing_score_fields: ("battery_life_hours" | "screen_quality" | "application_performance")[];
+            /**
+             * Data Version
+             * Format: uuid
+             */
+            data_version: string;
+        };
         /** LaptopConstraints */
         LaptopConstraints: {
             /** Max Weight G */
             max_weight_g?: number | null;
+        };
+        /** LaptopRankRequest */
+        LaptopRankRequest: {
+            /**
+             * Region
+             * @default CN
+             */
+            region: string;
+            /** Budget Minor */
+            budget_minor: number;
+            /** Max Weight G */
+            max_weight_g?: number | null;
+            /** Min Memory Gib */
+            min_memory_gib?: number | null;
+            /** Excluded Brands */
+            excluded_brands?: string[];
+        };
+        /** LaptopRankResponse */
+        LaptopRankResponse: {
+            /**
+             * Score Version
+             * @default laptop-score-v1
+             * @constant
+             */
+            score_version: "laptop-score-v1";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "no_candidates";
+            /** Candidates */
+            candidates: components["schemas"]["LaptopCandidate"][];
+            /** Blocking Constraints */
+            blocking_constraints: string[];
+            /** Missing Data */
+            missing_data: string[];
+            /** Data Version */
+            data_version: string | null;
         };
         /** LiveResponse */
         LiveResponse: {
@@ -3277,6 +3366,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rank_laptops: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LaptopRankRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LaptopRankResponse"];
                 };
             };
             /** @description Unprocessable Entity */

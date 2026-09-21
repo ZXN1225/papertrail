@@ -22,6 +22,7 @@ from app.ingestion.router import router as import_router
 from app.profiles.protection import WriteProtection
 from app.profiles.router import router as profile_router
 from app.profiles.service import DomainError
+from app.recommendation.router import router as recommendation_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -53,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(import_router)
     app.include_router(catalog_router)
     app.include_router(compatibility_router)
+    app.include_router(recommendation_router)
     app.add_middleware(AdminProtection, settings=settings)
     app.add_middleware(
         WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])
