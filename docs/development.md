@@ -1,4 +1,4 @@
-# 本地运行与检查（I02）
+# 本地运行与检查（T02）
 
 本阶段提供三入口首页、状态 API、匿名会话、画像保存/版本历史、真实 PG 迁移和 Redis 探测。没有商品、推荐或模型调用。已保存需求固定 24 小时有效，未保存编辑刷新即丢失。`ready=200` 只表示基础依赖可用，不表示数据已可推荐。身份保护、删除与过期清理见 [会话设计](sessions.md)。
 
@@ -53,7 +53,7 @@ pnpm --dir web dev
 - 存活：<http://127.0.0.1:8000/api/v1/health/live>。
 - 就绪：<http://127.0.0.1:8000/api/v1/health/ready>。
 
-Alembic `0001_baseline` 创建版本记录，`0002_sessions` 新增匿名身份、画像、revision 和限流表；仍不创建 T02 的商品/来源表。预览应用不会自动迁移；未迁移、版本不匹配、PG 失联或已配置 Redis 失联均返回 ready=503。升级 I01 后先运行 upgrade head，再重启 API/web。隔离 E2E 入口会自行迁移 test_* 数据库。
+Alembic `0001_baseline` 创建版本记录，`0002_sessions` 新增会话表，`0003_catalog` 新增 13 张空商品/来源/证据领域表。预览应用不会自动迁移；未迁移、版本不匹配、PG 失联或已配置 Redis 失联均返回 ready=503。升级后先运行 upgrade head，再重启 API/web。隔离 E2E 入口会自行迁移 test_* 数据库。T02 表关系与迁移边界见 [数据模型](catalog-model.md)，记录契约可在 API `/docs` 的 Schemas 查看，无目录写入接口。
 
 前端将固定状态 GET 和白名单会话/画像 API 转发到本机 8000；若改端口，在启动 Next 的进程环境中设置服务端 `API_BASE_URL`。没有浏览器可控 URL 代理，也不向浏览器传数据库或模型凭据。`.env` 由后端加载，Next 不读取根目录密钥。写请求需要允许的精确 Origin/JSON；会话密钥不足 32 字符时会话服务返回 503。
 

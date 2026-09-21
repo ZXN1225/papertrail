@@ -16,7 +16,7 @@
 | GET /profiles/{id}/revisions/{revision} | 当前会话的不可变历史快照 |
 | PATCH /profiles/{id} | expected_revision + patch；保留未修改字段，冲突 409，不自动覆盖 |
 
-0002_sessions 已建立匿名身份/画像/revision/限流表，但没有商品表；not_initialized 描述未具备目录能力。ready 不是可推荐状态。生产缺关键配置启动失败；开发 Redis 未配置时返回 disabled。
+0003_catalog 在会话表基础上建立空商品/证据领域表；not_initialized 描述未具备目录能力。OpenAPI components.schemas 中的 Catalog* 是 T02 记录契约，尚无导入/目录端点。ready 不是可推荐状态。生产缺关键配置启动失败；开发 Redis 未配置时返回 disabled。
 
 会话写接口要求 application/json、精确 Origin；除首次 bootstrap 外还要求 X-CSRF-Token 与 cookie 匹配。JSON 请求体最大 16 KiB，超限 413；非 JSON 415；来源/CSRF 拒绝 403。服务从 cookie 推导 owner，输入额外字段（如 owner_id）422。预算为严格整数分，范围 1—1,000,000,000；不接收浮点数、字符串或布尔值。画像字段、模式切换和来源元数据边界见 [会话设计](sessions.md)。
 

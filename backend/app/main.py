@@ -6,8 +6,10 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic.json_schema import models_json_schema
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.catalog.contracts import RECORD_MODELS
 from app.common.config import Settings
 from app.common.contracts import ErrorResponse, LiveResponse, PlatformStatus, ReadyResponse
 from app.common.dependencies import Dependencies
@@ -29,6 +31,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="电脑推荐平台 API", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
+    base_openapi = app.openapi
+
+    def record_openapi():
+        schema = base_openapi()
+        _, definitions = models_json_schema(
+            [(model, "validation") for model in RECORD_MODELS],
+            ref_template="#/components/schemas/{model}",
+        )
+        schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions["$defs"])
+        return schema
+
+    app.openapi = record_openapi
     app.include_router(profile_router)
     app.add_middleware(
         WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])

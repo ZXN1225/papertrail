@@ -1553,7 +1553,1380 @@
           "csrf_token"
         ],
         "title": "SessionResponse"
-      }
+      },
+      "CatalogAlias": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "alias": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Alias",
+            "type": "string"
+          },
+          "normalized_alias": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Normalized Alias",
+            "type": "string"
+          },
+          "locale": {
+            "maxLength": 20,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Locale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "sku_id",
+          "alias",
+          "normalized_alias",
+          "locale"
+        ],
+        "title": "CatalogAlias",
+        "type": "object"
+      },
+      "CatalogAttribute": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "key": {
+            "maxLength": 80,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "cpu",
+              "gpu",
+              "motherboard",
+              "memory",
+              "ssd",
+              "psu",
+              "case",
+              "cooler",
+              "laptop"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "value_type": {
+            "enum": [
+              "text",
+              "integer",
+              "decimal",
+              "boolean"
+            ],
+            "title": "Value Type",
+            "type": "string"
+          },
+          "canonical_unit": {
+            "maxLength": 24,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Canonical Unit",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "key",
+          "category",
+          "value_type",
+          "canonical_unit",
+          "description"
+        ],
+        "title": "CatalogAttribute",
+        "type": "object"
+      },
+      "CatalogBrand": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "normalized_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Normalized Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "name",
+          "normalized_name"
+        ],
+        "title": "CatalogBrand",
+        "type": "object"
+      },
+      "CatalogDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "canonical_url": {
+            "maxLength": 4000,
+            "title": "Canonical Url",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Title",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Published At"
+          },
+          "parser_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "storage_key": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "pattern": "^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_.-]+)*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Storage Key"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "source_id",
+          "canonical_url",
+          "title",
+          "content_sha256",
+          "fetched_at",
+          "parser_version"
+        ],
+        "title": "CatalogDocument",
+        "type": "object"
+      },
+      "CatalogEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "review_status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "reviewer": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reviewer"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reviewed At"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "locator_kind": {
+            "enum": [
+              "page",
+              "section",
+              "selector",
+              "json_pointer"
+            ],
+            "title": "Locator Kind",
+            "type": "string"
+          },
+          "locator": {
+            "maxLength": 500,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Locator",
+            "type": "string"
+          },
+          "excerpt_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Excerpt Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "document_id",
+          "locator_kind",
+          "locator",
+          "excerpt_sha256"
+        ],
+        "title": "CatalogEvidence",
+        "type": "object"
+      },
+      "CatalogEvidenceScope": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_id": {
+            "format": "uuid",
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "sku_id",
+          "synthetic"
+        ],
+        "title": "CatalogEvidenceScope",
+        "type": "object"
+      },
+      "CatalogFact": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "review_status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "reviewer": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reviewer"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reviewed At"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "attribute_id": {
+            "format": "uuid",
+            "title": "Attribute Id",
+            "type": "string"
+          },
+          "evidence_id": {
+            "format": "uuid",
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "cpu",
+              "gpu",
+              "motherboard",
+              "memory",
+              "ssd",
+              "psu",
+              "case",
+              "cooler",
+              "laptop"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "value_type": {
+            "enum": [
+              "text",
+              "integer",
+              "decimal",
+              "boolean"
+            ],
+            "title": "Value Type",
+            "type": "string"
+          },
+          "unit": {
+            "maxLength": 24,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Unit",
+            "type": "string"
+          },
+          "value_text": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value Text"
+          },
+          "value_integer": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775808,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value Integer"
+          },
+          "value_decimal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,20}|(?=[\\d.]{1,29}0*$)\\d{0,20}\\.\\d{0,8}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value Decimal"
+          },
+          "value_boolean": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value Boolean"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_collected",
+                  "not_disclosed",
+                  "conflicting",
+                  "not_applicable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Missing Reason"
+          },
+          "raw_value": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Value"
+          },
+          "raw_unit": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Unit"
+          },
+          "conditions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Conditions",
+            "type": "object"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "title": "Valid From",
+            "type": "string"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "sku_id",
+          "attribute_id",
+          "evidence_id",
+          "category",
+          "value_type",
+          "unit",
+          "valid_from"
+        ],
+        "title": "CatalogFact",
+        "type": "object"
+      },
+      "CatalogFamily": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "brand_id": {
+            "format": "uuid",
+            "title": "Brand Id",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "cpu",
+              "gpu",
+              "motherboard",
+              "memory",
+              "ssd",
+              "psu",
+              "case",
+              "cooler",
+              "laptop"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "brand_id",
+          "category",
+          "name"
+        ],
+        "title": "CatalogFamily",
+        "type": "object"
+      },
+      "CatalogListing": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "merchant_id": {
+            "format": "uuid",
+            "title": "Merchant Id",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "external_listing_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "External Listing Id",
+            "type": "string"
+          },
+          "listing_url": {
+            "maxLength": 4000,
+            "title": "Listing Url",
+            "type": "string"
+          },
+          "matched_sku_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Matched Sku Id"
+          },
+          "match_evidence_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Match Evidence Id"
+          },
+          "match_status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "matched",
+              "ambiguous",
+              "rejected"
+            ],
+            "title": "Match Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "merchant_id",
+          "source_id",
+          "external_listing_id",
+          "listing_url"
+        ],
+        "title": "CatalogListing",
+        "type": "object"
+      },
+      "CatalogMerchant": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "platform": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Platform",
+            "type": "string"
+          },
+          "external_seller_id": {
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "External Seller Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "name",
+          "platform",
+          "external_seller_id"
+        ],
+        "title": "CatalogMerchant",
+        "type": "object"
+      },
+      "CatalogOffer": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "review_status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Review Status",
+            "type": "string"
+          },
+          "reviewer": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reviewer"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reviewed At"
+          },
+          "listing_id": {
+            "format": "uuid",
+            "title": "Listing Id",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "evidence_id": {
+            "format": "uuid",
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Minor"
+          },
+          "amount_missing_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_collected",
+                  "not_disclosed",
+                  "conflicting",
+                  "not_applicable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Amount Missing Reason"
+          },
+          "shipping_minor": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Shipping Minor"
+          },
+          "tax_minor": {
+            "anyOf": [
+              {
+                "maximum": 9223372036854775807,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tax Minor"
+          },
+          "tax_included": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tax Included"
+          },
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "region": {
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region",
+            "type": "string"
+          },
+          "stock_status": {
+            "default": "unknown",
+            "enum": [
+              "in_stock",
+              "out_of_stock",
+              "preorder",
+              "unknown"
+            ],
+            "title": "Stock Status",
+            "type": "string"
+          },
+          "condition": {
+            "default": "unknown",
+            "enum": [
+              "new",
+              "used",
+              "refurbished",
+              "unknown"
+            ],
+            "title": "Condition",
+            "type": "string"
+          },
+          "eligibility_type": {
+            "default": "unknown",
+            "enum": [
+              "unconditional",
+              "member",
+              "coupon",
+              "bundle",
+              "unknown"
+            ],
+            "title": "Eligibility Type",
+            "type": "string"
+          },
+          "eligibility_details": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Eligibility Details"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "listing_id",
+          "sku_id",
+          "evidence_id",
+          "currency",
+          "region",
+          "observed_at",
+          "expires_at"
+        ],
+        "title": "CatalogOffer",
+        "type": "object"
+      },
+      "CatalogSKU": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "brand_id": {
+            "format": "uuid",
+            "title": "Brand Id",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "cpu",
+              "gpu",
+              "motherboard",
+              "memory",
+              "ssd",
+              "psu",
+              "case",
+              "cooler",
+              "laptop"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "manufacturer_part_number": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Manufacturer Part Number"
+          },
+          "normalized_part_number": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Normalized Part Number"
+          },
+          "region": {
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region",
+            "type": "string"
+          },
+          "hardware_revision": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Hardware Revision"
+          },
+          "revision_status": {
+            "default": "unknown",
+            "enum": [
+              "unknown",
+              "known",
+              "not_applicable"
+            ],
+            "title": "Revision Status",
+            "type": "string"
+          },
+          "configuration_fingerprint": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Configuration Fingerprint"
+          },
+          "identity_evidence_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Identity Evidence Id"
+          },
+          "identity_status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "verified"
+            ],
+            "title": "Identity Status",
+            "type": "string"
+          },
+          "status": {
+            "default": "unknown",
+            "enum": [
+              "active",
+              "discontinued",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "family_id",
+          "brand_id",
+          "category",
+          "region"
+        ],
+        "title": "CatalogSKU",
+        "type": "object"
+      },
+      "CatalogSource": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "record_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Record Key",
+            "type": "string"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "domain": {
+            "maxLength": 253,
+            "pattern": "^[a-z0-9][a-z0-9.-]*[a-z0-9]$",
+            "title": "Domain",
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "manufacturer",
+              "merchant",
+              "benchmark",
+              "manual"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "access_method": {
+            "enum": [
+              "manual",
+              "api",
+              "web",
+              "file"
+            ],
+            "title": "Access Method",
+            "type": "string"
+          },
+          "permission_status": {
+            "default": "unknown",
+            "enum": [
+              "unknown",
+              "allowed",
+              "restricted",
+              "denied"
+            ],
+            "title": "Permission Status",
+            "type": "string"
+          },
+          "permission_evidence": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Permission Evidence"
+          },
+          "terms_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Terms Checked At"
+          },
+          "allowed_uses": {
+            "items": {
+              "enum": [
+                "internal_review",
+                "public_display",
+                "automated_fetch",
+                "excerpt_storage"
+              ],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Allowed Uses",
+            "type": "array"
+          },
+          "requests_per_minute": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 2147483647,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requests Per Minute"
+          }
+        },
+        "required": [
+          "id",
+          "record_key",
+          "name",
+          "domain",
+          "source_type",
+          "access_method"
+        ],
+        "title": "CatalogSource",
+        "type": "object"
+      },
+      "JsonValue": {}
     }
   }
 }

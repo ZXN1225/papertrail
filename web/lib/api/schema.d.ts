@@ -367,6 +367,621 @@ export interface components {
             csrf_token: string;
             profile?: components["schemas"]["ProfileSnapshot"] | null;
         };
+        /** CatalogAlias */
+        CatalogAlias: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /** Alias */
+            alias: string;
+            /** Normalized Alias */
+            normalized_alias: string;
+            /** Locale */
+            locale: string;
+        };
+        /** CatalogAttribute */
+        CatalogAttribute: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /** Key */
+            key: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop";
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "text" | "integer" | "decimal" | "boolean";
+            /** Canonical Unit */
+            canonical_unit: string;
+            /** Description */
+            description: string;
+        };
+        /** CatalogBrand */
+        CatalogBrand: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /** Name */
+            name: string;
+            /** Normalized Name */
+            normalized_name: string;
+        };
+        /** CatalogDocument */
+        CatalogDocument: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Canonical Url */
+            canonical_url: string;
+            /** Title */
+            title: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /**
+             * Published At
+             * @default null
+             */
+            published_at: string | null;
+            /** Parser Version */
+            parser_version: string;
+            /**
+             * Storage Key
+             * @default null
+             */
+            storage_key: string | null;
+        };
+        /** CatalogEvidence */
+        CatalogEvidence: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Review Status
+             * @default pending
+             * @enum {string}
+             */
+            review_status: "pending" | "approved" | "rejected";
+            /**
+             * Reviewer
+             * @default null
+             */
+            reviewer: string | null;
+            /**
+             * Reviewed At
+             * @default null
+             */
+            reviewed_at: string | null;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Locator Kind
+             * @enum {string}
+             */
+            locator_kind: "page" | "section" | "selector" | "json_pointer";
+            /** Locator */
+            locator: string;
+            /** Excerpt Sha256 */
+            excerpt_sha256: string;
+        };
+        /** CatalogEvidenceScope */
+        CatalogEvidenceScope: {
+            /**
+             * Evidence Id
+             * Format: uuid
+             */
+            evidence_id: string;
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /** Synthetic */
+            synthetic: boolean;
+        };
+        /** CatalogFact */
+        CatalogFact: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Review Status
+             * @default pending
+             * @enum {string}
+             */
+            review_status: "pending" | "approved" | "rejected";
+            /**
+             * Reviewer
+             * @default null
+             */
+            reviewer: string | null;
+            /**
+             * Reviewed At
+             * @default null
+             */
+            reviewed_at: string | null;
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /**
+             * Attribute Id
+             * Format: uuid
+             */
+            attribute_id: string;
+            /**
+             * Evidence Id
+             * Format: uuid
+             */
+            evidence_id: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop";
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "text" | "integer" | "decimal" | "boolean";
+            /** Unit */
+            unit: string;
+            /**
+             * Value Text
+             * @default null
+             */
+            value_text: string | null;
+            /**
+             * Value Integer
+             * @default null
+             */
+            value_integer: number | null;
+            /**
+             * Value Decimal
+             * @default null
+             */
+            value_decimal: number | string | null;
+            /**
+             * Value Boolean
+             * @default null
+             */
+            value_boolean: boolean | null;
+            /**
+             * Missing Reason
+             * @default null
+             */
+            missing_reason: ("not_collected" | "not_disclosed" | "conflicting" | "not_applicable") | null;
+            /**
+             * Raw Value
+             * @default null
+             */
+            raw_value: string | null;
+            /**
+             * Raw Unit
+             * @default null
+             */
+            raw_unit: string | null;
+            /** Conditions */
+            conditions?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /**
+             * Valid To
+             * @default null
+             */
+            valid_to: string | null;
+        };
+        /** CatalogFamily */
+        CatalogFamily: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop";
+            /** Name */
+            name: string;
+        };
+        /** CatalogListing */
+        CatalogListing: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Merchant Id
+             * Format: uuid
+             */
+            merchant_id: string;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** External Listing Id */
+            external_listing_id: string;
+            /** Listing Url */
+            listing_url: string;
+            /**
+             * Matched Sku Id
+             * @default null
+             */
+            matched_sku_id: string | null;
+            /**
+             * Match Evidence Id
+             * @default null
+             */
+            match_evidence_id: string | null;
+            /**
+             * Match Status
+             * @default pending
+             * @enum {string}
+             */
+            match_status: "pending" | "matched" | "ambiguous" | "rejected";
+        };
+        /** CatalogMerchant */
+        CatalogMerchant: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /** Name */
+            name: string;
+            /** Platform */
+            platform: string;
+            /** External Seller Id */
+            external_seller_id: string;
+        };
+        /** CatalogOffer */
+        CatalogOffer: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Review Status
+             * @default pending
+             * @enum {string}
+             */
+            review_status: "pending" | "approved" | "rejected";
+            /**
+             * Reviewer
+             * @default null
+             */
+            reviewer: string | null;
+            /**
+             * Reviewed At
+             * @default null
+             */
+            reviewed_at: string | null;
+            /**
+             * Listing Id
+             * Format: uuid
+             */
+            listing_id: string;
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /**
+             * Evidence Id
+             * Format: uuid
+             */
+            evidence_id: string;
+            /**
+             * Amount Minor
+             * @default null
+             */
+            amount_minor: number | null;
+            /**
+             * Amount Missing Reason
+             * @default null
+             */
+            amount_missing_reason: ("not_collected" | "not_disclosed" | "conflicting" | "not_applicable") | null;
+            /**
+             * Shipping Minor
+             * @default null
+             */
+            shipping_minor: number | null;
+            /**
+             * Tax Minor
+             * @default null
+             */
+            tax_minor: number | null;
+            /**
+             * Tax Included
+             * @default null
+             */
+            tax_included: boolean | null;
+            /** Currency */
+            currency: string;
+            /** Region */
+            region: string;
+            /**
+             * Stock Status
+             * @default unknown
+             * @enum {string}
+             */
+            stock_status: "in_stock" | "out_of_stock" | "preorder" | "unknown";
+            /**
+             * Condition
+             * @default unknown
+             * @enum {string}
+             */
+            condition: "new" | "used" | "refurbished" | "unknown";
+            /**
+             * Eligibility Type
+             * @default unknown
+             * @enum {string}
+             */
+            eligibility_type: "unconditional" | "member" | "coupon" | "bundle" | "unknown";
+            /**
+             * Eligibility Details
+             * @default null
+             */
+            eligibility_details: string | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** CatalogSKU */
+        CatalogSKU: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /**
+             * Family Id
+             * Format: uuid
+             */
+            family_id: string;
+            /**
+             * Brand Id
+             * Format: uuid
+             */
+            brand_id: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop";
+            /**
+             * Manufacturer Part Number
+             * @default null
+             */
+            manufacturer_part_number: string | null;
+            /**
+             * Normalized Part Number
+             * @default null
+             */
+            normalized_part_number: string | null;
+            /** Region */
+            region: string;
+            /**
+             * Hardware Revision
+             * @default null
+             */
+            hardware_revision: string | null;
+            /**
+             * Revision Status
+             * @default unknown
+             * @enum {string}
+             */
+            revision_status: "unknown" | "known" | "not_applicable";
+            /**
+             * Configuration Fingerprint
+             * @default null
+             */
+            configuration_fingerprint: string | null;
+            /**
+             * Identity Evidence Id
+             * @default null
+             */
+            identity_evidence_id: string | null;
+            /**
+             * Identity Status
+             * @default pending
+             * @enum {string}
+             */
+            identity_status: "pending" | "verified";
+            /**
+             * Status
+             * @default unknown
+             * @enum {string}
+             */
+            status: "active" | "discontinued" | "unknown";
+        };
+        /** CatalogSource */
+        CatalogSource: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Synthetic
+             * @default false
+             */
+            synthetic: boolean;
+            /** Name */
+            name: string;
+            /** Domain */
+            domain: string;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "manufacturer" | "merchant" | "benchmark" | "manual";
+            /**
+             * Access Method
+             * @enum {string}
+             */
+            access_method: "manual" | "api" | "web" | "file";
+            /**
+             * Permission Status
+             * @default unknown
+             * @enum {string}
+             */
+            permission_status: "unknown" | "allowed" | "restricted" | "denied";
+            /**
+             * Permission Evidence
+             * @default null
+             */
+            permission_evidence: string | null;
+            /**
+             * Terms Checked At
+             * @default null
+             */
+            terms_checked_at: string | null;
+            /** Allowed Uses */
+            allowed_uses?: ("internal_review" | "public_display" | "automated_fetch" | "excerpt_storage")[];
+            /**
+             * Requests Per Minute
+             * @default null
+             */
+            requests_per_minute: number | null;
+        };
+        JsonValue: unknown;
     };
     responses: never;
     parameters: never;

@@ -2,7 +2,7 @@
 
 面向中国大陆市场，以预算、用途和偏好为输入，逐步构建可追溯的笔记本精确 SKU 推荐与经过规则校验的 PC 装机清单。
 
-**当前步骤 04 / I02：匿名会话与需求保存已实现。三入口支持保存、刷新恢复、版本冲突提示、新需求与删除；真实商品、报价和推荐尚未开放。完成后等待用户确认 T02。**
+**当前步骤 05 / T02：商品、来源、证据、事实与报价的 13 张领域表和强类型契约已实现。三入口与需求保存继续可用；真实商品、报价和推荐尚未开放。完成后等待用户确认 T03。**
 
 ## 本地运行
 
@@ -24,7 +24,7 @@ uv run --directory backend --frozen uvicorn app.main:create_app --factory --host
 ## 文档与验证
 
 - [完整执行计划](docs/EXECUTION_PLAN.md)、[任务台账](docs/TASKS.md)、[进度与验证记录](docs/PROGRESS.md)。
-- [I02 验收](docs/research/I02-acceptance.md)、[本轮 PR 说明](docs/reviews/I02-PR.md)、[版本矩阵](docs/runtime-matrix.md)；I01 记录保留于历史文档。
+- [T02 模型与关系图](docs/catalog-model.md)、[T02 验收](docs/research/T02-acceptance.md)、[本轮 PR 说明](docs/reviews/T02-PR.md)、[版本矩阵](docs/runtime-matrix.md)；前轮记录保留于历史文档。
 - [来源可行性核验](docs/research/V01-source-feasibility.md)、[人工报价路径](docs/manual-offer-workflow.md)。D01—D03 仍阻塞真实数据发布。
 - [原始规格](docs/PROJECT_SPEC.md)、[架构决策](docs/adr/README.md)、[数据字典](docs/data-dictionary.md)、[来源登记](docs/data-sources.md)、[API 边界](docs/api-contract.md)、[生成的 OpenAPI](docs/openapi.json)。
 

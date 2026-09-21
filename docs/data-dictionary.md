@@ -1,6 +1,6 @@
-# 核心数据语义草案
+# 核心数据语义
 
-依据规格 §6—12；商品/证据部分在 P2 转为强类型 Schema、PG 约束与测试。I02 已实现 anonymous_sessions（摘要/到期）、profiles（会话唯一/当前 revision）、profile_revisions（复合主键/JSONB 快照/来源/创建时间）、request_limits（摘要键/分钟窗口/计数），详见 [会话设计](sessions.md)。不代表商品表已实现或已生产部署。
+依据规格 §6—12。T02 已建立商品/来源/证据/事实/报价的强类型契约与 13 张 PG 表，详见 [字段、关系与实现边界](catalog-model.md)。I02 已实现 anonymous_sessions（摘要/到期）、profiles（会话唯一/当前 revision）、profile_revisions（复合主键/JSONB 快照/来源/创建时间）、request_limits（摘要键/分钟窗口/计数），详见 [会话设计](sessions.md)。下表中的总价、兼容性、评分与事务发布仍属后续阶段，尚无真实目录或生产部署。
 
 | 概念 | 语义 / 不变量 |
 |---|---|

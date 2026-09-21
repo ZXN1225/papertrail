@@ -8,7 +8,7 @@
 | V01 | 四类来源各 5 样本或失败证据、运行时版本核验 | T01、用户确认 | 步骤 02 / 规格 §9.2；报告见 research/V01-source-feasibility.md | done |
 | I01 | 前后端、PG/Redis、配置、CI、健康检查、锁文件 | V01 | 步骤 03；research/I01-acceptance.md | done |
 | I02 | 会话身份、权限与请求保护 | I01 | 步骤 04；research/I02-acceptance.md | done |
-| T02 | SKU/来源/证据 Schema 与领域首次迁移 | I01、V01 | 步骤 05 / §8 | todo |
+| T02 | SKU/来源/证据 Schema 与领域首次迁移 | I01、V01 | 步骤 05 / §8；research/T02-acceptance.md | done |
 | T03 | 人工导入、预览、审核、事务发布 | T02、I02 | 步骤 06 / §9 | todo |
 | T04 | 目录查询与前端只读列表、规格适配器 | T03 | 步骤 07 | todo |
 | T05 | 报价快照、人工 Provider、总价函数 | T02 | 步骤 07 / §9.5 | todo |
