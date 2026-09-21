@@ -22,7 +22,7 @@
 | T13 | 审核手册摄取、BM25、引用 | T03 | 步骤 14 / §10；research/T13-acceptance.md | done |
 | T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13；research/T14-acceptance.md | done |
 | T15 | PC/笔记本/单零件界面、后台、E2E | T10、T14 | 步骤 15；research/T15-acceptance.md | done |
-| T16 | 金标评估、部署、恢复演练（A/B 分轮） | T15 | 步骤 16—17 / §16—17 | todo |
+| T16 | 金标评估、部署、恢复演练（A/B 分轮） | T15 | 步骤 16—17 / §16—17；research/T16-A-acceptance.md | in_progress |
 
 详细交付、失败反例和确认点见 [完整执行计划](EXECUTION_PLAN.md)。跨任务接口变动先更新契约；一个 PR 聚焦一个可审查结果，不将所有阶段合并成一次提交。
 
