@@ -16,7 +16,7 @@
 | T07 | C004—C012 与完整报告聚合 | T06 | 步骤 09 / research/T07-acceptance.md | done |
 | T08 | 笔记本过滤与分项评分 | T04、T05 | 步骤 10 / research/T08-acceptance.md | done |
 | T09 | PC 有界求解 | T05、T07 | 步骤 11 / §12；research/T09-acceptance.md | done |
-| T10 | 快照保存、修订、比较、导出 | T08、T09、T11 | 步骤 12 | todo |
+| T10 | 快照保存、修订、比较、导出 | T08、T09、T11 | 步骤 12；research/T10-acceptance.md | done |
 | T11 | 画像 patch、revision 与会话状态 | I02 | 步骤 04 基础完成；Agent 状态机在 P5 扩充 / §6 | done |
 | T12 | 工具协议、Harness、模型适配 | T10、T11 | 步骤 13 / §6—7 | todo |
 | T13 | 审核手册摄取、BM25、引用 | T03 | 步骤 14 / §10 | todo |

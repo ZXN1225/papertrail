@@ -2,7 +2,15 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
+from pydantic import (
+    AwareDatetime,
+    Field,
+    JsonValue,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    model_validator,
+)
 
 from app.common.contracts import Contract
 from app.compatibility.contracts import CompatibilityReport, RequirementName, Slot
@@ -99,3 +107,48 @@ class PcSolveResponse(Contract):
     blocking_constraints: list[str]
     missing_data: list[str]
     relaxation_options: list[str]
+
+
+RecommendationMode = Literal["laptop", "pc"]
+
+
+class RecommendationCreate(Contract):
+    profile_id: UUID
+    profile_revision: Annotated[StrictInt, Field(ge=1)]
+    mode: RecommendationMode
+    request: dict[str, JsonValue]
+
+
+class RecommendationRevisionCreate(Contract):
+    request: dict[str, JsonValue]
+
+
+class RecommendationSnapshot(Contract):
+    id: UUID
+    lineage_id: UUID
+    parent_id: UUID | None
+    revision: StrictInt
+    profile_id: UUID
+    profile_revision: StrictInt
+    mode: RecommendationMode
+    request: dict[str, JsonValue]
+    result: dict[str, JsonValue]
+    data_version: UUID | None
+    expires_at: AwareDatetime | None
+    price_state: Literal["current", "historical", "unknown"]
+    created_at: AwareDatetime
+
+
+class ComparisonRequest(Contract):
+    recommendation_ids: Annotated[list[UUID], Field(min_length=2, max_length=3)]
+
+    @model_validator(mode="after")
+    def ids_are_distinct(self):
+        if len(set(self.recommendation_ids)) != len(self.recommendation_ids):
+            raise ValueError("Comparison IDs must be distinct")
+        return self
+
+
+class ComparisonResponse(Contract):
+    recommendations: list[RecommendationSnapshot]
+    price_differences_minor: list[StrictInt | None]

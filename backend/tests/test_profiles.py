@@ -21,6 +21,8 @@ from app.profiles.contracts import ProfileInput, ProfilePatch
 from app.profiles.models import profiles, revisions, sessions
 from app.profiles.router import set_cookie
 from app.profiles.service import DomainError, ProfileService
+from app.recommendation.contracts import RecommendationCreate, RecommendationRevisionCreate
+from app.recommendation.snapshot_service import RecommendationSnapshotService
 
 ORIGIN = "http://localhost:3000"
 # Scenario metadata is separate from the strict production profile request schema.
@@ -341,3 +343,66 @@ def test_shared_limit_and_dependency_fail_closed(database):
         response = client.post("/api/v1/sessions", json={}, headers={"Origin": ORIGIN})
         assert response.status_code == 503
         assert "redis://" not in response.text
+
+
+@pytest.mark.integration
+def test_recommendation_snapshot_history_idempotency_and_owner_isolation(client, database):
+    headers = bootstrap(client)
+    profile = save(client, headers)
+    service = RecommendationSnapshotService(
+        database[1], ProfileService(database[1], database[0]), catalog=None
+    )
+    service._run = lambda mode, request: {
+        "status": "ok",
+        "candidates": [{"total_minor": request["budget_minor"]}],
+        "data_version": None,
+    }
+    service._expiry = lambda mode, request, result: datetime.now(UTC) + timedelta(hours=1)
+    cookie = client.cookies.get("computer_session")
+    created = service.create(
+        cookie,
+        RecommendationCreate(
+            profile_id=UUID(profile["id"]),
+            profile_revision=1,
+            mode="laptop",
+            request={"budget_minor": 600001},
+        ),
+        "TEST-create-key",
+    )
+    replay = service.create(
+        cookie,
+        RecommendationCreate(
+            profile_id=UUID(profile["id"]),
+            profile_revision=1,
+            mode="laptop",
+            request={"budget_minor": 600001},
+        ),
+        "TEST-create-key",
+    )
+    assert replay["id"] == created["id"] and created["price_state"] == "current"
+    with pytest.raises(DomainError, match="幂等"):
+        service.create(
+            cookie,
+            RecommendationCreate(
+                profile_id=UUID(profile["id"]),
+                profile_revision=1,
+                mode="laptop",
+                request={"budget_minor": 600002},
+            ),
+            "TEST-create-key",
+        )
+    revised = service.revise(
+        cookie,
+        created["id"],
+        RecommendationRevisionCreate(request={"budget_minor": 500001}),
+        "TEST-revision-key",
+    )
+    assert revised["id"] != created["id"] and revised["revision"] == 2
+    assert service.read(cookie, created["id"])["request"]["budget_minor"] == 600001
+    assert "500001" in service.markdown(cookie, revised["id"])
+    with TestClient(create_app(database[0])) as other:
+        other_headers = bootstrap(other)
+        save(other, other_headers)
+        with pytest.raises(DomainError) as error:
+            service.read(other.cookies.get("computer_session"), created["id"])
+        assert error.value.status == 404
