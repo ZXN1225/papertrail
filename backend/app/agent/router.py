@@ -9,6 +9,7 @@ from app.agent.provider import DisabledProvider
 from app.agent.tools import ToolRegistry
 from app.catalog.read_service import CatalogReadService
 from app.common.contracts import ErrorResponse
+from app.knowledge.service import KnowledgeService
 from app.profiles.router import Service as ProfileService
 
 router = APIRouter(
@@ -20,7 +21,11 @@ router = APIRouter(
 
 async def harness_for(request: Request, profile: ProfileService):
     catalog = CatalogReadService(request.app.state.dependencies.engine, request.app.state.settings)
-    return AgentHarness(profile, ToolRegistry(catalog), DisabledProvider())
+    return AgentHarness(
+        profile,
+        ToolRegistry(catalog, KnowledgeService(request.app.state.dependencies.engine, catalog)),
+        DisabledProvider(),
+    )
 
 
 Harness = Annotated[AgentHarness, Depends(harness_for)]

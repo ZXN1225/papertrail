@@ -13,6 +13,7 @@ from app.catalog.contracts import Category, Region
 from app.common.contracts import Contract
 from app.compatibility.contracts import CompatibilityRequest
 from app.compatibility.service import CompatibilityService
+from app.knowledge.contracts import KnowledgeSearchRequest
 from app.recommendation.contracts import LaptopRankRequest, PcSolveRequest
 from app.recommendation.pc_solver import PcSolver
 from app.recommendation.service import LaptopRanker
@@ -44,8 +45,8 @@ class CompatibilityArgs(CompatibilityRequest):
 class ToolRegistry:
     """Maps model-visible names to validated domain-service calls only."""
 
-    def __init__(self, catalog):
-        self.catalog = catalog
+    def __init__(self, catalog, knowledge=None):
+        self.catalog, self.knowledge = catalog, knowledge
         self.schemas = {
             "search_catalog": SearchCatalogArgs,
             "get_product_facts": FactsArgs,
@@ -53,6 +54,7 @@ class ToolRegistry:
             "rank_laptops": None,
             "solve_pc_builds": None,
             "check_compatibility": CompatibilityArgs,
+            "retrieve_knowledge": KnowledgeSearchRequest,
         }
 
     def schema_names(self):
@@ -122,9 +124,13 @@ class ToolRegistry:
                     hard_requirements=requirements,
                 )
             )
-        else:
+        elif call.name == "check_compatibility":
             args = CompatibilityArgs.model_validate(call.arguments)
             data = CompatibilityService(self.catalog).check(args)
+        else:
+            if self.knowledge is None:
+                raise ValueError("Knowledge retrieval is unavailable")
+            data = self.knowledge.search(KnowledgeSearchRequest.model_validate(call.arguments))
         # Tool observations are JSON-only; providers never receive live service objects.
         data = json.loads(json.dumps(data, default=str))
         version = data.get("data_version") or data.get("candidate_pool_version")
@@ -135,6 +141,6 @@ class ToolRegistry:
             else "ok",
             data=data,
             evidence_ids=self._evidence_ids(data),
-            missing_fields=data.get("missing_data", []),
+            missing_fields=data.get("missing_data", data.get("missing_fields", [])),
             data_version=version,
         )

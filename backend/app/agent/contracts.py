@@ -14,6 +14,7 @@ ToolName = Literal[
     "rank_laptops",
     "solve_pc_builds",
     "check_compatibility",
+    "retrieve_knowledge",
 ]
 RunStatus = Literal[
     "completed",

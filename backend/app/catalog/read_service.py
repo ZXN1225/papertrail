@@ -62,6 +62,30 @@ class CatalogReadService:
             version, _ = self._version(conn)
         return version
 
+    def knowledge_document_reference(self, source_document_id):
+        """Return only a published document whose source permits stored public excerpts."""
+        with self.engine.connect() as conn:
+            version, records = self._version(conn)
+        if version is None:
+            raise DomainError(404, "SOURCE_DOCUMENT_NOT_FOUND", "来源文档不存在或尚未发布。")
+        index = self._index(records)
+        document = index.get("source_documents", {}).get(str(source_document_id))
+        source = index.get("sources", {}).get(str(document["source_id"])) if document else None
+        if (
+            not document
+            or not source
+            or source["permission_status"] not in {"allowed", "restricted"}
+            or not {"public_display", "excerpt_storage"}.issubset(source["allowed_uses"])
+        ):
+            raise DomainError(
+                404, "SOURCE_DOCUMENT_NOT_FOUND", "来源文档不存在或未获片段展示许可。"
+            )
+        return {
+            "data_version": version,
+            "title": document["title"],
+            "canonical_url": document["canonical_url"],
+        }
+
     @staticmethod
     def _index(records):
         indexed = {}

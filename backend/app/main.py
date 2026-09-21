@@ -20,6 +20,8 @@ from app.common.dependencies import Dependencies
 from app.compatibility.router import router as compatibility_router
 from app.ingestion.auth import AdminProtection
 from app.ingestion.router import router as import_router
+from app.knowledge.router import admin_router as knowledge_admin_router
+from app.knowledge.router import router as knowledge_router
 from app.profiles.protection import WriteProtection
 from app.profiles.router import router as profile_router
 from app.profiles.service import DomainError
@@ -53,6 +55,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.openapi = record_openapi
     app.include_router(profile_router)
     app.include_router(import_router)
+    app.include_router(knowledge_admin_router)
+    app.include_router(knowledge_router)
     app.include_router(catalog_router)
     app.include_router(compatibility_router)
     app.include_router(recommendation_router)

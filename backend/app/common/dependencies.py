@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.common.config import Settings
 from app.common.contracts import DependencyChecks, ReadyResponse
 
-SCHEMA_REVISION = "0005_recommendation_snapshots"
+SCHEMA_REVISION = "0006_knowledge_bm25"
 
 
 class Dependencies:
