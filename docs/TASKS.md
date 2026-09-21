@@ -20,7 +20,7 @@
 | T11 | 画像 patch、revision 与会话状态 | I02 | 步骤 04 基础完成；Agent 状态机在 P5 扩充 / §6 | done |
 | T12 | 工具协议、Harness、模型适配 | T10、T11 | 步骤 13 / §6—7；research/T12-acceptance.md | done |
 | T13 | 审核手册摄取、BM25、引用 | T03 | 步骤 14 / §10；research/T13-acceptance.md | done |
-| T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13 | todo |
+| T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13；research/T14-acceptance.md | done |
 | T15 | PC/笔记本/单零件界面、后台、E2E | T10、T14 | 步骤 15 | todo |
 | T16 | 金标评估、部署、恢复演练（A/B 分轮） | T15 | 步骤 16—17 / §16—17 | todo |
 

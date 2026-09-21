@@ -4,6 +4,7 @@ from uuid import uuid4
 from app.agent.contracts import AgentDecision, AgentPreviewRequest, ToolCall, ToolObservation
 from app.agent.harness import AgentHarness
 from app.agent.provider import DisabledProvider, ScriptedProvider
+from app.agent.run_service import AgentRunService
 from app.agent.tools import ToolRegistry
 
 
@@ -95,3 +96,43 @@ def test_catalog_tool_returns_json_only_observation_data():
     )
     assert isinstance(observation.data["items"][0]["id"], str)
     assert observation.data_version is not None
+
+
+def test_answer_contract_uses_only_structured_tool_candidates_and_citations():
+    document_id, chunk_id, data_version = uuid4(), uuid4(), uuid4()
+    result = {
+        "status": "completed",
+        "profile_revision": 2,
+        "reason": "TEST_DONE",
+        "observations": [
+            ToolObservation(
+                name="rank_laptops",
+                status="ok",
+                evidence_ids=[],
+                missing_fields=["current_offer"],
+                data_version=data_version,
+                data={"candidates": [{"sku_id": "TEST-SKU"}]},
+            ),
+            ToolObservation(
+                name="retrieve_knowledge",
+                status="ok",
+                evidence_ids=[],
+                missing_fields=[],
+                data={
+                    "citations": [
+                        {
+                            "document_id": str(document_id),
+                            "chunk_id": str(chunk_id),
+                            "title": "TEST",
+                            "canonical_url": "https://example.test",
+                            "locator": "p1",
+                        }
+                    ]
+                },
+            ),
+        ],
+    }
+    answer = AgentRunService._answer(result)
+    assert answer.candidates[0].data["sku_id"] == "TEST-SKU"
+    assert answer.citations[0].document_id == document_id
+    assert answer.missing_fields == ["current_offer"] and answer.data_version == data_version
