@@ -378,7 +378,9 @@ def test_migration_preserves_sessions_and_empty_catalog(database):
     with TestClient(create_app(settings)) as client:
         assert client.get("/api/v1/health/ready").status_code == 200
         assert client.get("/api/v1/platform/status").json()["recommendation_available"] is False
-        assert client.get("/api/v1/catalog/products").status_code == 404
+        response = client.get("/api/v1/catalog/products")
+        assert response.status_code == 200
+        assert response.json()["empty_reason"] == "no_published_catalog"
 
 
 @pytest.mark.integration
@@ -524,13 +526,13 @@ def test_missing_values_and_unmatched_listing(conn, graph):
             conn.execute(update(m.offers).values(listing_id=pending["id"]))
 
 
-def test_openapi_documents_records_without_exposing_import_routes():
+def test_openapi_documents_records_and_published_catalog_routes():
     schema = create_app(
         Settings(_env_file=None, app_env="test", database_url="", redis_url="")
     ).openapi()
     assert "CatalogOffer" in schema["components"]["schemas"]
     assert "CatalogSKU" in schema["components"]["schemas"]
-    assert "/api/v1/catalog/products" not in schema["paths"]
+    assert "/api/v1/catalog/products" in schema["paths"]
     assert "/api/v1/admin/imports" in schema["paths"]
 
 

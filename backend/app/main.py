@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
@@ -10,6 +11,8 @@ from pydantic.json_schema import models_json_schema
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.catalog.contracts import RECORD_MODELS
+from app.catalog.read_service import CatalogReadService
+from app.catalog.router import router as catalog_router
 from app.common.config import Settings
 from app.common.contracts import ErrorResponse, LiveResponse, PlatformStatus, ReadyResponse
 from app.common.dependencies import Dependencies
@@ -47,6 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.openapi = record_openapi
     app.include_router(profile_router)
     app.include_router(import_router)
+    app.include_router(catalog_router)
     app.add_middleware(AdminProtection, settings=settings)
     app.add_middleware(
         WriteProtection, origins=set(settings.origins + [settings.public_base_url.rstrip("/")])
@@ -149,7 +153,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     }
                 },
             )
-        # Public catalog arrives in T04. This describes capability, not import/version counts.
-        return PlatformStatus()
+        catalog = CatalogReadService(
+            request.app.state.dependencies.engine, request.app.state.settings
+        )
+        version = await asyncio.to_thread(catalog.current_version)
+        return PlatformStatus(data_status="published" if version else "empty", data_version=version)
 
     return app

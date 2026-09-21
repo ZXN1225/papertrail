@@ -22,6 +22,20 @@ async function saved(page: Page, budget = "6000.01") {
   ).toBeVisible();
 }
 
+test("published catalog has an honest empty state without test products", async ({
+  page,
+}) => {
+  await page.goto("/catalog");
+  await expect(
+    page.getByRole("heading", { name: "尚无可公开的商品" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "只有经过来源许可、证据核验和版本发布的精确 SKU 才会出现在这里。",
+    ),
+  ).toBeVisible();
+});
+
 test("save, restore, patch and all three device modes through real API", async ({
   page,
 }, testInfo) => {

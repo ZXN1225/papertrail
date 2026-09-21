@@ -1,6 +1,6 @@
 # 人工导入、审核与版本发布 · T03
 
-本轮提供管理员 API 和 CLI，共用 `app/ingestion/service.py`。管理员网页工作台在 T15；现阶段可以通过 API `/docs` 或 CLI 查看完整规范化记录、行错误、差异与审核结果。T04 的公开目录尚未开放，首页仍是数据准备中。
+本轮提供管理员 API 和 CLI，共用 `app/ingestion/service.py`。管理员网页工作台在 T15；现阶段可以通过 API `/docs` 或 CLI 查看完整规范化记录、行错误、差异与审核结果。T04/T05 已提供只读公开目录和确定性报价计算，仍不提供管理员网页工作台。
 
 ```mermaid
 flowchart LR
@@ -86,7 +86,7 @@ REVIEW_JSON：`{"content_hash":"HASH","base_version":null,"decision":"approve","
 
 outbox 消费使用 SKIP LOCKED、30 秒租约、失败退避（上限 300 秒）和 version_id 唯一通知记录。进程崩溃后过期租约可重领，消费端须容忍至少一次投递。当前落地的是持久通知 inbox，没有外部缓存或知识索引，不把 delivered 宣称为 RAG 重建成功。没有自动后台调度；手动 dispatch 可重试，生产调度留待部署阶段。
 
-没有执行下游目录查询/推荐时，平台仍返回 not_initialized、data_version=null；这表示用户可用能力尚未开放。T04 将接入当前真实版本。合成版本独立指针，禁止成为真实版本父节点或投影。
+平台状态返回 `empty` 或 `published` 与当前数据版本；这只描述目录是否可读取，不表示可推荐。合成版本独立指针，禁止成为真实版本父节点或投影。
 
 ## 验收与限制
 

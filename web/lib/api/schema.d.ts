@@ -193,6 +193,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products */
+        get: operations["list_catalog_products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/products/{sku_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Product */
+        get: operations["get_catalog_product"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/products/{sku_id}/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Offers */
+        get: operations["list_catalog_offers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/price-quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quote */
+        post: operations["quote_catalog_prices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/live": {
         parameters: {
             query?: never;
@@ -248,6 +316,22 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CatalogPage */
+        CatalogPage: {
+            /** Items */
+            items: components["schemas"]["ProductSummary"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Data Version */
+            data_version?: string | null;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Empty Reason */
+            empty_reason?: "no_published_catalog" | null;
+        };
         /** DependencyChecks */
         DependencyChecks: {
             /**
@@ -279,6 +363,45 @@ export interface components {
         /** ErrorResponse */
         ErrorResponse: {
             error: components["schemas"]["ErrorDetail"];
+        };
+        /** FactView */
+        FactView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Description */
+            description: string;
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "text" | "integer" | "decimal" | "boolean";
+            /** Value */
+            value: string | number | boolean | null;
+            /** Unit */
+            unit: string;
+            /** Raw Value */
+            raw_value: string | null;
+            /** Raw Unit */
+            raw_unit: string | null;
+            /** Missing Reason */
+            missing_reason: ("not_collected" | "not_disclosed" | "conflicting" | "not_applicable") | null;
+            /** Conditions */
+            conditions: {
+                [key: string]: unknown;
+            };
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to: string | null;
+            evidence: components["schemas"]["SourceReference"];
         };
         /** FieldOrigin */
         FieldOrigin: {
@@ -408,6 +531,94 @@ export interface components {
              */
             status: "alive";
         };
+        /** OfferPage */
+        OfferPage: {
+            /** Items */
+            items: components["schemas"]["OfferView"][];
+            /** Data Version */
+            data_version?: string | null;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Empty Reason */
+            empty_reason?: ("no_published_catalog" | "no_matching_offers") | null;
+        };
+        /** OfferView */
+        OfferView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /** Merchant Name */
+            merchant_name: string;
+            /** Platform */
+            platform: string;
+            /** Listing Url */
+            listing_url: string;
+            /** Amount Minor */
+            amount_minor: number | null;
+            /** Amount Missing Reason */
+            amount_missing_reason: ("not_collected" | "not_disclosed" | "conflicting" | "not_applicable") | null;
+            /** Shipping Minor */
+            shipping_minor: number | null;
+            /** Tax Minor */
+            tax_minor: number | null;
+            /** Tax Included */
+            tax_included: boolean | null;
+            /**
+             * Currency
+             * @constant
+             */
+            currency: "CNY";
+            /** Region */
+            region: string;
+            /**
+             * Stock Status
+             * @enum {string}
+             */
+            stock_status: "in_stock" | "out_of_stock" | "preorder" | "unknown";
+            /**
+             * Condition
+             * @enum {string}
+             */
+            condition: "new" | "used" | "refurbished" | "unknown";
+            /**
+             * Eligibility Type
+             * @enum {string}
+             */
+            eligibility_type: "unconditional" | "member" | "coupon" | "bundle" | "unknown";
+            /** Eligibility Details */
+            eligibility_details: string | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Freshness
+             * @enum {string}
+             */
+            freshness: "current" | "historical";
+            evidence: components["schemas"]["SourceReference"];
+            /**
+             * Data Version
+             * Format: uuid
+             */
+            data_version: string;
+        };
         /** PCConstraints */
         PCConstraints: {
             /** Wifi Required */
@@ -423,16 +634,16 @@ export interface components {
         PlatformStatus: {
             /**
              * Stage
-             * @default foundation
+             * @default catalog
              * @constant
              */
-            stage: "foundation";
+            stage: "catalog";
             /**
              * Data Status
-             * @default not_initialized
-             * @constant
+             * @default empty
+             * @enum {string}
              */
-            data_status: "not_initialized";
+            data_status: "empty" | "published";
             /**
              * Recommendation Available
              * @default false
@@ -458,7 +669,7 @@ export interface components {
              */
             currency: "CNY";
             /** Data Version */
-            data_version?: null;
+            data_version?: string | null;
         };
         /** Preview */
         Preview: {
@@ -478,6 +689,171 @@ export interface components {
             normalized: components["schemas"]["ImportRow"][];
             /** Conflict Groups */
             conflict_groups: string[][];
+        };
+        /** PriceItemInput */
+        PriceItemInput: {
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+            /** Offer Id */
+            offer_id?: string | null;
+        };
+        /** PriceQuote */
+        PriceQuote: {
+            /** Data Version */
+            data_version: string | null;
+            /** Lines */
+            lines: components["schemas"]["PricedLine"][];
+            /** Known Subtotal Minor */
+            known_subtotal_minor: number;
+            /** Total Minor */
+            total_minor: number | null;
+            /** Price Complete */
+            price_complete: boolean;
+            /** Budget Minor */
+            budget_minor: number | null;
+            /** Budget Satisfied */
+            budget_satisfied: boolean | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** PriceRequest */
+        PriceRequest: {
+            /**
+             * Region
+             * @default CN
+             */
+            region: string;
+            /** Budget Minor */
+            budget_minor?: number | null;
+            /** Items */
+            items: components["schemas"]["PriceItemInput"][];
+        };
+        /** PricedLine */
+        PricedLine: {
+            /**
+             * Sku Id
+             * Format: uuid
+             */
+            sku_id: string;
+            /** Quantity */
+            quantity: number;
+            /** Offer Id */
+            offer_id: string | null;
+            /** Amount Minor */
+            amount_minor: number | null;
+            /** Shipping Minor */
+            shipping_minor: number | null;
+            /** Tax Minor */
+            tax_minor: number | null;
+            /** Tax Included */
+            tax_included: boolean | null;
+            /** Known Total Minor */
+            known_total_minor: number;
+            /** Unpriced Reasons */
+            unpriced_reasons: ("NO_CURRENT_OFFER" | "PRICE_UNKNOWN" | "SHIPPING_UNKNOWN" | "TAX_UNKNOWN")[];
+            /** Expires At */
+            expires_at: string | null;
+        };
+        /** ProductDetail */
+        ProductDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop";
+            /** Region */
+            region: string;
+            /** Brand */
+            brand: string;
+            /** Family */
+            family: string;
+            /** Manufacturer Part Number */
+            manufacturer_part_number: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "discontinued" | "unknown";
+            /**
+             * Data Version
+             * Format: uuid
+             */
+            data_version: string;
+            /** Missing Key Facts */
+            missing_key_facts: boolean;
+            /**
+             * Identity Status
+             * @enum {string}
+             */
+            identity_status: "pending" | "verified";
+            /**
+             * Revision Status
+             * @enum {string}
+             */
+            revision_status: "unknown" | "known" | "not_applicable";
+            /** Hardware Revision */
+            hardware_revision: string | null;
+            /** Configuration Fingerprint */
+            configuration_fingerprint: string | null;
+            /** Aliases */
+            aliases: string[];
+            /** Facts */
+            facts: components["schemas"]["FactView"][];
+        };
+        /** ProductSummary */
+        ProductSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Key */
+            record_key: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop";
+            /** Region */
+            region: string;
+            /** Brand */
+            brand: string;
+            /** Family */
+            family: string;
+            /** Manufacturer Part Number */
+            manufacturer_part_number: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "discontinued" | "unknown";
+            /**
+             * Data Version
+             * Format: uuid
+             */
+            data_version: string;
+            /** Missing Key Facts */
+            missing_key_facts: boolean;
         };
         /** ProfileInput */
         ProfileInput: {
@@ -619,6 +995,33 @@ export interface components {
             /** Csrf Token */
             csrf_token: string;
             profile?: components["schemas"]["ProfileSnapshot"] | null;
+        };
+        /** SourceReference */
+        SourceReference: {
+            /** Source Name */
+            source_name: string;
+            /** Source Domain */
+            source_domain: string;
+            /** Document Title */
+            document_title: string;
+            /** Canonical Url */
+            canonical_url: string;
+            /** Document Hash */
+            document_hash: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /**
+             * Locator Kind
+             * @enum {string}
+             */
+            locator_kind: "page" | "section" | "selector" | "json_pointer";
+            /** Locator */
+            locator: string;
+            /** Excerpt Hash */
+            excerpt_hash: string;
         };
         /** CatalogAlias */
         CatalogAlias: {
@@ -2513,6 +2916,211 @@ export interface operations {
             };
             /** @description Too Many Requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_catalog_products: {
+        parameters: {
+            query?: {
+                category?: ("cpu" | "gpu" | "motherboard" | "memory" | "ssd" | "psu" | "case" | "cooler" | "laptop") | null;
+                region?: string | null;
+                q?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_catalog_product: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sku_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetail"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_catalog_offers: {
+        parameters: {
+            query?: {
+                region?: string | null;
+                include_historical?: boolean;
+            };
+            header?: never;
+            path: {
+                sku_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferPage"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    quote_catalog_prices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceQuote"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

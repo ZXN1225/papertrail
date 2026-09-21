@@ -1,4 +1,5 @@
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -33,10 +34,10 @@ class ErrorResponse(Contract):
 
 
 class PlatformStatus(Contract):
-    stage: Literal["foundation"] = "foundation"
-    data_status: Literal["not_initialized"] = "not_initialized"
+    stage: Literal["catalog"] = "catalog"
+    data_status: Literal["empty", "published"] = "empty"
     recommendation_available: Literal[False] = False
     mode: Literal["deterministic"] = "deterministic"
     market: Literal["CN"] = "CN"
     currency: Literal["CNY"] = "CNY"
-    data_version: None = None
+    data_version: UUID | None = None

@@ -11,6 +11,9 @@ export default function Home() {
         <a className="header-link" href="#principles">
           推荐原则 <span aria-hidden="true">↗</span>
         </a>
+        <a className="header-link" href="/catalog">
+          浏览目录 <span aria-hidden="true">↗</span>
+        </a>
       </header>
       <main>
         <section className="hero">

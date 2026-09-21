@@ -138,7 +138,7 @@ def test_real_postgres_empty_migration_and_dependency_failures(monkeypatch):
         with TestClient(create_app(config)) as client:
             assert client.get("/api/v1/health/ready").status_code == 200
             body = client.get("/api/v1/platform/status").json()
-            assert body["data_status"] == "not_initialized"
+            assert body["data_status"] == "empty"
             assert body["recommendation_available"] is False
             assert body["data_version"] is None
             assert body["mode"] == "deterministic"

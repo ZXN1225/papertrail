@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     llm_provider: Literal["disabled"] = "disabled"
     session_write_limit: int = Field(default=60, ge=1, le=600)
     admin_auth_config: SecretStr = SecretStr("")
+    price_max_age_seconds: int = Field(default=86400, ge=60, le=2592000)
 
     @field_validator("database_url")
     @classmethod

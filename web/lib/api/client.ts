@@ -65,8 +65,8 @@ export async function getPlatformStatus(
   if (!response.ok) throw new Error("Service unavailable");
   const value: PlatformStatus = await response.json();
   if (
-    value.stage !== "foundation" ||
-    value.data_status !== "not_initialized" ||
+    value.stage !== "catalog" ||
+    !["empty", "published"].includes(value.data_status) ||
     value.recommendation_available !== false ||
     value.currency !== "CNY" ||
     value.market !== "CN"

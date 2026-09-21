@@ -3,9 +3,11 @@ const uuid = "[0-9a-fA-F-]{36}";
 const allowed = new Map([
   [
     "GET",
-    new RegExp(`^(sessions/current|profiles/${uuid}(/revisions/[0-9]+)?)$`),
+    new RegExp(
+      `^(sessions/current|profiles/${uuid}(/revisions/[0-9]+)?|catalog/products(/${uuid}(/offers)?)?)$`,
+    ),
   ],
-  ["POST", /^(sessions|sessions\/reset|profiles)$/],
+  ["POST", /^(sessions|sessions\/reset|profiles|catalog\/price-quotes)$/],
   ["PATCH", new RegExp(`^profiles/${uuid}$`)],
   ["DELETE", /^sessions\/current$/],
 ]);

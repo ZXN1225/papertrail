@@ -1529,6 +1529,363 @@
         }
       }
     },
+    "/api/v1/catalog/products": {
+      "get": {
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "Products",
+        "operationId": "list_catalog_products",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cpu",
+                    "gpu",
+                    "motherboard",
+                    "memory",
+                    "ssd",
+                    "psu",
+                    "case",
+                    "cooler",
+                    "laptop"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/products/{sku_id}": {
+      "get": {
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "Product",
+        "operationId": "get_catalog_product",
+        "parameters": [
+          {
+            "name": "sku_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sku Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/products/{sku_id}/offers": {
+      "get": {
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "Offers",
+        "operationId": "list_catalog_offers",
+        "parameters": [
+          {
+            "name": "sku_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Sku Id"
+            }
+          },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "name": "include_historical",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Historical"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfferPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/price-quotes": {
+      "post": {
+        "tags": [
+          "Published catalog"
+        ],
+        "summary": "Quote",
+        "operationId": "quote_catalog_prices",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceQuote"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "summary": "Live",
@@ -1606,6 +1963,64 @@
   },
   "components": {
     "schemas": {
+      "CatalogPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "no_published_catalog"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "generated_at"
+        ],
+        "title": "CatalogPage"
+      },
       "DependencyChecks": {
         "properties": {
           "database": {
@@ -1686,6 +2101,136 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "FactView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "integer",
+              "decimal",
+              "boolean"
+            ],
+            "title": "Value Type"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "raw_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Value"
+          },
+          "raw_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Unit"
+          },
+          "missing_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_collected",
+                  "not_disclosed",
+                  "conflicting",
+                  "not_applicable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Reason"
+          },
+          "conditions": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Conditions"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/SourceReference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "description",
+          "value_type",
+          "value",
+          "unit",
+          "raw_value",
+          "raw_unit",
+          "missing_reason",
+          "conditions",
+          "valid_from",
+          "valid_to",
+          "evidence"
+        ],
+        "title": "FactView"
       },
       "FieldOrigin": {
         "properties": {
@@ -1996,6 +2541,253 @@
         "type": "object",
         "title": "LiveResponse"
       },
+      "OfferPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OfferView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "empty_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "no_published_catalog",
+                  "no_matching_offers"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "generated_at"
+        ],
+        "title": "OfferPage"
+      },
+      "OfferView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          },
+          "merchant_name": {
+            "type": "string",
+            "title": "Merchant Name"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "listing_url": {
+            "type": "string",
+            "title": "Listing Url"
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
+          "amount_missing_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_collected",
+                  "not_disclosed",
+                  "conflicting",
+                  "not_applicable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Missing Reason"
+          },
+          "shipping_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Minor"
+          },
+          "tax_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Minor"
+          },
+          "tax_included": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Included"
+          },
+          "currency": {
+            "type": "string",
+            "const": "CNY",
+            "title": "Currency"
+          },
+          "region": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region"
+          },
+          "stock_status": {
+            "type": "string",
+            "enum": [
+              "in_stock",
+              "out_of_stock",
+              "preorder",
+              "unknown"
+            ],
+            "title": "Stock Status"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "new",
+              "used",
+              "refurbished",
+              "unknown"
+            ],
+            "title": "Condition"
+          },
+          "eligibility_type": {
+            "type": "string",
+            "enum": [
+              "unconditional",
+              "member",
+              "coupon",
+              "bundle",
+              "unknown"
+            ],
+            "title": "Eligibility Type"
+          },
+          "eligibility_details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligibility Details"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Observed At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "freshness": {
+            "type": "string",
+            "enum": [
+              "current",
+              "historical"
+            ],
+            "title": "Freshness"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/SourceReference"
+          },
+          "data_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "sku_id",
+          "merchant_name",
+          "platform",
+          "listing_url",
+          "amount_minor",
+          "amount_missing_reason",
+          "shipping_minor",
+          "tax_minor",
+          "tax_included",
+          "currency",
+          "region",
+          "stock_status",
+          "condition",
+          "eligibility_type",
+          "eligibility_details",
+          "observed_at",
+          "expires_at",
+          "freshness",
+          "evidence",
+          "data_version"
+        ],
+        "title": "OfferView"
+      },
       "PCConstraints": {
         "properties": {
           "wifi_required": {
@@ -2037,15 +2829,18 @@
         "properties": {
           "stage": {
             "type": "string",
-            "const": "foundation",
+            "const": "catalog",
             "title": "Stage",
-            "default": "foundation"
+            "default": "catalog"
           },
           "data_status": {
             "type": "string",
-            "const": "not_initialized",
+            "enum": [
+              "empty",
+              "published"
+            ],
             "title": "Data Status",
-            "default": "not_initialized"
+            "default": "empty"
           },
           "recommendation_available": {
             "type": "boolean",
@@ -2072,7 +2867,15 @@
             "default": "CNY"
           },
           "data_version": {
-            "type": "null",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Data Version"
           }
         },
@@ -2153,6 +2956,529 @@
           "conflict_groups"
         ],
         "title": "Preview"
+      },
+      "PriceItemInput": {
+        "properties": {
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sku_id"
+        ],
+        "title": "PriceItemInput"
+      },
+      "PriceQuote": {
+        "properties": {
+          "data_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Version"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PricedLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "known_subtotal_minor": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Known Subtotal Minor"
+          },
+          "total_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Minor"
+          },
+          "price_complete": {
+            "type": "boolean",
+            "title": "Price Complete"
+          },
+          "budget_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Minor"
+          },
+          "budget_satisfied": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Satisfied"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "lines",
+          "known_subtotal_minor",
+          "total_minor",
+          "price_complete",
+          "budget_minor",
+          "budget_satisfied",
+          "expires_at",
+          "generated_at"
+        ],
+        "title": "PriceQuote"
+      },
+      "PriceRequest": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region",
+            "default": "CN"
+          },
+          "budget_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Minor"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PriceItemInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PriceRequest"
+      },
+      "PricedLine": {
+        "properties": {
+          "sku_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sku Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "offer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Id"
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor"
+          },
+          "shipping_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipping Minor"
+          },
+          "tax_minor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Minor"
+          },
+          "tax_included": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Included"
+          },
+          "known_total_minor": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 0.0,
+            "title": "Known Total Minor"
+          },
+          "unpriced_reasons": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "NO_CURRENT_OFFER",
+                "PRICE_UNKNOWN",
+                "SHIPPING_UNKNOWN",
+                "TAX_UNKNOWN"
+              ]
+            },
+            "type": "array",
+            "title": "Unpriced Reasons"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sku_id",
+          "quantity",
+          "offer_id",
+          "amount_minor",
+          "shipping_minor",
+          "tax_minor",
+          "tax_included",
+          "known_total_minor",
+          "unpriced_reasons",
+          "expires_at"
+        ],
+        "title": "PricedLine"
+      },
+      "ProductDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "record_key": {
+            "type": "string",
+            "title": "Record Key"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "cpu",
+              "gpu",
+              "motherboard",
+              "memory",
+              "ssd",
+              "psu",
+              "case",
+              "cooler",
+              "laptop"
+            ],
+            "title": "Category"
+          },
+          "region": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region"
+          },
+          "brand": {
+            "type": "string",
+            "title": "Brand"
+          },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "manufacturer_part_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer Part Number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "discontinued",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "data_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Version"
+          },
+          "missing_key_facts": {
+            "type": "boolean",
+            "title": "Missing Key Facts"
+          },
+          "identity_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified"
+            ],
+            "title": "Identity Status"
+          },
+          "revision_status": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "known",
+              "not_applicable"
+            ],
+            "title": "Revision Status"
+          },
+          "hardware_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware Revision"
+          },
+          "configuration_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Fingerprint"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactView"
+            },
+            "type": "array",
+            "title": "Facts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "record_key",
+          "category",
+          "region",
+          "brand",
+          "family",
+          "manufacturer_part_number",
+          "status",
+          "data_version",
+          "missing_key_facts",
+          "identity_status",
+          "revision_status",
+          "hardware_revision",
+          "configuration_fingerprint",
+          "aliases",
+          "facts"
+        ],
+        "title": "ProductDetail"
+      },
+      "ProductSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "record_key": {
+            "type": "string",
+            "title": "Record Key"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "cpu",
+              "gpu",
+              "motherboard",
+              "memory",
+              "ssd",
+              "psu",
+              "case",
+              "cooler",
+              "laptop"
+            ],
+            "title": "Category"
+          },
+          "region": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "title": "Region"
+          },
+          "brand": {
+            "type": "string",
+            "title": "Brand"
+          },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "manufacturer_part_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer Part Number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "discontinued",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "data_version": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Version"
+          },
+          "missing_key_facts": {
+            "type": "boolean",
+            "title": "Missing Key Facts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "record_key",
+          "category",
+          "region",
+          "brand",
+          "family",
+          "manufacturer_part_number",
+          "status",
+          "data_version",
+          "missing_key_facts"
+        ],
+        "title": "ProductSummary"
       },
       "ProfileInput": {
         "properties": {
@@ -2672,6 +3998,67 @@
           "csrf_token"
         ],
         "title": "SessionResponse"
+      },
+      "SourceReference": {
+        "properties": {
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "source_domain": {
+            "type": "string",
+            "title": "Source Domain"
+          },
+          "document_title": {
+            "type": "string",
+            "title": "Document Title"
+          },
+          "canonical_url": {
+            "type": "string",
+            "title": "Canonical Url"
+          },
+          "document_hash": {
+            "type": "string",
+            "title": "Document Hash"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "locator_kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "section",
+              "selector",
+              "json_pointer"
+            ],
+            "title": "Locator Kind"
+          },
+          "locator": {
+            "type": "string",
+            "title": "Locator"
+          },
+          "excerpt_hash": {
+            "type": "string",
+            "title": "Excerpt Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_name",
+          "source_domain",
+          "document_title",
+          "canonical_url",
+          "document_hash",
+          "fetched_at",
+          "locator_kind",
+          "locator",
+          "excerpt_hash"
+        ],
+        "title": "SourceReference"
       },
       "CatalogAlias": {
         "additionalProperties": false,
