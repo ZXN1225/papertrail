@@ -1,0 +1,16 @@
+{
+  "dataset_id": "synthetic-retrieval-v1",
+  "synthetic": true,
+  "purpose": "TEST-only retrieval metric fixture; no real products, prices, or market claims.",
+  "documents": [
+    {"doc_id": "TEST-DOC-CPU-A", "text": "TEST CPU ALPHA 使用 TEST SOCKET A，核心数量为八。"},
+    {"doc_id": "TEST-DOC-BOARD-A", "text": "TEST BOARD ALPHA 使用 TEST SOCKET A，支持 TEST MEMORY X。"},
+    {"doc_id": "TEST-DOC-GPU-B", "text": "TEST GPU BETA 需要两个 TEST POWER 连接器。"},
+    {"doc_id": "TEST-DOC-PRICE-C", "text": "TEST OFFER GAMMA 的运费未知，不能判定预算通过。"}
+  ],
+  "queries": [
+    {"case_id": "TEST-RET-001", "query": "TEST CPU ALPHA 使用什么 SOCKET", "relevance": {"TEST-DOC-CPU-A": 3, "TEST-DOC-BOARD-A": 1}},
+    {"case_id": "TEST-RET-002", "query": "TEST GPU BETA 需要几个 POWER 连接器", "relevance": {"TEST-DOC-GPU-B": 3}},
+    {"case_id": "TEST-RET-003", "query": "运费未知时能否判预算通过", "relevance": {"TEST-DOC-PRICE-C": 3}}
+  ]
+}
