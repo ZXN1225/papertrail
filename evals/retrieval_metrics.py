@@ -19,7 +19,7 @@ def overlap(query, documents):
 
 def bm25(query, documents):
     terms, tokenized = tokenize(query), [tokenize(doc["text"]) for doc in documents]
-    if not terms:
+    if not terms or not documents:
         return []
     average = sum(max(1, len(tokens)) for tokens in tokenized) / len(tokenized)
     frequencies = [Counter(tokens) for tokens in tokenized]
@@ -31,18 +31,41 @@ def bm25(query, documents):
                 continue
             df = sum(term in item for item in tokenized)
             inverse = math.log(1 + (len(documents) - df + 0.5) / (df + 0.5))
-            score += inverse * counts[term] * 2.2 / (counts[term] + 1.2 * (0.25 + 0.75 * len(tokens) / average))
+            score += (
+                inverse
+                * counts[term]
+                * 2.2
+                / (counts[term] + 1.2 * (0.25 + 0.75 * len(tokens) / average))
+            )
         result.append((score, doc["doc_id"]))
     return sorted(result, key=lambda item: (-item[0], item[1]))
 
 
+def reciprocal_rank_fusion(rankings, constant=60):
+    """Fuse independent ranked lists by reciprocal rank; ranks are 1-based."""
+    scores = Counter()
+    for ranking in rankings:
+        for rank, identifier in enumerate(ranking, start=1):
+            scores[identifier] += 1 / (constant + rank)
+    return sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+
+
 def metrics(ranked_ids, relevance, k):
+    if k < 1:
+        raise ValueError("k must be >= 1")
     ranked = ranked_ids[:k]
-    first = next((index + 1 for index, item in enumerate(ranked) if relevance.get(item, 0) > 0), None)
+    first = next(
+        (index + 1 for index, item in enumerate(ranked) if relevance.get(item, 0) > 0), None
+    )
     hit = 1.0 if first else 0.0
     mrr = 1.0 / first if first else 0.0
-    gain = lambda value: (2**value - 1)
-    dcg = sum(gain(relevance.get(item, 0)) / math.log2(index + 2) for index, item in enumerate(ranked))
+
+    def gain(value):
+        return 2**value - 1
+
+    dcg = sum(
+        gain(relevance.get(item, 0)) / math.log2(index + 2) for index, item in enumerate(ranked)
+    )
     ideal = sorted(relevance.values(), reverse=True)[:k]
     idcg = sum(gain(value) / math.log2(index + 2) for index, value in enumerate(ideal))
     return {"hit": hit, "mrr": mrr, "ndcg": dcg / idcg if idcg else 0.0}

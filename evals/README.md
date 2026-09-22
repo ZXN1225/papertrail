@@ -18,6 +18,20 @@ python -m unittest evals/test_retrieval_metrics.py
 
 报告包含 Hit@k、MRR@k、NDCG@k、查询均值/P95 延迟、数据集 SHA-256、方法和限制。只有在独立人工金标、保留集、固定环境和足够样本完成后，才能把这些指标用于项目质量结论。
 
+## T20 多桶对照与 Agent 工具策略
+
+运行 24 条多桶检索集的词面 overlap、BM25 和 RRF(overlap+BM25) 对照，并可写出 JSON 报告：
+
+```powershell
+uv run --directory backend --frozen python ../evals/run_retrieval_eval.py ../evals/datasets/synthetic-retrieval-v2.json --k 5 --output ../evals/reports/synthetic-retrieval-v2.json
+uv run --directory backend --frozen python ../evals/run_agent_policy_eval.py ../evals/datasets/synthetic-agent-policy-v1.json --output ../evals/reports/synthetic-agent-policy-v1.json
+uv run --directory backend --frozen python -m unittest discover -s ../evals -p "test_*.py"
+```
+
+Agent 策略结果仅表示固定工具名和参数 Schema 的接受/拒绝情况，不调用 LLM，也不执行工具。Provider 仍 disabled，禁止把策略准确率表述为 Agent 任务成功率。
+
+本轮 24 条 synthetic 查询在 k=5 下三种方法 Hit@5 均为 1.0、MRR@5 均为 0.951389；NDCG@5 为 overlap 0.949384、BM25 0.938008、RRF 0.950099。RRF 相比 overlap 的差异很小，而且两个通道都是词面检索，不构成独立检索证据；当前保留 BM25/overlap 作为简单基线，不据此宣称 RRF 有质量收益。12 条工具契约场景全部符合预期（3 条接受、9 条拒绝）。样本规模与人工合成标签不足以支持质量外推，延迟只作本机微基准记录。
+
 关键反例：预算超 1 分；漏运费；BIOS 未知；GPU 尺寸超限；PSU 连接器不足；同系列屏幕混用；套装条数；过期报价；跨会话访问；旧 revision 晚到；坏批导入；LLM 超时；提示注入。
 
 报告记录提交、数据/规则/评分/模型/提示词版本、时钟、种子、成本、样本数、分母与限制。付费模型评测单独触发；未来向量/重排/多 Agent 与相同预算基线比较。验收阈值见执行计划和原规格 §16。
