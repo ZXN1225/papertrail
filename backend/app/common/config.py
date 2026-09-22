@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     session_write_limit: int = Field(default=60, ge=1, le=600)
     admin_auth_config: SecretStr = SecretStr("")
     price_max_age_seconds: int = Field(default=86400, ge=60, le=2592000)
+    authorized_price_sources: str = ""
+    jd_union_permission_reference: str = ""
+    jd_union_app_key: SecretStr = SecretStr("")
+    jd_union_app_secret: SecretStr = SecretStr("")
+    jd_union_site_id: SecretStr = SecretStr("")
+
+    @property
+    def authorized_price_source_ids(self) -> tuple[str, ...]:
+        return tuple(
+            item.strip() for item in self.authorized_price_sources.split(",") if item.strip()
+        )
 
     @field_validator("database_url")
     @classmethod
@@ -75,4 +86,20 @@ class Settings(BaseSettings):
                 for origin in [self.public_base_url, *self.origins]
             ):
                 raise ValueError("Production requires explicit HTTPS origins")
+        source_ids = self.authorized_price_source_ids
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("AUTHORIZED_PRICE_SOURCES cannot contain duplicate source IDs")
+        unsupported = set(source_ids) - {"jd_union"}
+        if unsupported:
+            raise ValueError("AUTHORIZED_PRICE_SOURCES contains an unsupported source ID")
+        if "jd_union" in source_ids:
+            required = {
+                "JD_UNION_PERMISSION_REFERENCE": self.jd_union_permission_reference,
+                "JD_UNION_APP_KEY": self.jd_union_app_key.get_secret_value(),
+                "JD_UNION_APP_SECRET": self.jd_union_app_secret.get_secret_value(),
+                "JD_UNION_SITE_ID": self.jd_union_site_id.get_secret_value(),
+            }
+            missing = sorted(name for name, value in required.items() if not value)
+            if missing:
+                raise ValueError("JD Union source requires: " + ", ".join(missing))
         return self
