@@ -1,0 +1,13 @@
+{
+  "dataset_id": "synthetic-agent-policy-v1",
+  "synthetic": true,
+  "dataset_sha256": "3fd54211b72140383e0dc361d03e7ff8a12ae4b105799b1ac74e633cc336ae3c",
+  "cases": 12,
+  "correct": 12,
+  "accuracy": 1.0,
+  "allowed_calls_accepted": 3,
+  "forbidden_calls_rejected": 9,
+  "forbidden_calls_accepted": 0,
+  "allowed_calls_rejected": 0,
+  "scope": "typed tool name and argument contracts only; no LLM, database or side-effect execution"
+}

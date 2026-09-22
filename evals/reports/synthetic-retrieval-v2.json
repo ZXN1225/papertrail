@@ -1,0 +1,140 @@
+{
+  "dataset_id": "synthetic-retrieval-v2",
+  "synthetic": true,
+  "dataset_sha256": "cfa77b1ace580d1222832e6ec06a736581cb8955a35dc8991816e749c34df2cf",
+  "commit": "e35d8e4fcadb9517e00d23ddd1576f56df2901b7",
+  "python": "3.12.14",
+  "k": 5,
+  "documents": 18,
+  "queries": 24,
+  "methods": {
+    "overlap": {
+      "hit_at_k": 1.0,
+      "mrr_at_k": 0.951389,
+      "ndcg_at_k": 0.949384,
+      "by_bucket": {
+        "agent_safety": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 0.833333,
+          "ndcg_at_k": 0.81321
+        },
+        "compatibility": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 0.916667,
+          "ndcg_at_k": 0.934115
+        },
+        "cross_bucket": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 0.972424
+        },
+        "laptop": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 0.995711
+        },
+        "pricing": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "rag_citation": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 1.0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.2197,
+        "p95": 0.3047
+      }
+    },
+    "bm25": {
+      "hit_at_k": 1.0,
+      "mrr_at_k": 0.951389,
+      "ndcg_at_k": 0.938008,
+      "by_bucket": {
+        "agent_safety": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 0.833333,
+          "ndcg_at_k": 0.744952
+        },
+        "compatibility": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 0.916667,
+          "ndcg_at_k": 0.934115
+        },
+        "cross_bucket": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 0.972424
+        },
+        "laptop": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 0.995711
+        },
+        "pricing": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "rag_citation": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 1.0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.2953,
+        "p95": 0.4401
+      }
+    },
+    "rrf_overlap_bm25": {
+      "hit_at_k": 1.0,
+      "mrr_at_k": 0.951389,
+      "ndcg_at_k": 0.950099,
+      "by_bucket": {
+        "agent_safety": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 0.833333,
+          "ndcg_at_k": 0.817499
+        },
+        "compatibility": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 0.916667,
+          "ndcg_at_k": 0.934115
+        },
+        "cross_bucket": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 0.972424
+        },
+        "laptop": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 0.995711
+        },
+        "pricing": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "rag_citation": {
+          "hit_at_k": 1.0,
+          "mrr_at_k": 1.0,
+          "ndcg_at_k": 1.0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.4331,
+        "p95": 0.5578
+      }
+    }
+  },
+  "limitations": [
+    "synthetic dataset with synthetic gold relevance labels",
+    "retrieval only; no live catalog, price, or model interaction",
+    "latency is a local microbenchmark and is not an API or production SLO"
+  ]
+}

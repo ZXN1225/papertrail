@@ -23,8 +23,8 @@ python -m unittest evals/test_retrieval_metrics.py
 运行 24 条多桶检索集的词面 overlap、BM25 和 RRF(overlap+BM25) 对照，并可写出 JSON 报告：
 
 ```powershell
-uv run --directory backend --frozen python ../evals/run_retrieval_eval.py ../evals/datasets/synthetic-retrieval-v2.json --k 5 --output ../evals/reports/synthetic-retrieval-v2.json
-uv run --directory backend --frozen python ../evals/run_agent_policy_eval.py ../evals/datasets/synthetic-agent-policy-v1.json --output ../evals/reports/synthetic-agent-policy-v1.json
+uv run --directory backend --frozen python ../evals/run_retrieval_eval.py ../evals/datasets/synthetic-retrieval-v2.json --k 5 --output evals/reports/synthetic-retrieval-v2.json
+uv run --directory backend --frozen python ../evals/run_agent_policy_eval.py ../evals/datasets/synthetic-agent-policy-v1.json --output evals/reports/synthetic-agent-policy-v1.json
 uv run --directory backend --frozen python -m unittest discover -s ../evals -p "test_*.py"
 ```
 
