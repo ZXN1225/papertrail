@@ -54,6 +54,7 @@ class AgentDecision(Contract):
     tool_call: ToolCall | None = None
     question: Annotated[StrictStr, Field(min_length=1, max_length=500)] | None = None
     reason: Annotated[StrictStr, Field(min_length=1, max_length=200)] | None = None
+    final_text: Annotated[StrictStr, Field(min_length=1, max_length=2000)] | None = None
 
 
 class ToolObservation(Contract):

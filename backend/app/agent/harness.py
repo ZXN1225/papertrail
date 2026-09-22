@@ -82,9 +82,12 @@ class AgentHarness:
                 "observations": [item.model_dump(mode="json") for item in observations],
             }
             try:
-                decision = AgentDecision.model_validate(
-                    self.provider.decide(context, self.registry.schema_names())
+                schemas = (
+                    self.registry.schema_definitions()
+                    if hasattr(self.registry, "schema_definitions")
+                    else self.registry.schema_names()
                 )
+                decision = AgentDecision.model_validate(self.provider.decide(context, schemas))
             except (ValidationError, StopIteration, TypeError, ValueError):
                 return self._response(
                     "failed",
@@ -94,11 +97,17 @@ class AgentHarness:
                     observations,
                     "INVALID_PROVIDER_DECISION",
                 )
+            except Exception:
+                return self._response(
+                    "failed", snapshot, tool_calls, rounds, observations, "PROVIDER_ERROR"
+                )
             rounds += 1
             if decision.kind == "final":
-                return self._response(
+                result = self._response(
                     "completed", snapshot, tool_calls, rounds, observations, decision.reason
                 )
+                result["final_text"] = decision.final_text
+                return result
             if decision.kind == "clarify":
                 return self._response(
                     "clarifying", snapshot, tool_calls, rounds, observations, decision.question

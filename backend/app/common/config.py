@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     session_signing_secret: SecretStr = SecretStr("")
     public_base_url: str = "http://localhost:3000"
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    llm_provider: Literal["disabled"] = "disabled"
+    llm_provider: Literal["disabled", "openai"] = "disabled"
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_api_key: SecretStr = SecretStr("")
+    llm_model: str = "gpt-6-astra"
+    llm_timeout_seconds: int = Field(default=15, ge=1, le=45)
+    llm_max_output_tokens: int = Field(default=512, ge=64, le=2048)
     session_write_limit: int = Field(default=60, ge=1, le=600)
     admin_auth_config: SecretStr = SecretStr("")
     price_max_age_seconds: int = Field(default=86400, ge=60, le=2592000)
@@ -58,6 +63,15 @@ class Settings(BaseSettings):
                 raise ValueError("REDIS_URL must use redis or rediss")
         return value
 
+    @field_validator("llm_base_url", mode="before")
+    @classmethod
+    def default_llm_endpoint(cls, value: str) -> str:
+        return (
+            value.strip()
+            if isinstance(value, str) and value.strip()
+            else "https://api.openai.com/v1"
+        )
+
     @property
     def origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
@@ -86,6 +100,19 @@ class Settings(BaseSettings):
                 for origin in [self.public_base_url, *self.origins]
             ):
                 raise ValueError("Production requires explicit HTTPS origins")
+        if self.llm_base_url.rstrip("/") not in {
+            "https://api.openai.com/v1",
+            "https://eu.api.openai.com/v1",
+        }:
+            raise ValueError("LLM_BASE_URL must be an approved OpenAI API endpoint")
+        if self.llm_provider == "openai":
+            missing_llm = []
+            if not self.llm_api_key.get_secret_value():
+                missing_llm.append("LLM_API_KEY")
+            if not self.llm_model.strip():
+                missing_llm.append("LLM_MODEL")
+            if missing_llm:
+                raise ValueError("OpenAI provider requires: " + ", ".join(missing_llm))
         source_ids = self.authorized_price_source_ids
         if len(source_ids) != len(set(source_ids)):
             raise ValueError("AUTHORIZED_PRICE_SOURCES cannot contain duplicate source IDs")

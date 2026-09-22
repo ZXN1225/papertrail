@@ -53,6 +53,34 @@ pnpm --dir web dev
 - 存活：<http://127.0.0.1:8000/api/v1/health/live>。
 - 就绪：<http://127.0.0.1:8000/api/v1/health/ready>。
 
+## 可选：启用 GPT Provider 做本机 Agent 联调
+
+OpenAI API 与 ChatGPT 订阅分开计费。先确认你所在的欧洲国家/地区出现在[官方 API 支持列表](https://help.openai.com/en/articles/5347006-openai-api-supported-countries-and-territories)，然后在 [OpenAI API Platform](https://platform.openai.com/) 设置 API 账单并创建项目 API Key。API Key 由后端使用；不要放入前端环境、截图、聊天或 Git。官方密钥创建和调用步骤见[开发者快速入门](https://developers.openai.com/api/docs/quickstart)。
+
+只修改仓库根目录本机 `.env` 中的模型配置，保留其数据库、会话和其他已有字段：
+
+```dotenv
+LLM_PROVIDER=openai
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=你的项目API密钥
+LLM_MODEL=gpt-6-astra
+LLM_TIMEOUT_SECONDS=15
+LLM_MAX_OUTPUT_TOKENS=512
+```
+
+模型名必须是当前项目可调用的模型；若默认模型没有权限，在 API Platform 的项目模型页选择已启用模型并替换 `LLM_MODEL`。保存后重启后端。默认 `LLM_PROVIDER=disabled`，缺 Key 时 OpenAI 模式会拒绝启动配置。代码只允许 OpenAI 官方 HTTPS API 地址；常规联调请保留默认地址。人在欧洲不代表请求自动在欧盟区域处理；EU endpoint 只适用于项目已获相应数据驻留/处理资格的情况，详情看[官方数据控制文档](https://developers.openai.com/api/docs/guides/your-data)。
+
+确认 API `/api/v1/health/ready` 返回 200，再打开 <http://127.0.0.1:3000>：
+
+1. 进入笔记本或 PC 推荐表单，填写少量需求并保存画像。
+2. 点击“开始核对”。该请求会把当前用户文本、保存画像和本轮结构化工具观察发送到 GPT。初次学习测试不要写入真实个人资料。
+3. 在 Agent 页面观察状态、工具调用摘要和最终回答。空目录时仍可能发生 GPT 调用和工具循环，但商品结果应为空；不要把此结果当作真实推荐。
+4. 运行离线保护测试（无需 API Key）：`uv run --directory backend --frozen pytest -q tests/test_openai_provider.py tests/test_agent_harness.py`。
+
+每轮 Agent 受 4 个决策回合、8 次工具调用、45 秒 Harness 总时限约束；单次模型响应默认最多 512 个输出 Token、15 秒 HTTP 超时、逐轮发送且 `store=false`。多轮调用仍会按输入/输出 Token 计费，先只试 1—3 个请求并在 API Platform 查看 usage/billing。此阶段没有服务端美元硬预算器，也不纳入 ChatGPT Plus/API 共享额度。Key 和提示内容不会放进模型评测文件，但供应商会收到实现一次 Agent 决策所需的请求上下文。
+
+手工联调是唯一会产生真实 API 调用的步骤；mock 测试不会连接 OpenAI。真实目录仍为空时只能验证模型选工具、服务端执行和回答循环，不能验证推荐准确性；真实商品/价格仍受 D01—D03 数据授权与样本阻塞。
+
 Alembic `0001_baseline` 创建版本记录，`0002_sessions` 新增会话表，`0003_catalog` 新增 13 张空商品/来源/证据领域表。预览应用不会自动迁移；未迁移、版本不匹配、PG 失联或已配置 Redis 失联均返回 ready=503。升级后先运行 upgrade head，再重启 API/web。隔离 E2E 入口会自行迁移 test_* 数据库。T02 表关系与迁移边界见 [数据模型](catalog-model.md)，记录契约可在 API `/docs` 的 Schemas 查看，无目录写入接口。
 
 当前 head 为 `0004_imports`，新增 6 张导入/版本/通知表，并为规范事实投影建立数据库引用约束。管理 API/CLI 入口与认证配置见 [人工导入指南](manual-imports.md)。管理员配置默认空值；未配置返回 ADMIN_DISABLED，不为了预览而设置通用密码。无真实资料时不向开发库导入 TEST 商品；合成验证须 APP_ENV=test 且 test_* 数据库。

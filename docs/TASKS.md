@@ -26,7 +26,8 @@
 | T17 | 京东/联想商城来源授权门禁与受控接入 | 用户确认京东为主要来源，并允许替代候选 | research/T17-jd-source-gate.md | blocked |
 | T18 | 授权报价 API 配置门禁与接入指南 | T17、用户确认 API 优先策略 | research/T18-authorized-price-adapters-acceptance.md | in_progress |
 | T19 | 开放数据登记与隔离检索评测框架 | 用户确认学习/评测数据路线 | research/T19-open-evaluation-framework-acceptance.md | in_progress |
-| T20 | 多桶检索基线对照与 Agent 工具策略评测 | T19 | research/T20-evaluation-suite-acceptance.md | in_progress |
+| T20 | 多桶检索基线对照与 Agent 工具策略评测 | T19 | research/T20-evaluation-suite-acceptance.md | done |
+| T21 | GPT Provider 接入与隔离联调 | T12、T14、T20 | research/T21-openai-provider-acceptance.md | in_progress |
 
 详细交付、失败反例和确认点见 [完整执行计划](EXECUTION_PLAN.md)。跨任务接口变动先更新契约；一个 PR 聚焦一个可审查结果，不将所有阶段合并成一次提交。
 

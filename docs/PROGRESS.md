@@ -1,13 +1,14 @@
 # 项目进度
 
-更新日期：2026-09-22。当前交付：T20 多桶检索与 Agent 工具策略评测实施中；T17 来源授权仍阻塞真实数据接入。分支：codex/t20-evaluation-suite；起点：859c683。最终提交以 git log -1 为准。
+更新日期：2026-09-22。当前交付：T21 OpenAI GPT Provider 与本机 Agent 联调实施中；T17 来源授权仍阻塞真实数据接入。分支：codex/t21-openai-provider-eval；起点：T20 已推送分支 codex/t20-evaluation-suite。最终提交以 git log -1 为准。
 
 ## 本轮成果与边界
 
 - 新增 24 条分桶检索查询和 18 个 TEST 文档，涵盖兼容性、笔记本、报价、Agent 安全、RAG 引用和跨主题问题；标签与文档都明确 synthetic。
 - 检索对照扩展为 overlap、BM25 和 RRF 融合，并报告总分及分桶 Hit@k、MRR@k、NDCG@k、查询均值/P95 延迟、数据集哈希和 Python 环境。
 - 新增 12 条 Agent 工具名/参数边界场景。该检查只运行 Pydantic 工具契约，不启动 LLM、不连数据库、不执行工具副作用。
-- 当前模型 Provider 为 disabled，所以没有 LLM 答案质量、Agent 完成率、成本或端到端性能结果；综合报告不得从这些离线测试推断生产能力。
+- 默认模型 Provider 保持 disabled。T21 正在添加用户显式启用的 OpenAI Provider；尚无用户 API Key，本轮不会发起真实 API 请求或报告模型质量/成本。
+- T21 使用 Responses API 的受限函数调用；密钥仅从本机 `.env` 读取，默认只允许 OpenAI 官方 HTTPS endpoints。终态 GPT 文本进入摘要字段，候选 SKU 与引用仍只从后端结构化工具观察生成。
 - 选定 Wikidata CC0 作为开放实体资料候选；它不提供中国实时价格，也不替代厂商兼容性事实。自动提取仍默认关闭，待固定查询与字段审核后才能进入暂存。
 - 新增 TEST-only 检索金标、overlap/BM25 基线和 Hit@k、MRR@k、NDCG@k、延迟报告命令。小型合成集只验证评测框架，不宣称生产 RAG、市场推荐或 Agent 质量。
 - 已新增固定授权报价来源注册表，首个候选为京东联盟。默认禁用；只有许可记录、App Key、App Secret 和推广位/站点标识全部存在时才被标记为已配置。本轮不含 HTTP 客户端，不会因配置而联网。
@@ -64,10 +65,4 @@
 
 ## Git 与接续
 
-本轮基于 T03 已确认内容，保护中断前已有改动。#1—#6 仍 OPEN、未合并；[PR #7](https://github.com/ZXN1225/Agent_Computer_Recommanding_Platform/pull/7) 以 #6 为 base，只审查本轮增量。实现提交 74ada19；未合并、未生产部署。
-
-本地开发库已升级到 0004_imports，确认没有数据版本。首页 http://127.0.0.1:3000、API 8000 与 /docs 的最终重启验证在 PR 前完成；预览 PID 位于忽略入库的 .local/preview-pids.json。管理认证保持未配置，预览不接受导入。
-
-## 下一轮（必须等待确认）
-
-等待用户检查步骤 14。下一步为步骤 15 / T14：回答契约、SSE 与取消；D01—D03 仍未解除，不能以合成数据抵消。
+T21 从 T20 工作分支 `codex/t20-evaluation-suite` 创建。Ruff 与全后端测试已通过（97 passed、75 skipped；集成项因没有提供 TEST_DATABASE_URL 跳过）；4 项评测单元测试、基础检查、来源登记检查和 diff check 均通过。API Key 未配置，所以没有真实 OpenAI 请求；本机联调步骤见 development.md。待用户检查本阶段与 PR 后再继续下一阶段。

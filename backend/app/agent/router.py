@@ -14,7 +14,7 @@ from app.agent.contracts import (
     AgentSession,
 )
 from app.agent.harness import AgentHarness
-from app.agent.provider import DisabledProvider
+from app.agent.provider import DisabledProvider, OpenAIProvider
 from app.agent.run_service import AgentRunService
 from app.agent.tools import ToolRegistry
 from app.catalog.read_service import CatalogReadService
@@ -31,10 +31,20 @@ router = APIRouter(
 
 async def harness_for(request: Request, profile: ProfileService):
     catalog = CatalogReadService(request.app.state.dependencies.engine, request.app.state.settings)
+    settings = request.app.state.settings
+    provider = DisabledProvider()
+    if settings.llm_provider == "openai":
+        provider = OpenAIProvider(
+            settings.llm_api_key.get_secret_value(),
+            settings.llm_model,
+            settings.llm_base_url,
+            settings.llm_timeout_seconds,
+            settings.llm_max_output_tokens,
+        )
     return AgentHarness(
         profile,
         ToolRegistry(catalog, KnowledgeService(request.app.state.dependencies.engine, catalog)),
-        DisabledProvider(),
+        provider,
     )
 
 

@@ -251,7 +251,7 @@ class AgentRunService:
             warnings.append(result["reason"])
         if result["status"] == "provider_disabled":
             warnings.append("模型服务尚未配置，未生成推荐结论。")
-        summary = (
+        summary = result.get("final_text") or (
             "已验证工具结果并生成结构化回答。" if candidates else "当前没有可展示的已验证候选。"
         )
         return AgentAnswer(

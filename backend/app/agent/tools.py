@@ -60,6 +60,38 @@ class ToolRegistry:
     def schema_names(self):
         return sorted(self.schemas)
 
+    def schema_definitions(self):
+        descriptions = {
+            "search_catalog": (
+                "Search published catalog items using optional category and query filters."
+            ),
+            "get_product_facts": "Read evidence-backed facts for exact SKU IDs.",
+            "get_offers": "Read current offer snapshots for an exact SKU and region.",
+            "rank_laptops": (
+                "Rank laptops using the saved profile constraints; arguments must be empty."
+            ),
+            "solve_pc_builds": (
+                "Search PC builds using the saved profile constraints; arguments must be empty."
+            ),
+            "check_compatibility": (
+                "Check a supplied component list against deterministic compatibility rules."
+            ),
+            "retrieve_knowledge": (
+                "Search reviewed knowledge documents and return evidence citations."
+            ),
+        }
+        definitions = []
+        for name, model in self.schemas.items():
+            parameters = (
+                model.model_json_schema()
+                if model is not None
+                else {"type": "object", "properties": {}, "additionalProperties": False}
+            )
+            definitions.append(
+                {"name": name, "description": descriptions[name], "parameters": parameters}
+            )
+        return definitions
+
     @staticmethod
     def _evidence_ids(data):
         if not isinstance(data, dict):

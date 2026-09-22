@@ -136,3 +136,17 @@ def test_answer_contract_uses_only_structured_tool_candidates_and_citations():
     assert answer.candidates[0].data["sku_id"] == "TEST-SKU"
     assert answer.citations[0].document_id == document_id
     assert answer.missing_fields == ["current_offer"] and answer.data_version == data_version
+
+
+def test_answer_uses_model_summary_but_candidates_remain_tool_derived():
+    answer = AgentRunService._answer(
+        {
+            "status": "completed",
+            "profile_revision": 1,
+            "final_text": "依据工具结果，目前没有符合条件的可展示商品。",
+            "reason": None,
+            "observations": [],
+        }
+    )
+    assert answer.summary.startswith("依据工具结果")
+    assert answer.candidates == []
