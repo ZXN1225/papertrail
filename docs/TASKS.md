@@ -19,7 +19,7 @@
 | P13 | 扩展论文检索评测集与 AI 标注诊断 | P05 | done |
 | P14 | 检索方法对照与失败查询诊断 | P13、P10 | done |
 | P15 | 简历展示文档、GitHub CI 与收尾回归 | P14 | done |
-| P16 | 迁移当前仓库为 PaperTrail 并发布 | P15 | blocked_auth |
+| P16 | 迁移当前仓库为 PaperTrail 并发布 | P15 | done |
 
 P05 的 80 项 qrels 已由用户导入为 human-reviewed v2，且 BM25 候选/人审对照已完成；小样本报告仍为 exploratory-only。细节见 [`research/P05-acceptance.md`](research/P05-acceptance.md) 与 [`research/P05-qrels-review.md`](research/P05-qrels-review.md)。P09 本机验收记录见 [`research/P09-acceptance.md`](research/P09-acceptance.md)。P10 实现、自动测试和用户本机 live smoke 均已完成。已增加本地 qrels 复核包工具，详见 [`research/P05-review-workflow-acceptance.md`](research/P05-review-workflow-acceptance.md) 与 [`research/P10-acceptance.md`](research/P10-acceptance.md)。P12 离线 benchmark、mock Agent 安全评测和作品集文档已完成，结果及 E2E 清理限制见 [`research/P12-acceptance.md`](research/P12-acceptance.md)。
 
@@ -29,6 +29,6 @@ P13 已建立 100 篇/30 查询/3,000 pair 的候选评测集；按用户选择�
 
 P14 已完成 BM25/Dense/RRF 的同查询对照、分桶指标和失败查询诊断；使用 `text-embedding-3-small` 产生 23,960 输入 tokens。报告仅作 AI-qrels 探索分析，`quality_claim_allowed=false`。详见 [`research/P14-acceptance.md`](research/P14-acceptance.md)。
 
-P15 的 README、架构/评测介绍、CI、全文 PDF 忽略规则与最终回归已完成。P16 已完成本地根目录迁移；远程改名与推送受当前 GitHub 凭据失效和网络访问阻拦。
+P15 的 README、架构/评测介绍、CI、全文 PDF 忽略规则与最终回归已完成。P16 已将仓库改名为 `papertrail`，将完整代码推送到默认 `main`，清理旧项目分支并关闭旧项目 PR；GitHub Actions 最终运行通过。
 
 P11 研究工作区及自动验收已完成，结果见 [P11 验收](research/P11-acceptance.md)。用户确认启动的 P12 已完成，阶段报告见 [P12 验收](research/P12-acceptance.md)。P05 qrels 已由用户复核导入并完成 BM25 对照，但数据集规模较小；P13/P14 标签未经人工核验，仅支持探索诊断，不支持对外质量声明。

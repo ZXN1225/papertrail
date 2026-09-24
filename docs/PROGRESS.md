@@ -1,6 +1,6 @@
 # 进度
 
-更新日期：2026-09-24。PaperTrail 已迁移为仓库根目录项目，旧电脑推荐项目源码从当前 Git 工作树移除并保存在本机忽略目录 `.local/legacy-computer-project/`。P11 用户本机验收修复并验证 arXiv 检索；P12 离线评测与展示资料完成；P05 80 条人工复核 qrels 已导入；P13/P14 结果仅为 AI 标签探索性诊断。后端 99 项自动测试、Web 15 项 E2E 及静态检查通过。当前 GitHub 凭据无效，无法进行远程仓库改名与推送。
+更新日期：2026-09-24。PaperTrail 已迁移为仓库根目录项目，并发布至 [GitHub](https://github.com/ZXN1225/papertrail)；默认分支 `main` 是唯一远程分支，旧项目开放 PR 已清理。旧电脑推荐项目源码从当前 Git 工作树移除并保存在本机忽略目录 `.local/legacy-computer-project/`。P11 用户本机验收修复并验证 arXiv 检索；P12 离线评测与展示资料完成；P05 80 条人工复核 qrels 已导入；P13/P14 结果仅为 AI 标签探索性诊断。后端 99 项自动测试、Web 15 项 E2E 及静态检查通过；GitHub Actions 最终运行通过。
 ## P01 已完成
 
 - 用户确认将项目方向改为论文检索与研究助理 Agent。
@@ -99,7 +99,13 @@
 - 新增根目录 `.github/workflows/ci.yml`；根仓库 GitHub Actions 将执行后端锁定安装/Ruff/pytest/OpenAPI 校验，以及 Web 格式、TypeScript、生产构建和 Playwright E2E。由于旧 workflow 位于子目录而 GitHub 不会发现它，根 workflow 才是可运行入口。
 - 将真实论文 PDF 加入忽略规则；README 明确全文不随仓库分发、代码复用许可证尚未选择。旧电脑项目源码已在本轮从发布树移除。
 - 后端：99 passed；Ruff check/format、OpenAPI 导出通过。Web：format、typecheck、production build 全通过；Playwright 15/15 passed、退出码 0（Windows 下先启动 3001 开发服务，Playwright 复用该服务）。根 foundation/source-review、diff 检查通过；npm 与 Python 依赖审计均未发现已知漏洞。
-- 发布尚未执行：用户已确认将当前仓库改作 PaperTrail；本机 GitHub 凭据失效且网络请求受限，等待重新登录后执行远程改名与推送。
+- 首次 GitHub Actions 发现 SQLite 兼容问题：部分 SQL 将 `2_000` 作为数字字面量，CI 使用的 SQLite 不支持该写法；改为 `2000` 后，本机 99 项测试通过，后续 GitHub Actions 全部通过。
+
+## P16 仓库迁移与发布（2026-09-24）
+
+- 将 GitHub 仓库改名为 `papertrail`，更新本机 `origin`，并将已验证的 PaperTrail 根目录版本快进发布到默认分支 `main`。
+- 按用户先前要求，删除其余 22 个旧项目远程分支；21 个旧项目开放 PR 已关闭，PR #1 随 `main` 更新显示为已合并。确认远程只剩 `main` 且无开放 PR。
+- 更新 GitHub 仓库简介与 topics；最终 Actions 运行通过。旧项目文件只保留在本机 Git 忽略的 `.local/legacy-computer-project/` 归档中，不在发布树中。
 
 ## P05 本轮实施进度
 

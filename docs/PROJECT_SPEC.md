@@ -1,6 +1,6 @@
 # PaperTrail 项目规格
 
-更新日期：2026-09-24。状态：P01—P15 已实施；P16 本地根目录迁移完成，远程改名与发布等待 GitHub 凭据恢复。OpenAlex/arXiv 元数据、受限 Agent、许可准入全文 BM25 RAG、可选 Dense/Hybrid 检索及 Web 工作区均已接入。
+更新日期：2026-09-24。状态：P01—P16 已完成；仓库已更名为 `papertrail` 并发布到唯一远程分支 `main`。OpenAlex/arXiv 元数据、受限 Agent、许可准入全文 BM25 RAG、可选 Dense/Hybrid 检索及 Web 工作区均已接入。
 
 ## 1. 产品目标
 
