@@ -1,125 +1,265 @@
 # PaperTrail · 论文检索与研究助理 Agent
 
-**从研究问题出发，检索真实论文；让 Agent 使用受控工具逐步查证，并把回答中的证据和来源展示出来。**
+**从研究问题出发发现论文，让 Agent 逐步检查知识库，并用可追溯的证据回答。**
 
-PaperTrail 是一个用于学习和简历展示的全栈 Agent 项目。它接入 OpenAlex 与 arXiv 元数据，支持人工许可登记后的全文证据检索，并提供中文研究工作区。项目重点是 Agent Harness、可追溯 RAG 和可重复评测，不是生产级文献服务。
+[![PaperTrail CI](https://github.com/ZXN1225/papertrail/actions/workflows/ci.yml/badge.svg)](https://github.com/ZXN1225/papertrail/actions/workflows/ci.yml)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![Agent](https://img.shields.io/badge/Agent-bounded%20tools-176B55)
 
-> 当前实现：元数据搜索、受限工具 Agent、许可全文 RAG、BM25/Dense/Hybrid 检索与本地 Web 工作区。Agent 默认关闭；OpenAI 调用需服务端显式配置。评测数字和限制见下文。
+PaperTrail 是一个用于学习研究与简历展示的全栈 Agent 项目。它连接 OpenAlex 和 arXiv 元数据，提供论文检索、比较、许可全文 RAG 与研究助理工作区。项目聚焦 Agent Harness、证据溯源和可重复评测；它不是生产级文献服务，也不代替系统综述或研究者判断。
 
-## 演示流程
+## 项目能做什么
+
+- **发现与管理论文**：从 OpenAlex、arXiv 搜索元数据，或使用已导入的本地目录；保存查询快照、来源、版本和内容哈希，支持重复导入与历史快照查看。
+- **逐步研究**：Agent 可搜索目录、查看单篇论文、查找词法相似论文、比较元数据，并根据问题决定是否继续调用工具。
+- **许可全文问答**：逐篇登记并确认 CC0 或 CC BY 许可后，才可将本地 UTF-8 文本导入；全文按可追踪位置分块，支持 BM25、Dense 和 Hybrid 检索。
+- **可核验回答**：引用绑定本轮工具返回的论文 ID、证据片段、来源和位置；引用无效或证据不足时，Harness 会拒绝完成为可信答案。
+- **检索实验**：在相同语料和查询上比较 BM25、Dense cosine 与 RRF Hybrid，输出指标、配置、数据哈希和成本估算。
+- **中文研究工作区**：浏览论文、查看详情、并列比较元数据、向研究助理提问，并查看引用、证据片段和运行 trace。
+
+## 工作流
 
 ```mermaid
 flowchart LR
-    Q[研究问题] --> UI[PaperTrail Web 工作区]
+    Q[研究问题] --> UI[PaperTrail 工作区]
     UI --> H[受限 Agent Harness]
-    H --> T[白名单只读工具]
-    T --> O[OpenAlex / arXiv 元数据]
-    T --> L[本地许可全文证据]
-    O --> R[BM25 / Dense / RRF]
-    L --> R
-    R --> V[引用与证据校验]
-    V --> A[带来源回答或证据不足]
+    H --> D{需要哪类信息？}
+    D -->|发现论文| O[OpenAlex / arXiv 元数据 API]
+    D -->|读取本地资料| C[SQLite 论文目录]
+    D -->|核对论文内容| F[已批准全文证据]
+    O --> C
+    C --> H
+    F --> R[BM25 / Dense / Hybrid]
+    R --> H
+    H --> V[服务端引用与证据校验]
+    V --> A[带引用回答 / 证据不足]
     A --> UI
 ```
 
-## 主要功能
+Agent 使用服务端固定工具，不允许模型执行任意 SQL、shell 或 URL 抓取。论文标题、摘要、全文片段和工具输出都按不可信数据处理。
 
-- **真实论文发现**：通过固定 OpenAlex Works 与 arXiv API 搜索、查看和导入论文元数据；保存查询快照、来源、许可标识及内容哈希，方便复现。
-- **可控的 Agent Harness**：模型通过 Responses API 请求固定工具；服务端校验参数、工具调用预算、决策步数和 deadline。Harness 检查引用是否来自本轮工具结果，证据不足时可以拒答。
-- **许可门控的全文 RAG**：全文只从本地 UTF-8 文本导入，并要求逐篇审核许可和署名；支持精确字符定位、BM25 与可撤销删除。元数据开放不代表全文自动获准。
-- **检索对照**：提供 BM25、Dense cosine 和 RRF Hybrid。BM25 可离线复现；Dense/Hybrid 可明确启用 OpenAI Embeddings，并记录模型、token 与估算费用。
-- **中文研究工作区**：按 OpenAlex、arXiv 或本地库检索；查看论文详情、并列比较元数据、向研究助理提问并展开引用、证据片段和运行 trace。
-- **安全和可观测性**：工具为只读白名单；不提供任意 URL 抓取、shell 或 SQL 工具。Trace 记录工具名、状态、耗时和 token，不记录问题、论文正文或密钥。
+## Agent 与 RAG 设计
 
-## 技术结构
+### 固定工具集
 
-| 部分 | 实现 |
-|---|---|
-| Web | Next.js 16、React 19、TypeScript；同源 API 代理将服务端密钥留在后端 |
-| API 与 Agent | FastAPI、Pydantic、OpenAI Responses function calling、受限 Harness |
-| 数据与来源 | SQLite 迁移、不可变元数据版本、OpenAlex 快照与哈希；OpenAlex / arXiv 客户端固定官方主机 |
-| 检索 | 自实现 Okapi BM25、OpenAI Embeddings cosine、RRF@60 |
-| 测试 | pytest、Ruff、Playwright；mock/合成数据标记 `TEST-*` 与 `synthetic=true` |
+| 工具类型 | 能力                                                    | 边界                                                              |
+| -------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
+| 本地目录 | 搜索论文、读取详情、查找词法相似论文、比较 2–5 篇论文   | 只读已导入的元数据；“相似”不是引用关系                            |
+| OpenAlex | 搜索 Works、读取 Work、搜索/读取 Author、列出作者 Works | 固定官方 API 主机；请求字段、页大小、超时均受限                   |
+| arXiv    | 搜索和读取论文元数据                                    | 固定官方 API；限速；不会通过该工具下载 PDF                        |
+| 许可全文 | 检索批准全文的片段并返回定位与署名信息                  | 仅使用当前批准版本；BM25 默认，Dense/Hybrid 需显式启用 Embeddings |
 
-## 评测结果与适用范围
+### Agent Harness 的运行约束
 
-### P14：固定语料上的检索方法对照
+- 工具参数经 Pydantic schema 验证，未知工具和多余参数会被拒绝。
+- 每次运行限制决策步数、工具调用次数、总时限和观察内容大小。
+- Harness 校验模型给出的引用是否来自本轮工具观察，并验证证据片段和论文 ID 的对应关系。
+- 元数据只能支持元数据层面的说法；论文结论必须有全文证据。证据不足时明确拒答，不从模型记忆补写论文事实。
+- Trace 记录步骤、工具状态、耗时和 token 计数，不记录密钥或论文正文。
 
-同一份 100 篇 OpenAlex 元数据、30 个查询和同一组 P13 候选标签上，比较 BM25、Dense 与 Hybrid。Hit@1、MRR@10、NDCG@10 如下：
+### 检索管线
 
-| 方法 | Hit@1 | MRR@10 | NDCG@10 |
-|---|---:|---:|---:|
-| BM25 | 0.5333 | 0.6444 | 0.5222 |
-| Dense (`text-embedding-3-small`) | 0.8333 | 0.8562 | 0.6464 |
-| Hybrid (RRF@60) | 0.7000 | 0.8208 | 0.6321 |
+1. 解析查询并检查本地知识库中的论文对象。
+2. 按需搜索标题/摘要元数据，Agent 可根据结果决定继续查看哪些论文。
+3. 只有问题需要论文内容且本地存在获准全文时，才检索全文证据。
+4. 返回片段、来源、许可、署名和字符位置，再由 Harness 检查引用。
 
-**重要限制：** P13 的 3,000 个分数是从候选建议复制的 AI 标签，未经人工核验；语料也来自单一主题搜索。因此 P14 是工程诊断，不是金标准评测，不能用来证明 Dense 优于 BM25，也不能外推到真实用户检索。Dense 本次处理 130 个输入、23,960 tokens，单次估算费用约 USD 0.0004792；向量未持久化。完整配置、分桶和低分查询见 [P14 验收记录](docs/research/P14-acceptance.md) 与本机报告 `backend/reports/p14-retrieval-comparison.json`（报告目录被 Git 忽略，不包含在仓库中）。
+BM25 为默认全文检索，不调用外部 Embeddings 服务。Dense 使用 OpenAI Embeddings 与 cosine 相似度；Hybrid 用 BM25 与 Dense 排名进行 RRF（`k=60`）。Embedding provider 默认关闭；启用后，获准全文片段和搜索问题会发送到配置的 Embeddings API。
 
-### Agent / RAG 测试
+## 技术栈
 
-- 后端自动测试：**99 passed**；包含工具循环、来源客户端、许可全文检索、向量检索、Agent 引用约束及 P14 评测器。
-- P12 离线 Agent 场景：3/3 mock 场景通过；越权工具尝试被拦截，未授权工具执行为 0。它验证安全与评测管线，不代表真实 LLM 回答质量。
-- Web E2E：覆盖论文搜索、详情、比较、Agent 证据展示、错误重试和键盘操作；结果与 Windows 进程退出限制见 [P11 记录](docs/research/P11-acceptance.md) 和 [P12 记录](docs/research/P12-acceptance.md)。
-- 一篇经许可确认的 arXiv 全文完成本机导入、证据定位、Agent 引用与删除/恢复 smoke；单篇 smoke 不代表全文 RAG 的统计质量。
+| 层     | 技术                                                                      |
+| ------ | ------------------------------------------------------------------------- |
+| Web    | Next.js 16、React 19、TypeScript                                          |
+| API    | FastAPI、Pydantic、Uvicorn                                                |
+| Agent  | OpenAI Responses API function calling、受限 Agent Harness、服务端引用校验 |
+| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                    |
+| 数据源 | OpenAlex Works / Authors API、arXiv API                                   |
+| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60                  |
+| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions            |
 
-## 本地启动
+## 评测结果与可信边界
 
-需要 Python 3.12、uv、Node.js 24 和 pnpm 11。详细说明见[开发与验收指南](docs/development.md)。
+### P05：小规模人工复核 BM25 集
+
+80 条论文-查询相关性判断由用户人工复核，数据集包含 8 个查询和 10 篇论文。重跑 BM25 的结果为：
+
+| 指标    |   结果 |
+| ------- | -----: |
+| Hit@1   |   0.75 |
+| MRR@10  |  0.875 |
+| NDCG@10 | 0.8849 |
+
+这是小样本流程验收与探索性结果，不能推断大规模检索质量。
+
+### P14：BM25、Dense、Hybrid 对照
+
+在 100 篇 OpenAlex 元数据和 30 个查询上对比相同候选集：
+
+| 方法                             |  Hit@1 | MRR@10 | NDCG@10 |
+| -------------------------------- | -----: | -----: | ------: |
+| BM25                             | 0.5333 | 0.6444 |  0.5222 |
+| Dense (`text-embedding-3-small`) | 0.8333 | 0.8562 |  0.6464 |
+| Hybrid (RRF@60)                  | 0.7000 | 0.8208 |  0.6321 |
+
+**解读限制：** P14 使用的 3,000 个相关性分数来自 AI 候选建议，未经人工核验；语料也来自单一主题搜索。因此这些结果只用于工程诊断，不能证明 Dense 优于 BM25，也不能代表真实用户检索表现。该次 Dense 运行处理 23,960 个输入 tokens，估算费用约 USD 0.0004792；实际账单以账户记录为准。完整分桶、配置与限制见 [P14 记录](docs/research/P14-acceptance.md)。
+
+### Agent / Web 验证
+
+- 后端自动测试：**99 passed**，覆盖 Agent 工具循环、来源客户端、全文许可门禁、精确证据定位、检索与引用校验。
+- 离线 Agent 安全评测：**3/3 mock 场景通过**；越权工具尝试被拦截，未授权工具执行为 0。它验证安全和评测管线，不代表真实模型质量。
+- Web Playwright：**15/15 E2E 通过**，包含搜索、详情、比较、Agent 证据展示、错误重试和键盘操作。
+- GitHub Actions：后端与 Web jobs 均通过，包含 Ruff、pytest、OpenAPI 契约、前端类型检查、生产构建及浏览器 E2E。
+
+一篇经许可确认的 arXiv 全文完成了本机导入、检索、Agent 引用和删除/恢复 smoke。这只验证单篇闭环，不代表全文检索的统计质量。更多阶段记录见 [`docs/research/`](docs/research/)。
+
+## 本地运行
+
+### 环境要求
+
+- Python 3.12 与 [uv](https://docs.astral.sh/uv/)
+- Node.js 24 与 pnpm 11
+- SQLite 随应用运行，无需单独安装数据库服务
+
+### 配置服务端环境
+
+在仓库根目录复制配置模板；若 `.env` 已存在，不要覆盖：
 
 ```powershell
-# 终端一：后端
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+```
+
+编辑 `.env`。`OPENALEX_API_KEY` 可选；`LLM_PROVIDER` 和 `EMBEDDING_PROVIDER` 默认均为 `disabled`。只有显式配置服务端模型凭据后，Agent 或 Dense/Hybrid Embeddings 才会调用 OpenAI。不要把密钥写入 Web 环境变量或提交到 Git。
+
+### 启动 API 与 Web
+
+终端一启动后端：
+
+```powershell
 cd backend
 uv sync --locked --all-groups
 uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
+```
 
-# 终端二：Web
+终端二启动 Web：
+
+```powershell
 cd web
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-打开 `http://127.0.0.1:3000`。OpenAI LLM 与 Embedding provider 默认禁用；密钥只放在仓库根目录 `.env`，不要放入前端环境变量或提交到 Git。OpenAlex 和 arXiv 搜索需要后端网络访问。若只运行 BM25/自动测试，无需启用收费模型。
+打开 <http://127.0.0.1:3000>。API 文档位于 <http://127.0.0.1:8001/docs>；存活与就绪检查分别是 `/api/health/live` 和 `/api/health/ready`。首次 Web 安装后如果没有 Playwright 浏览器，执行 `pnpm exec playwright install chromium`。
+
+### 导入论文数据
+
+导入少量 OpenAlex 元数据到本地 SQLite：
+
+```powershell
+cd backend
+uv run --locked python -m app.cli.import_openalex --query "retrieval augmented generation" --per-page 10
+```
+
+导入一页 arXiv 元数据：
+
+```powershell
+uv run --locked python -m app.cli.import_arxiv --query 'all:"retrieval augmented generation"' --max-results 10
+```
+
+元数据搜索会访问对应公开 API；导入命令只保存元数据，不下载全文。更多来源与本机验收步骤见[开发与验收指南](docs/development.md)。
+
+### 许可全文 RAG
+
+全文导入前，需从原始来源核对具体论文的许可、来源链接和署名要求。当前仅允许明确确认的 `CC0-1.0` 与 `CC-BY-4.0`；“可免费阅读”、`is_oa=true` 或元数据许可均不能代替全文许可。项目不会自动抓取全文，全文和 PDF 不随仓库分发。
+
+准备好本地 UTF-8 `.txt` 和 manifest 后，按[全文导入说明](docs/development.md#许可全文导入与检索-p09)运行导入命令。之后可调用：
+
+```text
+GET /api/v1/evidence/search?q=knowledge%20base&limit=5&retrieval_method=bm25
+```
+
+没有批准全文时，接口返回 `no_results`，不会把摘要伪装成全文证据。
+
+## Agent API 示例
+
+启用 OpenAI Responses provider 后，调用 `POST /api/v1/agent/ask`：
+
+```json
+{
+  "question": "请找出 RAG 检索质量评测的代表论文，并说明本地元数据能支持什么结论？"
+}
+```
+
+响应包含 `status`、答案、引用、警告、工具调用数、模型步骤、token 计数、`run_id` 和 trace。若没有启用 LLM，接口会返回 `model_disabled`；它不会生成伪造的回答。API 的完整 schema 见 [`docs/openapi.json`](docs/openapi.json)。
 
 ## 评测与测试命令
+
+后端：
 
 ```powershell
 cd backend
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked pytest -q
+uv run --locked python -m tools.export_openapi
 uv run --locked python -m app.cli.evaluate_p12
 ```
 
-P14 需要显式允许调用 OpenAI Embeddings，可能产生少量费用：
-
-```powershell
-uv run --locked python -m app.cli.evaluate_p14 --allow-provider-call
-```
-
-Web 检查：
+Web：
 
 ```powershell
 cd web
 pnpm run format:check
 pnpm run typecheck
 pnpm run build
-# Windows 本机 E2E：先在此终端之外按开发手册启动 3001 端口服务
 pnpm run test:e2e
 ```
 
-E2E 使用浏览器 API mock；Windows 本机需先启动 3001 服务，详情见[开发说明](docs/development.md#p11-web-研究工作区)。
+P14 会访问 OpenAI Embeddings，可能产生少量费用；只有显式确认后才运行：
 
-## 项目边界
+```powershell
+cd backend
+uv run --locked python -m app.cli.evaluate_p14 --allow-provider-call
+```
 
-- 这是学习研究与简历展示项目，不提供生产 SLA、线上可用率或大规模服务承诺。
-- P13/P14 相关性标签没有人工全审；检索指标只能作为探索性结果。
-- 真实论文全文不随仓库分发；使用全文前需逐篇确认许可证、证据链接及署名要求。
-- LLM 生成质量、真实 Agent 任务成功率和多用户压力表现尚未系统评估。
-- PaperTrail 现位于仓库根目录；旧电脑推荐项目源码已从当前工作树移除。
-- 本仓库尚未选择源码复用许可证；公开展示不等于授予再发布或商用许可。
+Windows 本机 E2E 若在所有断言结束后未正常退出，可先在独立终端启动 `node ./node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3001`，再运行 Playwright。GitHub Actions 在 Linux 上会自动管理该服务。
 
-## 项目记录
+## 项目结构
 
-- [阶段进度](docs/PROGRESS.md) · [任务台账](docs/TASKS.md) · [项目规格](docs/PROJECT_SPEC.md) · [执行计划](docs/EXECUTION_PLAN.md)
-- [P12 端到端评测](docs/research/P12-acceptance.md) · [P13 数据集与 AI 标签](docs/research/P13-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md)
-- [API 契约](docs/openapi.json) · [开发说明](docs/development.md)
+```text
+.
+├── backend/
+│   ├── app/agent/       # Harness、Responses 模型客户端、固定工具集
+│   ├── app/embeddings/  # 可选 Embeddings Provider
+│   ├── app/evaluation/  # BM25、P12/P14 与评测指标
+│   ├── app/retrieval/   # BM25、全文切块、向量与融合检索
+│   ├── app/sources/     # OpenAlex 和 arXiv 客户端
+│   ├── app/storage/     # SQLite repository 与版本化迁移
+│   ├── app/cli/         # 导入、评测、向量索引与全文撤销 CLI
+│   ├── data/evaluation/ # 可复现评测集
+│   └── tests/           # API、存储、Agent、RAG 与评测测试
+├── web/
+│   ├── app/             # 研究工作区与同源 API 代理
+│   ├── components/      # 搜索、论文详情、比较和 Agent UI
+│   └── tests/e2e/       # 浏览器端端到端用例
+├── docs/
+│   ├── research/        # 各阶段验收与研究记录
+│   ├── development.md   # 本机运行、数据导入与验收说明
+│   └── openapi.json     # API 契约
+└── .github/workflows/  # 后端与 Web 持续集成
+```
+
+## 已知限制
+
+- 这是学习与简历项目，不提供生产 SLA、线上可用率或大规模服务承诺。
+- P05 人工复核集仅 8 个查询、10 篇论文，仍是探索性小样本。
+- P13/P14 相关性标签未经人工全审，相关检索指标不能作为质量声明。
+- 尚未系统评估真实用户任务成功率、LLM 回答质量和多用户压力表现。
+- 全文许可逐篇人工核对；项目源码目前未选择再发布许可证。公开仓库不自动授予代码复用许可。
+
+## 项目文档
+
+- [项目规格](docs/PROJECT_SPEC.md) · [任务台账](docs/TASKS.md) · [阶段进度](docs/PROGRESS.md) · [执行计划](docs/EXECUTION_PLAN.md)
+- [开发与验收指南](docs/development.md) · [OpenAPI 契约](docs/openapi.json)
+- [P05 人工复核评测](docs/research/P05-acceptance.md) · [P12 Agent 离线评测](docs/research/P12-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md)

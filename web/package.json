@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "format:check": "prettier --check app components lib tests playwright.config.ts next.config.ts tsconfig.json package.json",
+    "format:check": "prettier --check app components lib tests playwright.config.ts next.config.ts tsconfig.json package.json ../README.md",
     "test:e2e": "playwright test"
   },
   "dependencies": {
