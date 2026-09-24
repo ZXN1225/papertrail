@@ -696,7 +696,7 @@ class PaperStore:
                 LEFT JOIN fulltext_embeddings e ON e.chunk_id=c.chunk_id
                 AND e.model=? AND e.dimensions=? AND e.normalization='none'
                 WHERE {" AND ".join(clauses)} ORDER BY c.source_type, c.source_id,
-                c.ordinal LIMIT 2_000""",
+                c.ordinal LIMIT 2000""",
                 [embedding_model or "", len(query_embedding or []), *params],
             ).fetchall()
         if not rows:
@@ -804,7 +804,7 @@ class PaperStore:
                 JOIN fulltext_chunks c ON c.source_type=v.source_type
                 AND c.source_id=v.source_id AND c.content_sha256=v.content_sha256
                 WHERE {" AND ".join(clauses)} ORDER BY c.source_type,c.source_id,c.ordinal
-                LIMIT 2_000""",
+                LIMIT 2000""",
                 params,
             ).fetchall()
         return [dict(row) for row in rows]
