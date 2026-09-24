@@ -1,138 +1,237 @@
-# 本地运行与检查（T04/T05）
+# 本地开发
 
-本阶段提供三入口首页、状态 API、匿名会话、画像保存/版本历史、已发布目录和确定性报价计算。没有推荐或模型调用。已保存需求固定 24 小时有效，未保存编辑刷新即丢失。`ready=200` 只表示基础依赖可用，不表示数据已可推荐。身份保护、删除与过期清理见 [会话设计](sessions.md)。
+## P11 Web 研究工作区
 
-## 固定工具
-
-Python 3.12.14、Node 24.19.0、uv 0.12.10、pnpm 11.19.0。版本文件位于根目录，完整依赖见 backend/uv.lock 与 web/pnpm-lock.yaml。uv 可用 `uv python install 3.12.14` 准备 Python。不要用系统 Python 3.11 直接运行后端。
-
-以下命令除特别标记外均从仓库根目录执行。先确保对应版本工具可用，再选一种数据库运行方式；不要同时启动两个占用 55432 的 PostgreSQL。
-
-## 方式 A：Docker Compose（推荐的完整环境）
-
-需要可运行 Linux 容器的 Docker 和 Compose v2。
+前置需要 Node.js 24.x 和 pnpm 11.x。先按上文启动后端，再开第二个 PowerShell 窗口：
 
 ```powershell
-python scripts/init_env.py
-docker compose --env-file .env -f deploy/compose.yml up -d --wait
-docker compose --env-file .env -f deploy/compose.yml exec postgres createdb -U computer test_computer
+cd D:\Coding\Computer_Recommand\web
+pnpm install --frozen-lockfile
+Copy-Item .env.example .env.local
+pnpm dev
 ```
 
-最后一条只在首次创建测试库时执行。脚本生成忽略入库的 `.env`，凭据随机且不打印；已有文件时拒绝覆盖，后续重启只执行 Compose 命令。PG 映射本机 55432、Redis 56379，仅绑定 127.0.0.1。镜像按版本和摘要固定。Redis 开发实例无密码，因此只能保留本机绑定，不可将此配置直接部署公网。
+浏览 `http://127.0.0.1:3000`。若使用默认地址，可不创建 `.env.local`；代理默认将请求转发到 `http://127.0.0.1:8001`。需要改地址时，只能在服务端 `.env.local` 配置 `PAPERTRAIL_API_BASE_URL`，不能将 OpenAlex、OpenAI 或 Embedding 密钥写入 Web 环境变量。页面状态栏读取后端 readiness；OpenAlex/arXiv 搜索需要后端可联网，本地文献库只查询本地 SQLite。Agent 会使用已配置的模型并可能产生 API 费用；LLM 未启用时会显示服务错误，不会伪造回答。
 
-## 方式 B：当前 Windows 的便携 PostgreSQL
+在 `web` 目录运行 `pnpm run format:check`、`pnpm run typecheck`、`pnpm run build` 和 `pnpm run test:e2e`。Playwright 以浏览器路由 mock 后端响应；`TEST-*` fixture 全部是合成数据，测试不连接 SQLite、OpenAlex 或 OpenAI。首次运行前若 Chromium 尚未安装，可执行 `pnpm exec playwright install chromium`。
 
-本机没有可用 Docker/WSL 发行版，本轮已用 EDB PostgreSQL 17.11 二进制包完成真实数据库验证，不注册 Windows 服务。
-
-新机器可从 [PostgreSQL 官方 Windows 下载页](https://www.postgresql.org/download/windows/) 指向的 [EDB 二进制下载页](https://www.enterprisedb.com/download-postgresql-binaries) 获取 17.11。此次包为 `postgresql-17.11-3-windows-x64-binaries.zip`；解压其中 `pgsql/bin`、`pgsql/lib`、`pgsql/share` 到仓库 `.local/pgsql/`，不提交二进制文件。缺少运行库时按 EDB 的系统要求安装。
+Windows 本机运行 E2E 时，为让 Playwright 复用开发服务器并在 15 项用例结束后正常退出，先在一个终端启动：
 
 ```powershell
-python scripts/init_env.py --without-redis
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-postgres.ps1
+node ./node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3001
 ```
 
-本机已有 `.env` 和已初始化的集群，**不用重复生成配置**，重启只运行第二条。脚本读取 `.env`，初始化 `.local/pgdata`，创建 computer/test_computer 两个数据库。本机 Redis 明确关闭；此路径不能算作 Redis 成功连接验证，完整组合由 CI 实测。生产配置禁止关闭 Redis。
+再开另一个终端运行 `pnpm run test:e2e`；完成后回到服务器终端按 `Ctrl+C`。GitHub Actions 在 Linux CI 中会自行启动与清理独立 E2E 服务。
 
-## 安装、迁移和启动
+## 前置环境
+
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+
+SQLite 目录会在首次就绪检查/导入时自动建立，无需单独安装数据库服务。OpenAlex 搜索支持无 Key 的小规模试用；配置免费 Key 可提升日请求额度。LLM 与 embedding 仍默认关闭。
+
+## Windows PowerShell
 
 ```powershell
-uv sync --directory backend --frozen
-pnpm --dir web install --frozen-lockfile
-uv run --directory backend --frozen alembic upgrade head
-uv run --directory backend --frozen uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+cd D:\Coding\Computer_Recommand\backend
+uv sync --locked --all-groups
+uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-另开终端，从仓库根目录运行：
+浏览 `http://127.0.0.1:8001/docs` 查看 API，或访问：
 
-```powershell
-pnpm --dir web dev
+- `http://127.0.0.1:8001/api/health/live`
+- `http://127.0.0.1:8001/api/health/ready`
+
+## macOS / Linux
+
+```bash
+cd backend
+uv sync --locked --all-groups
+uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-- 首页：<http://127.0.0.1:3000>。
-- 后端接口文档：<http://127.0.0.1:8000/docs>。
-- 存活：<http://127.0.0.1:8000/api/v1/health/live>。
-- 就绪：<http://127.0.0.1:8000/api/v1/health/ready>。
+## 配置
 
-## 可选：启用 GPT Provider 做本机 Agent 联调
-
-OpenAI API 与 ChatGPT 订阅分开计费。先确认你所在的欧洲国家/地区出现在[官方 API 支持列表](https://help.openai.com/en/articles/5347006-openai-api-supported-countries-and-territories)，然后在 [OpenAI API Platform](https://platform.openai.com/) 设置 API 账单并创建项目 API Key。API Key 由后端使用；不要放入前端环境、截图、聊天或 Git。官方密钥创建和调用步骤见[开发者快速入门](https://developers.openai.com/api/docs/quickstart)。
-
-只修改仓库根目录本机 `.env` 中的模型配置，保留其数据库、会话和其他已有字段：
+在仓库根目录执行 `Copy-Item .env.example .env`（如果 `.env` 已存在就不要覆盖），再用编辑器打开 `.env`。将 OpenAlex Key 填入 `OPENALEX_API_KEY=` 后面。无需引号，例如：
 
 ```dotenv
-LLM_PROVIDER=openai
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=你的项目API密钥
-LLM_MODEL=gpt-6-astra
-LLM_TIMEOUT_SECONDS=15
-LLM_MAX_OUTPUT_TOKENS=512
+OPENALEX_API_KEY=你的OpenAlexKey
+LLM_PROVIDER=disabled
+LLM_API_KEY=
 ```
 
-模型名必须是当前项目可调用的模型；若默认模型没有权限，在 API Platform 的项目模型页选择已启用模型并替换 `LLM_MODEL`。保存后重启后端。默认 `LLM_PROVIDER=disabled`，缺 Key 时 OpenAI 模式会拒绝启动配置。代码只允许 OpenAI 官方 HTTPS API 地址；常规联调请保留默认地址。人在欧洲不代表请求自动在欧盟区域处理；EU endpoint 只适用于项目已获相应数据驻留/处理资格的情况，详情看[官方数据控制文档](https://developers.openai.com/api/docs/guides/your-data)。
+OpenAlex Key 可从 [OpenAlex API 设置](https://openalex.org/settings/api) 获取；免费 Key 用于提高日请求额度和查看用量。没有 Key 时 OpenAlex 也允许基础查询。不要把 Key 粘贴到命令行、URL、浏览器前端、聊天或 Git。`.env` 已被忽略；如果曾误提交或泄露，应在 OpenAlex 设置页轮换 Key。
 
-确认 API `/api/v1/health/ready` 返回 200，再打开 <http://127.0.0.1:3000>：
+你已有的 OpenAI Key 暂时不要启用：之后配置时放在同一个服务端 `.env` 的 `LLM_API_KEY=`，并按对应阶段设置 `LLM_PROVIDER` 和模型名。本阶段只调用 OpenAlex，不会调用 OpenAI，也不会消耗 OpenAI 额度。写入/修改 `.env` 后需重启后端进程。
 
-1. 进入笔记本或 PC 推荐表单，填写少量需求并保存画像。
-2. 点击“开始核对”。该请求会把当前用户文本、保存画像和本轮结构化工具观察发送到 GPT。初次学习测试不要写入真实个人资料。
-3. 在 Agent 页面观察状态、工具调用摘要和最终回答。空目录时仍可能发生 GPT 调用和工具循环，但商品结果应为空；不要把此结果当作真实推荐。
-4. 运行离线保护测试（无需 API Key）：`uv run --directory backend --frozen pytest -q tests/test_openai_provider.py tests/test_agent_harness.py`。
+客户端只访问固定的 `https://api.openalex.org` 官方域名；认证使用服务端 `Authorization: Bearer` 请求头。受控的直连接口包括 `GET /api/v1/papers/search`（Works 搜索）、`GET /api/v1/openalex/works/{WID}`（Work 详情）、`GET /api/v1/openalex/authors/search`、`GET /api/v1/openalex/authors/{AID}` 和 `GET /api/v1/openalex/authors/{AID}/works`。所有列表最多每页 25 条、限制在前 10,000 条；不下载论文全文。完整 schema 可在 `/docs` 查看。
 
-每轮 Agent 受 4 个决策回合、8 次工具调用、45 秒 Harness 总时限约束；单次模型响应默认最多 512 个输出 Token、15 秒 HTTP 超时、逐轮发送且 `store=false`。多轮调用仍会按输入/输出 Token 计费，先只试 1—3 个请求并在 API Platform 查看 usage/billing。此阶段没有服务端美元硬预算器，也不纳入 ChatGPT Plus/API 共享额度。Key 和提示内容不会放进模型评测文件，但供应商会收到实现一次 Agent 决策所需的请求上下文。
+Key 写入并保存后，在运行后端的终端按 `Ctrl+C` 停止旧进程，再重新运行上面的 Uvicorn 命令。访问 `http://127.0.0.1:8001/api/v1/papers/search?q=agent%20research&per_page=5` 进行一次小规模真实搜索。返回 JSON 中应有 `meta.count`、`results`、`fetched_at` 和可用的额度信息；不需要也不要把 Key 放入 URL。浏览器地址栏只包含公开查询词，不包含 Key。不要连续刷新；OpenAlex 会在响应中提供额度信息并对超额/过快请求返回 429。
 
-手工联调是唯一会产生真实 API 调用的步骤；mock 测试不会连接 OpenAI。真实目录仍为空时只能验证模型选工具、服务端执行和回答循环，不能验证推荐准确性；真实商品/价格仍受 D01—D03 数据授权与样本阻塞。
+## 导入本地论文元数据
 
-Alembic `0001_baseline` 创建版本记录，`0002_sessions` 新增会话表，`0003_catalog` 新增 13 张空商品/来源/证据领域表。预览应用不会自动迁移；未迁移、版本不匹配、PG 失联或已配置 Redis 失联均返回 ready=503。升级后先运行 upgrade head，再重启 API/web。隔离 E2E 入口会自行迁移 test_* 数据库。T02 表关系与迁移边界见 [数据模型](catalog-model.md)，记录契约可在 API `/docs` 的 Schemas 查看，无目录写入接口。
+从仓库根目录在已配置 `.env` 后执行一次有界导入。每次只请求一个 OpenAlex Works 搜索页，默认 10 条、最多 25 条；相同数据重复导入幂等，变化内容会建立新版本。命令只输出计数、快照 ID、哈希与本地数据库路径，不打印论文标题或摘要。
 
-当前 head 为 `0004_imports`，新增 6 张导入/版本/通知表，并为规范事实投影建立数据库引用约束。管理 API/CLI 入口与认证配置见 [人工导入指南](manual-imports.md)。管理员配置默认空值；未配置返回 ADMIN_DISABLED，不为了预览而设置通用密码。无真实资料时不向开发库导入 TEST 商品；合成验证须 APP_ENV=test 且 test_* 数据库。
+```powershell
+cd D:\Coding\Computer_Recommand\backend
+uv run --locked python -m app.cli.import_openalex --query "retrieval augmented generation" --per-page 10
 
-前端将固定状态 GET、公开目录/报价和白名单会话/画像 API 转发到本机 8000；若改端口，在启动 Next 的进程环境中设置服务端 `API_BASE_URL`。公开目录只读取当前发布版本，空目录不会填充样例；报价计算不访问第三方 URL。没有浏览器可控 URL 代理，也不向浏览器传数据库或模型凭据。`.env` 由后端加载，Next 不读取根目录密钥。写请求需要允许的精确 Origin/JSON；会话密钥不足 32 字符时会话服务返回 503。
+OpenAlex Works 单页最多可导入 100 条元数据；一次运行仍只处理指定的一页。较大的本地评测集可用 `--per-page 100` 创建一个内容哈希锁定的完整快照，不会下载论文全文。
+```
 
-`APP_ENV=production` 必须提供 PG、Redis、至少 32 字符会话密钥、HTTPS 的 PUBLIC_BASE_URL/CORS_ALLOWED_ORIGINS。CORS 只允许配置来源、GET/POST/PATCH/DELETE 和明确头，带身份写入须匹配 CSRF。管理员写入和生产部署仍在后续阶段实现。开发 Redis 关闭时仍使用 PG 共享限流；默认 SESSION_WRITE_LIMIT=60 次/分钟/会话，可配置 1—600。
+数据库默认路径是 `data/papertrail.sqlite3`，可通过 `.env` 中的 `DATA_STORAGE_PATH` 改为绝对路径或相对项目根目录的路径；SQLite 文件被 Git 忽略。就绪检查 `/api/health/ready` 会创建/校验 schema 并在 SQLite 不可用时返回 HTTP 503。
+
+只读本地接口：`GET /api/v1/catalog/papers?limit=20&offset=0` 列出本地结果；`GET /api/v1/catalog/papers/W...` 读当前版本，或加 `?snapshot_id=<快照ID>` 读取该快照中的历史版本；`GET /api/v1/catalog/snapshots` 列出导入批次；`GET /api/v1/catalog/snapshots/<快照ID>` 读取批次 lineage。空目录返回空列表，不生成示例论文。当前不下载或保存论文全文。
+
+## P05 BM25 离线评测
+
+确认 P04 的十条 OpenAlex 导入仍在本地 SQLite 后，在 `backend` 目录运行：
+
+```powershell
+uv run --locked python -m app.cli.evaluate_bm25
+```
+
+评测仅使用 `backend/data/evaluation/p05_gold_v1.json` 声明的固定 OpenAlex ID 与逐篇内容哈希；找不到完全匹配的快照或文档内容发生变化时会停止并报错。报告默认写到 `backend/reports/p05-bm25-report.json`，该目录已忽略，不会提交。报告包含 Hit@k、MRR@10、NDCG@k、分桶平均、空结果率、单查询均值/P95 延迟、数据集与语料哈希、BM25 和 tokenizer 版本。
+
+当前评测集只有 8 个 query / 10 篇论文，`exploratory_only=true`。qrels 是根据标题和可用摘要整理的候选标注，等待用户复核；复核说明见 `docs/research/P05-qrels-review.md`。它目前**不是已人工确认的金标**，结果不能作为简历中的检索质量成绩。该命令不访问 OpenAlex，不调用 OpenAI/embedding，也不下载全文。
+
+### P05 人工复核候选标签
+
+P05 的候选相关性分级需要你逐条审阅。先确认本机已导入与固定 P05 ID/内容哈希完全匹配的 10 篇快照，然后在 `backend` 运行：
+
+```powershell
+uv run --frozen python -m app.cli.review_qrels export
+notepad .\reports\p05-review-pack.json
+```
+
+复核包列出 8 个查询与 10 篇论文的全部 80 个组合，包括题目、摘要、助手建议分级、`reviewed_grade`、`reviewed` 和备注。对每行填写 `reviewed_grade` 为 0—3，确认该行后把 `reviewed` 改为 `true`；备注可解释不确定判断。没有摘要时不要假装核验了全文，相关性按可用的标题/摘要信息判断。分级含义：0 不相关，1 背景相关，2 直接相关，3 高度相关。
+
+逐项检查完后，用你认可的审核者标识导入为独立的新数据集：
+
+```powershell
+uv run --frozen python -m app.cli.review_qrels import `
+  --pack .\reports\p05-review-pack.json `
+  --reviewer "local-project-owner" `
+  --confirm-human-review
+```
+
+这会新建 `backend/data/evaluation/p05_human_reviewed_v2.json`，不会覆盖候选文件或复核包。若你没有完成全部 80 行、标签越界、论文快照/hash 已变化或复核包基于另一版数据，导入会失败。该 CLI 不联网、不调用模型，也不修改 SQLite。导入动作中的 `--confirm-human-review` 表示你确认每一行都已由人检查；在你执行前，原始候选仍不是 gold。之后运行 BM25 时需显式指定 `--dataset data/evaluation/p05_human_reviewed_v2.json`；由于样本仍很小，报告仍会标记 exploratory。
+
+## P06 Agent 本地运行
+
+Agent 默认关闭 LLM。若要做后续真实模型烟测，可在服务端 `.env` 配置 `LLM_PROVIDER=openai`、`LLM_API_KEY` 和账户可用且支持 function calling/structured outputs 的 `LLM_MODEL`，并按需调整 `AGENT_MAX_STEPS`、`AGENT_MAX_TOOL_CALLS`、`AGENT_DEADLINE_SECONDS`；默认限制分别为 4 轮、8 次工具调用和 45 秒。保存 `.env` 后重启后端。
+
+请求 `POST http://127.0.0.1:8001/api/v1/agent/ask`，JSON 格式例如：
+
+```json
+{"question":"请找出 RAG 检索质量评测的代表论文，并说明本地元数据能支持什么结论。"}
+```
+
+当前 Agent 可读本地导入的 OpenAlex/arXiv 元数据，也可调用固定在线只读工具：Works 搜索/详情、Authors 搜索/详情、作者作品列表、arXiv 元数据搜索/详情；本地工具支持 BM25 搜索、查单篇、词法相关、元数据比较和许可全文片段检索。无批准全文时返回 `no_results`。在线 OpenAlex 工具每次调用 timeout 4 秒且不重试；若没有 OpenAlex Key，仍尝试 OpenAlex 的 keyless 服务额度。若没有设置 LLM，接口返回 503 `model_disabled`。自动测试使用假模型/HTTP mock，不消耗 API 额度。Agent 响应提供 run ID、总耗时、输入/输出 token 与脱敏模型/工具 trace；暂时不估算费用，也不持久化 trace。
+
+## arXiv 元数据（P08）
+
+arXiv API 无需 API Key。服务端接口为 `GET /api/v1/arxiv/search?q=...`、`GET /api/v1/arxiv/works/{arxiv_id}`；已导入的元数据可通过 `/api/v1/catalog/arxiv` 查询。Agent 使用固定工具 `search_arxiv_metadata` 和 `get_arxiv_metadata`。手动导入单页：
+
+```powershell
+uv run --directory backend --frozen python -m app.cli.import_arxiv --query 'all:"retrieval augmented generation"' --max-results 10
+```
+
+客户端限制每个进程至多每 3 秒发起一次请求；分布式多实例部署前须改用共享限流器。导入仅保存元数据，不下载 PDF/全文。元数据依 arXiv 条款为 CC0；论文文件许可另行判断。使用该 API 的项目应展示 arXiv 要求的致谢：`Thank you to arXiv for use of its open access interoperability.`
+
+## 许可全文导入与检索（P09）
+
+P09 不会从网页下载论文。先在论文原始来源页面逐篇确认使用许可确实允许你的用途，再准备本地 UTF-8 `.txt` 文件和 JSON manifest。当前准入白名单仅为 `CC0-1.0` 与 `CC-BY-4.0`；`is_oa=true`、可免费阅读、仅有 DOI 或 arXiv 元数据 CC0 都不够。未知、NC、ND、SA 等许可不会入库。命令行确认不构成法律意见，也不代替你核对原始许可。
+
+Manifest 示例（请用实际论文和许可证据替换示例值；不要将全文或真实个人信息提交到 Git）：
+
+```json
+{
+  "source_type": "arxiv",
+  "source_id": "2401.12345",
+  "text_source_url": "https://arxiv.org/pdf/2401.12345",
+  "license_id": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "license_evidence_url": "https://arxiv.org/abs/2401.12345",
+  "reviewer": "local-project-owner",
+  "attribution": "作者、论文标题、arXiv:2401.12345, CC BY 4.0"
+}
+```
+
+只有当你已从允许的来源合法取得文本并核对许可后才执行。输入必须是 `.txt` 且不超过 8 MB，内容不超过 2,000,000 字符；论文 ID 需要先导入本地元数据目录：
+
+```powershell
+uv run --directory backend --frozen python -m app.cli.import_licensed_fulltext --manifest path/to/manifest.json --text path/to/paper.txt --confirm-license-reviewed
+```
+
+重复导入相同版本幂等；新内容产生新版本，只检索当前版本。查询许可证据：
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:8001/api/v1/evidence/search?q=your%20research%20question&limit=5'
+```
+
+### P10 Dense / Hybrid 检索
+
+BM25 仍是默认且不产生 embedding API 调用。OpenAI 官方 Embeddings 指南当前推荐候选 `text-embedding-3-small`（1536 维，单输入最多 8192 token；当前标价每百万输入 token $0.02），项目首次实验固定用 1536 维，不裁剪。开始前需自行确认账户可用性与当前数据处理设置；启用后，获准全文片段和检索问题会发送到 OpenAI Embeddings API。来源：[OpenAI Embeddings 指南](https://developers.openai.com/api/docs/guides/embeddings)。
+
+启用前将服务端 `.env` 配置如下。Embedding API Key 单独放 `EMBEDDING_API_KEY`；默认保持 disabled。
+
+```dotenv
+EMBEDDING_PROVIDER=openai
+EMBEDDING_API_KEY=你的OpenAI_API_Key
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=1536
+EMBEDDING_PRICE_PER_MILLION_USD=0.02
+```
+
+`EMBEDDING_PRICE_PER_MILLION_USD` 用于本机估算报告，需按当前账户/模型价格手动维护；留空则费用估算为 null。该字段不决定实际账单。
+
+重启后端后，明确运行一次索引命令才会产生文档 embedding 请求和费用；该命令只处理本地当前已批准的全文，默认最多 2000 个 chunks，可用来源过滤器限定单篇：
+
+```powershell
+uv run --directory backend --frozen python -m app.cli.index_fulltext_embeddings --source-type arxiv --source-id 2609.25991
+```
+
+然后 API 可按 `retrieval_method=bm25|dense|hybrid` 检索。Dense/Hybrid 的每个搜索问题也会发一次 embedding 请求；Hybrid 使用 BM25 与 Dense 的 RRF（k=60）。若某模型/维度索引不完整，接口返回 `embeddings_missing`，不会悄悄退回 BM25 冒充混合结果。没有启用 Provider 时 Dense/Hybrid 返回 503。Agent 全文工具包含相同检索方法参数；默认仍选 BM25，模型可明确请求 Dense/Hybrid。
+
+独立 synthetic pipeline 不请求外部 provider，也不读写真实论文库：
+
+```powershell
+uv run --directory backend --frozen python -m app.cli.evaluate_hybrid
+```
+
+这项报告中的向量是固定 `TEST-*` 夹具，仅验证排名融合、指标和报告管线；`quality_claim_allowed=false`，不能当作 OpenAI embedding 的质量分数。真实向量 A/B 需要在固定授权语料和人工审核 qrels 上另行执行。
+
+### P12 离线端到端 benchmark
+
+执行单一命令，将 P10 的确定性检索评测与真实 AgentHarness 的离线 mock 安全场景合并为本机 JSON 报告：
+
+```powershell
+uv run --frozen python -m app.cli.evaluate_p12
+```
+
+默认输出为 Git 忽略的 `backend/reports/p12-offline-report.json`。报告包含夹具与 runner SHA-256、BM25/Dense/RRF Hit/MRR/NDCG、TEST 证据 span 的精确位置/支持断言、工具错误恢复、拒答与注入用例、mock token、Agent 调用数和本机 mock pipeline p50/p95。运行不需要 `.env`、SQLite、OpenAlex 或 OpenAI，不会联网。所有 mock 论文均为 TEST 数据；`quality_claim_allowed=false`、费用为 `null/not_measured_mock_mode`。mock 延迟不是 API/服务端延迟，mock token 不产生账单。
+
+运行完整自动测试仍用 `uv run --frozen pytest -q`。其中现有全文集成测试另覆盖许可门禁、真实存储 span locator、引用 lineage 与伪造引用拒绝；P12 报告里的固定 span 检查不替代这些测试。P05 qrels 人工复核与用户单独确认的小批量 live OpenAI 评测尚未完成，不能对外宣称真实检索/Agent 质量提升或真实模型成本。
+
+撤销某篇论文的全文并清除其所有版本和切片：
+
+```powershell
+uv run --directory backend --frozen python -m app.cli.delete_fulltext --source-type arxiv --source-id 2401.12345 --reason 'license verification failed'
+```
+
+删除审计只保留来源 ID、原内容哈希、理由与时间，不保留正文。没有获准片段时 API 和 Agent 返回 `no_results`，不会退回到摘要冒充全文证据。
 
 ## 验证
 
-根目录的记录检查：
+在 `backend` 执行：
 
 ```powershell
-python scripts/check_foundation.py
-python scripts/check_source_review.py
-git diff --check
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pytest
+uv run --locked python -m tools.export_openapi
 ```
 
-后端（工作目录 `backend`）：
-
-```powershell
-uv run --frozen ruff check .
-uv run --frozen ruff format --check .
-uv run --frozen python -m tools.test_local
-uv run --frozen python -m tools.export_openapi
-uv run --frozen pip-audit --progress-spinner off
-```
-
-`tools.test_local` 仅接受 development + 本机地址，从 `.env` 派生 test_computer 连接，避免复制密码。该数据库用户需要创建数据库权限。集成测试仅连接名称以 test_ 开头的测试入口，创建独立 `test_i01_<随机ID>` 空库并只清理自己创建的库，覆盖空库/升级/重复升级/回滚/重新升级与依赖故障；不接触 computer 库。外部测试环境可显式设置 TEST_DATABASE_URL 和 TEST_REDIS_URL 后运行 `uv run --frozen pytest -q`。未提供 TEST_DATABASE_URL 的普通 pytest 会跳过集成测试，不可声称完整通过。
-
-前端（工作目录 `web`）：
-
-```powershell
-pnpm run api:generate
-pnpm run format:check
-pnpm run typecheck
-pnpm run build
-pnpm audit --audit-level moderate
-pnpm exec playwright install chromium
-pnpm test:e2e
-```
-
-E2E 通过 tools.serve_e2e 启动独立 8001 后端与 3001 Next 生产构建，拒绝非 test_* 数据库且不复用预览服务。要求已有 test_computer 数据库和本地 `.env`（或 CI 的 TEST_DATABASE_URL/SESSION_SIGNING_SECRET），自动迁移该测试库。三个宽度共 15 项：三入口保存/恢复、跨标签冲突、新需求/删除/隔离、保存失败、网络重试/键盘。报告位于 web/playwright-report，截图位于 web/test-results（均不入库）。
-
-API 变化后依次导出 OpenAPI、生成 TypeScript 并一同提交。CI 重新生成后检查无差异，使用真正 PostgreSQL/Redis 服务、锁定安装和上述检查，浏览器报告保留 7 天。漏洞审计只反映当时已知数据库结果，不是全面安全认证。
-
-## 停止服务
-
-前后台终端按 Ctrl+C 停止；本轮后台预览的 PID 记录在 `.local/preview-pids.json`（存在时先核对 PID 对应命令，再停止）。便携 PG 可保留数据停止：
-
-```powershell
-& ./.local/pgsql/bin/pg_ctl.exe -D ./.local/pgdata -m fast -w stop
-```
-
-Compose 运行方式用 `docker compose --env-file .env -f deploy/compose.yml down` 停止；不要添加 `-v`，以保留数据库。更改 `.env` 密码不会自动修改已初始化集群账户，需通过数据库管理操作协调更新，不能删除集群重建来覆盖用户数据。
+OpenAPI 契约输出到 `docs/openapi.json`；CI 会重新生成并检查提交版本没有差异。

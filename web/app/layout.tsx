@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "选机有据 · 电脑推荐平台",
-  description: "从真实需求出发，让每一项电脑推荐都有依据。",
+  title: "PaperTrail · 论文研究工作区",
+  description: "搜索论文、并列比较，并让研究助理基于可追溯证据回答。",
 };
 
 export default function RootLayout({

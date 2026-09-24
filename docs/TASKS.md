@@ -1,47 +1,34 @@
 # 任务台账
 
-状态定义：done=本任务验收完成；todo=未开始；blocked=已有具体阻塞。T01 done 不代表整个 P0 done。每轮结束后等待用户确认。
+状态：done=验收完成；todo=未开始；blocked=有具体外部阻塞。阶段完成后等待用户确认。
 
-| ID | 任务 | 前置 | 验收定位 | 状态 |
-|---|---|---|---|---|
-| T01 | README、AGENTS、ADR、计划、台账、模板与骨架 | 无 | 执行计划步骤 01 | done |
-| V01 | 四类来源各 5 样本或失败证据、运行时版本核验 | T01、用户确认 | 步骤 02 / 规格 §9.2；报告见 research/V01-source-feasibility.md | done |
-| I01 | 前后端、PG/Redis、配置、CI、健康检查、锁文件 | V01 | 步骤 03；research/I01-acceptance.md | done |
-| I02 | 会话身份、权限与请求保护 | I01 | 步骤 04；research/I02-acceptance.md | done |
-| T02 | SKU/来源/证据 Schema 与领域首次迁移 | I01、V01 | 步骤 05 / §8；research/T02-acceptance.md | done |
-| T03 | 人工导入、预览、审核、事务发布 | T02、I02 | 步骤 06 / §9；research/T03-acceptance.md；功能通过，真实样本待 D01—D03 | blocked |
-| T04 | 目录查询与前端只读列表、规格适配器 | T03 | 步骤 07 / research/T04-T05-acceptance.md | done |
-| T05 | 报价快照、人工 Provider、总价函数 | T02 | 步骤 07 / research/T04-T05-acceptance.md | done |
-| T06 | CPU/主板/内存 C001—C003 | T03 | 步骤 08 / research/T06-acceptance.md | done |
-| T07 | C004—C012 与完整报告聚合 | T06 | 步骤 09 / research/T07-acceptance.md | done |
-| T08 | 笔记本过滤与分项评分 | T04、T05 | 步骤 10 / research/T08-acceptance.md | done |
-| T09 | PC 有界求解 | T05、T07 | 步骤 11 / §12；research/T09-acceptance.md | done |
-| T10 | 快照保存、修订、比较、导出 | T08、T09、T11 | 步骤 12；research/T10-acceptance.md | done |
-| T11 | 画像 patch、revision 与会话状态 | I02 | 步骤 04 基础完成；Agent 状态机在 P5 扩充 / §6 | done |
-| T12 | 工具协议、Harness、模型适配 | T10、T11 | 步骤 13 / §6—7；research/T12-acceptance.md | done |
-| T13 | 审核手册摄取、BM25、引用 | T03 | 步骤 14 / §10；research/T13-acceptance.md | done |
-| T14 | 回答契约、SSE、取消 | T12、T13 | 步骤 14 / §13；research/T14-acceptance.md | done |
-| T15 | PC/笔记本/单零件界面、后台、E2E | T10、T14 | 步骤 15；research/T15-acceptance.md | done |
-| T16 | 金标评估、部署、恢复演练（A/B 分轮） | T15 | 步骤 16—17 / §16—17；research/T16-A-acceptance.md | in_progress |
-| T17 | 京东/联想商城来源授权门禁与受控接入 | 用户确认京东为主要来源，并允许替代候选 | research/T17-jd-source-gate.md | blocked |
-| T18 | 授权报价 API 配置门禁与接入指南 | T17、用户确认 API 优先策略 | research/T18-authorized-price-adapters-acceptance.md | in_progress |
-| T19 | 开放数据登记与隔离检索评测框架 | 用户确认学习/评测数据路线 | research/T19-open-evaluation-framework-acceptance.md | in_progress |
-| T20 | 多桶检索基线对照与 Agent 工具策略评测 | T19 | research/T20-evaluation-suite-acceptance.md | done |
-| T21 | GPT Provider 接入与隔离联调 | T12、T14、T20 | research/T21-openai-provider-acceptance.md | in_progress |
+| ID | 任务 | 前置 | 状态 |
+|---|---|---|---|
+| P01 | 项目章程、迁移评估、来源/Agent/评测边界 | 用户确认方向 | done |
+| P02 | 独立应用骨架、锁文件、CI 与启动说明 | P01 用户确认 | done |
+| P03 | OpenAlex 固定 API 客户端与契约测试 | P02 | done |
+| P04 | 元数据快照、目录、来源 lineage | P03 | done |
+| P05 | BM25 与人工检索金标评测 | P04 | done |
+| P06 | 受限 Agent 工具循环与引用契约 | P05 BM25 baseline | done |
+| P07 | OpenAlex 研究 API 能力补全与 Agent Harness 可观测性 | P03、P06 | done |
+| P08 | arXiv 第二来源、ID 归一化与精确 ID 导入 | P04、P07 | done |
+| P09 | 全文许可登记和开放许可论文 RAG | P04、P06、P07 | done |
+| P10 | Embedding、Hybrid 与排序消融 | P05、P09 | done |
+| P11 | 研究工作区 Web UI 与 E2E | P07 | done |
+| P12 | 端到端 benchmark、工程指标与作品集交付 | P05、P07、P09、P10、P11 | done |
+| P13 | 扩展论文检索评测集与 AI 标注诊断 | P05 | done |
+| P14 | 检索方法对照与失败查询诊断 | P13、P10 | done |
+| P15 | 简历展示文档、GitHub CI 与收尾回归 | P14 | done |
+| P16 | 迁移当前仓库为 PaperTrail 并发布 | P15 | blocked_auth |
 
-详细交付、失败反例和确认点见 [完整执行计划](EXECUTION_PLAN.md)。跨任务接口变动先更新契约；一个 PR 聚焦一个可审查结果，不将所有阶段合并成一次提交。
+P05 的 80 项 qrels 已由用户导入为 human-reviewed v2，且 BM25 候选/人审对照已完成；小样本报告仍为 exploratory-only。细节见 [`research/P05-acceptance.md`](research/P05-acceptance.md) 与 [`research/P05-qrels-review.md`](research/P05-qrels-review.md)。P09 本机验收记录见 [`research/P09-acceptance.md`](research/P09-acceptance.md)。P10 实现、自动测试和用户本机 live smoke 均已完成。已增加本地 qrels 复核包工具，详见 [`research/P05-review-workflow-acceptance.md`](research/P05-review-workflow-acceptance.md) 与 [`research/P10-acceptance.md`](research/P10-acceptance.md)。P12 离线 benchmark、mock Agent 安全评测和作品集文档已完成，结果及 E2E 清理限制见 [`research/P12-acceptance.md`](research/P12-acceptance.md)。
 
-## V01 留存的真实数据阻塞
+用户已取得 OpenAlex 与 OpenAI Key；OpenAlex Key 已留在本机 `.env`，P03 完成一次真实搜索验证。Key 不通过聊天传递；本轮没有调用 OpenAI。
 
-这些不是 V01 未记录的失败，而是后续数据发布的必要条件；不能因研究完成自动标为解决。
+P13 已建立 100 篇/30 查询/3,000 pair 的候选评测集；按用户选择，生成了 AI 填分副本和探索性 BM25 诊断报告。原人工复核包保持未审核状态，AI 标签不作为人工金标。验收及指标限制见 [`research/P13-acceptance.md`](research/P13-acceptance.md)。
 
-| ID | 缺口 / 状态 | 解除条件与决定节点 |
-|---|---|---|
-| D01 | 规格资料的公开展示与自动使用范围未落实 / blocked | T03/T04 前取得至少一源可用资料和允许使用证据；ASUS 不启用自动采集 |
-| D02 | CN 笔记本精确身份和主板 BIOS/revision 证据不足 / blocked | 精确 SKU 文件/页面可读并审核；缺字段不得进入完整推荐 |
-| D03 | 真实人工报价 0 条、API 未配置 / blocked | T03/T05 前取得首批 5 条可用报价并补全费用/时间/资格/权限 |
-| D04 | 仅一个 CPU 平台研究，其它零件尚未覆盖 / todo | P2—P4 数据扩充；最终双平台与完整组合目标保持不变 |
+P14 已完成 BM25/Dense/RRF 的同查询对照、分桶指标和失败查询诊断；使用 `text-embedding-3-small` 产生 23,960 输入 tokens。报告仅作 AI-qrels 探索分析，`quality_claim_allowed=false`。详见 [`research/P14-acceptance.md`](research/P14-acceptance.md)。
 
-I01 可在空目录下推进，不受 D01—D03 阻塞；生产推荐与真实数据验收受其阻塞。
+P15 的 README、架构/评测介绍、CI、全文 PDF 忽略规则与最终回归已完成。P16 已完成本地根目录迁移；远程改名与推送受当前 GitHub 凭据失效和网络访问阻拦。
 
-T03 的代码、迁移、管理 API/CLI、隔离测试已交付；blocked 专指计划要求的真实样本端到端尚无合法可用资料，并非代码未实现。T04 的代码工作可在用户确认后继续，真实目录验收仍须解除资料阻塞。
+P11 研究工作区及自动验收已完成，结果见 [P11 验收](research/P11-acceptance.md)。用户确认启动的 P12 已完成，阶段报告见 [P12 验收](research/P12-acceptance.md)。P05 qrels 已由用户复核导入并完成 BM25 对照，但数据集规模较小；P13/P14 标签未经人工核验，仅支持探索诊断，不支持对外质量声明。

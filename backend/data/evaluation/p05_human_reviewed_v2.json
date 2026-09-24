@@ -1,0 +1,742 @@
+{
+  "corpus": {
+    "content_sha256": {
+      "W4317898419": "c42ad1e61efbb7d968ed0124c7dc047e90bf3dbb0e304c1ff54c8f81fe715bea",
+      "W4389519118": "2dc601794b26efea51cf8c7e1f9cd4adc030d8b0be517b1f35ca68d73981a87b",
+      "W4389984066": "2db5e76d2b5e987534e773253411f00a5a035094b0d4b36de5feb019afb24f9f",
+      "W4393147129": "bece0007511df69a80c2f7f37d9a306910e3bbd8a5aacbe3872181d69b6c5058",
+      "W4400526126": "132e5de3b18cb9c01d89802dbd1a6fade7d76d976d5b3b795c6d7f42d40db8fa",
+      "W4402670290": "1b5f9d25adccf98648c1e1282ce5b279bf7b8cfbc5ea1a603cc4a837e5c18e6a",
+      "W4406771321": "7c9ff3b1c7732d43c731066d635d6c3b1a4c28972f392cec1696031f13b649e4",
+      "W4411203672": "7db9cae5b5d9a3335d4615a853797405142e5b5756bdd45c22a26fd4c72deb57",
+      "W4411630045": "d0e961166f12301fb278da6a40b33257b726672e91ec49c958dac3ddab7fc820",
+      "W4416034797": "2c5c91df07f753e111d9d4f6c2c259f68872fd17279ada592f4d9f17e8b0fed2"
+    },
+    "import_query": "retrieval augmented generation",
+    "page": 1,
+    "per_page": 10,
+    "source": "openalex",
+    "work_ids": [
+      "W4406771321",
+      "W4416034797",
+      "W4411203672",
+      "W4393147129",
+      "W4402670290",
+      "W4400526126",
+      "W4411630045",
+      "W4389519118",
+      "W4317898419",
+      "W4389984066"
+    ]
+  },
+  "dataset_id": "papertrail-p05-rag-retrieval-v1",
+  "dataset_version": 2,
+  "judgment_protocol": "Read title and available abstract; relevance 0=not relevant, 1=background, 2=directly relevant, 3=highly relevant. Every query judges every frozen corpus work.",
+  "judgment_status": "human_reviewed",
+  "queries": [
+    {
+      "bucket": "evaluation",
+      "query_id": "Q01",
+      "relevance": [
+        3,
+        1,
+        1,
+        3,
+        2,
+        3,
+        3,
+        0,
+        0,
+        2
+      ],
+      "text": "evaluation methods and benchmarks for retrieval augmented generation"
+    },
+    {
+      "bucket": "domain-medical",
+      "query_id": "Q02",
+      "relevance": [
+        1,
+        0,
+        2,
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "text": "medical question answering benchmarks for retrieval augmented generation"
+    },
+    {
+      "bucket": "method-graph",
+      "query_id": "Q03",
+      "relevance": [
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "text": "graph based retrieval augmented generation method LightRAG"
+    },
+    {
+      "bucket": "method-active-retrieval",
+      "query_id": "Q04",
+      "relevance": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        1
+      ],
+      "text": "active retrieval augmented generation methods"
+    },
+    {
+      "bucket": "domain-adaptation",
+      "query_id": "Q05",
+      "relevance": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        1
+      ],
+      "text": "domain adaptation for retrieval augmented generation in open domain question answering"
+    },
+    {
+      "bucket": "retrieval-quality",
+      "query_id": "Q06",
+      "relevance": [
+        2,
+        0,
+        1,
+        1,
+        1,
+        3,
+        2,
+        0,
+        0,
+        2
+      ],
+      "text": "measuring retrieval quality in retrieval augmented generation systems"
+    },
+    {
+      "bucket": "evaluation-automation",
+      "query_id": "Q07",
+      "relevance": [
+        1,
+        0,
+        1,
+        1,
+        1,
+        2,
+        3,
+        0,
+        0,
+        1
+      ],
+      "text": "automated evaluation of retrieval augmented generation systems"
+    },
+    {
+      "bucket": "survey-overview",
+      "query_id": "Q08",
+      "relevance": [
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3
+      ],
+      "text": "survey of retrieval augmented generation paradigms for large language models"
+    }
+  ],
+  "review_audit": {
+    "entries": [
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q01",
+        "review_note": "论文专门综述 RAG 评测指标、数据集与基准。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q01",
+        "review_note": "提出并实验评估 LightRAG；是方法论文，评测不是主题。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q01",
+        "review_note": "医疗领域系统综述涉及 RAG 评价框架，但非通用评测主旨。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q01",
+        "review_note": "RGB 是专门的 RAG 评测基准。",
+        "reviewed_grade": 3,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q01",
+        "review_note": "MIRAGE 是医疗 RAG 基准，领域范围较窄。",
+        "reviewed_grade": 2,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q01",
+        "review_note": "eRAG 专门提出检索质量评测方法。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q01",
+        "review_note": "RAGAs 是自动 RAG 评测框架。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q01",
+        "review_note": "研究主动检索方法，不是 RAG 评测方法或基准。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q01",
+        "review_note": "研究领域适配方法，不是 RAG 评测主题。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q01",
+        "review_note": "综述 RAG 范式并包含评测框架与基准。",
+        "reviewed_grade": 2,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q02",
+        "review_note": "通用 RAG 评测综述可作背景，但不是医疗 QA 专项。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q02",
+        "review_note": "图结构 RAG 方法与医疗 QA 基准无直接关系。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q02",
+        "review_note": "医疗 RAG 系统综述直接覆盖医疗应用与评价；不是单一基准。",
+        "reviewed_grade": 2,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q02",
+        "review_note": "RGB 是通用 RAG 基准，未见医疗 QA 专项证据。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q02",
+        "review_note": "MIRAGE 明确以医疗 QA 数据构建 RAG 基准。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q02",
+        "review_note": "通用检索质量评测，不聚焦医疗问答。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q02",
+        "review_note": "通用自动评测框架，不聚焦医疗问答。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q02",
+        "review_note": "主动检索方法与医疗 QA 基准无直接关系。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q02",
+        "review_note": "ODQA 领域适配并非医疗 QA 基准研究。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q02",
+        "review_note": "通用 RAG 综述可提供背景，不是医疗基准研究。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q03",
+        "review_note": "评测综述不是图结构 RAG 方法研究。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q03",
+        "review_note": "LightRAG 的核心即图结构索引和双层检索。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q03",
+        "review_note": "医疗 RAG 综述与指定图方法不直接相关。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q03",
+        "review_note": "通用 RAG 基准，不研究 LightRAG 或图检索。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q03",
+        "review_note": "医疗基准与图 RAG 方法不直接相关。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q03",
+        "review_note": "检索质量评测方法，不研究图 RAG。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q03",
+        "review_note": "RAG 评测框架，不研究图 RAG。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q03",
+        "review_note": "主动检索方法与图结构 LightRAG 不同。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q03",
+        "review_note": "领域适配研究与图 RAG 不直接相关。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q03",
+        "review_note": "通用 RAG 范式综述可作背景，非特定图方法。",
+        "reviewed_grade": 1,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q04",
+        "review_note": "RAG 评测综述不以主动检索方法为主题。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q04",
+        "review_note": "LightRAG 是图结构检索方法，不是主动检索策略。",
+        "reviewed_grade": 0,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q04",
+        "review_note": "医疗 RAG 综述与主动检索无直接证据。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q04",
+        "review_note": "通用基准评测不等同主动检索方法。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q04",
+        "review_note": "医疗基准不研究主动检索决策。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q04",
+        "review_note": "检索质量评测不等同主动检索方法。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q04",
+        "review_note": "自动评测框架不研究何时/何内容检索。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q04",
+        "review_note": "FLARE 明确提出生成过程中主动决定何时及检索什么。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q04",
+        "review_note": "领域适配方法不以主动检索为主题。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q04",
+        "review_note": "综述可作 RAG 背景，主动检索不是已知摘要核心。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q05",
+        "review_note": "评测综述不是 ODQA 领域适配方法研究。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q05",
+        "review_note": "LightRAG 图检索方法不聚焦领域适配。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q05",
+        "review_note": "医疗 RAG 系统综述属于特定领域背景，非 ODQA 适配方法。",
+        "reviewed_grade": 1,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q05",
+        "review_note": "RAG 能力基准与领域适配方法不是同一主题。",
+        "reviewed_grade": 0,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q05",
+        "review_note": "医疗 QA 基准与 ODQA 领域适配不同。",
+        "reviewed_grade": 0,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q05",
+        "review_note": "检索质量评测与领域适配无直接关系。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q05",
+        "review_note": "自动化评测框架与领域适配无直接关系。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q05",
+        "review_note": "主动检索方法与知识域适配不同。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q05",
+        "review_note": "论文核心直接研究 RAG 模型向开放域问答领域适配。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q05",
+        "review_note": "通用 RAG 综述可作背景，非领域适配研究。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q06",
+        "review_note": "评测综述覆盖检索组件指标，但重点不只检索质量。",
+        "reviewed_grade": 2,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q06",
+        "review_note": "LightRAG 报告检索效果，不以检索质量测量为研究问题。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q06",
+        "review_note": "系统综述讨论评价框架，可作检索评测背景。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q06",
+        "review_note": "RGB 测量 RAG 能力维度，但不专门提出检索质量指标。",
+        "reviewed_grade": 1,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q06",
+        "review_note": "MIRAGE 比较语料与 retriever 的系统表现，属于间接相关。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q06",
+        "review_note": "eRAG 核心是以文档级下游效果评估 RAG 检索质量。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q06",
+        "review_note": "RAGAs 含检索上下文相关性指标，但也评估生成等维度。",
+        "reviewed_grade": 2,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q06",
+        "review_note": "主动检索方法不以检索质量测量为主题。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q06",
+        "review_note": "领域适配效果不是 RAG 检索质量测量。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q06",
+        "review_note": "通用综述包含评测框架，可作为检索质量背景。",
+        "reviewed_grade": 2,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q07",
+        "review_note": "综述 RAG 评测，但自动化不是其核心主题。",
+        "reviewed_grade": 1,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q07",
+        "review_note": "LightRAG 是检索生成方法，不是自动评测框架。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q07",
+        "review_note": "医疗系统综述涉及评测框架，不专注自动化。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q07",
+        "review_note": "RGB 是可执行基准，但不是自动评测框架研究。",
+        "reviewed_grade": 1,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q07",
+        "review_note": "MIRAGE 是医疗 RAG 基准，不是通用自动评测方法。",
+        "reviewed_grade": 1,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q07",
+        "review_note": "eRAG 以文档级自动评估替代昂贵端到端测评，直接相关。",
+        "reviewed_grade": 2,
+        "suggested_grade": 2
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q07",
+        "review_note": "RAGAs 明确提出无需人工参考答案的自动评测框架。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q07",
+        "review_note": "FLARE 研究主动检索，不是评测方法。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q07",
+        "review_note": "领域适配论文不是自动 RAG 评测研究。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q07",
+        "review_note": "通用 RAG 综述讨论评测框架，可作背景。",
+        "reviewed_grade": 1,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4406771321",
+        "query_id": "Q08",
+        "review_note": "综述范围聚焦 RAG 评测，不是 RAG 范式全景综述。",
+        "reviewed_grade": 1,
+        "suggested_grade": 1
+      },
+      {
+        "openalex_id": "W4416034797",
+        "query_id": "Q08",
+        "review_note": "LightRAG 是具体方法论文，可作为范式背景。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411203672",
+        "query_id": "Q08",
+        "review_note": "医疗领域系统综述可补充特定应用背景。",
+        "reviewed_grade": 1,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4393147129",
+        "query_id": "Q08",
+        "review_note": "基准论文不是 RAG 范式综述。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4402670290",
+        "query_id": "Q08",
+        "review_note": "医疗基准论文不是 RAG 范式综述。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4400526126",
+        "query_id": "Q08",
+        "review_note": "检索评测方法论文不是 RAG 范式综述。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4411630045",
+        "query_id": "Q08",
+        "review_note": "自动评测框架论文不是 RAG 范式综述。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389519118",
+        "query_id": "Q08",
+        "review_note": "主动检索方法论文不是 RAG 范式综述。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4317898419",
+        "query_id": "Q08",
+        "review_note": "领域适配方法论文不是 RAG 范式综述。",
+        "reviewed_grade": 0,
+        "suggested_grade": 0
+      },
+      {
+        "openalex_id": "W4389984066",
+        "query_id": "Q08",
+        "review_note": "论文明确系统综述 RAG 范式、组件及研究挑战。",
+        "reviewed_grade": 3,
+        "suggested_grade": 3
+      }
+    ],
+    "review_pack_sha256": "8808d14cffcb01df1f9fc51aff35d47a98c388910106d839ff267773dfca5e16",
+    "reviewed_at": "2026-09-24T08:59:01.303992+00:00",
+    "reviewed_pair_count": 80,
+    "reviewer": "me"
+  }
+}

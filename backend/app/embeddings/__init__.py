@@ -1,0 +1,1 @@
+"""Bounded embedding provider adapters."""

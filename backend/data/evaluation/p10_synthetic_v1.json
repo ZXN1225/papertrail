@@ -1,0 +1,20 @@
+{
+  "dataset_id": "papertrail-p10-synthetic-retrieval",
+  "dataset_version": 1,
+  "synthetic": true,
+  "description": "Small isolated fixture for BM25, dense cosine, and RRF plumbing; not a research-quality benchmark.",
+  "documents": [
+    {"id": "TEST-P10-DOC-001", "synthetic": true, "title": "Evidence grounded generation", "text": "Retrieval augmented generation retrieves passages and grounds answers in citations.", "fixture_vector": [1.0, 0.0, 0.0]},
+    {"id": "TEST-P10-DOC-002", "synthetic": true, "title": "Supported question answering", "text": "A grounded question answering system cites supporting evidence from selected passages.", "fixture_vector": [0.96, 0.08, 0.0]},
+    {"id": "TEST-P10-DOC-003", "synthetic": true, "title": "Ranking metrics", "text": "Hit rate, mean reciprocal rank, and NDCG measure information retrieval ranking quality.", "fixture_vector": [0.0, 1.0, 0.0]},
+    {"id": "TEST-P10-DOC-004", "synthetic": true, "title": "Scoring ranked retrieval", "text": "Mean reciprocal rank and discounted gain score ranked search results.", "fixture_vector": [0.08, 0.96, 0.0]},
+    {"id": "TEST-P10-DOC-005", "synthetic": true, "title": "Cross language semantic search", "text": "Embeddings represent multilingual academic papers as vectors for semantic search.", "fixture_vector": [0.0, 0.0, 1.0]},
+    {"id": "TEST-P10-DOC-006", "synthetic": true, "title": "Dense paper retrieval", "text": "Cosine similarity finds semantically related research passages across languages.", "fixture_vector": [0.0, 0.08, 0.96]}
+  ],
+  "queries": [
+    {"id": "TEST-P10-Q-001", "text": "How can answers cite retrieved source passages?", "fixture_vector": [1.0, 0.04, 0.0], "relevance": {"TEST-P10-DOC-001": 3, "TEST-P10-DOC-002": 2, "TEST-P10-DOC-003": 0, "TEST-P10-DOC-004": 0, "TEST-P10-DOC-005": 0, "TEST-P10-DOC-006": 0}},
+    {"id": "TEST-P10-Q-002", "text": "Which measures evaluate retrieval ranking quality?", "fixture_vector": [0.0, 1.0, 0.04], "relevance": {"TEST-P10-DOC-001": 0, "TEST-P10-DOC-002": 0, "TEST-P10-DOC-003": 3, "TEST-P10-DOC-004": 2, "TEST-P10-DOC-005": 0, "TEST-P10-DOC-006": 0}},
+    {"id": "TEST-P10-Q-003", "text": "Find multilingual research text using vector similarity.", "fixture_vector": [0.0, 0.0, 1.0], "relevance": {"TEST-P10-DOC-001": 0, "TEST-P10-DOC-002": 0, "TEST-P10-DOC-003": 0, "TEST-P10-DOC-004": 0, "TEST-P10-DOC-005": 3, "TEST-P10-DOC-006": 2}},
+    {"id": "TEST-P10-Q-004", "text": "grounded generation citations from evidence", "fixture_vector": [0.98, 0.0, 0.02], "relevance": {"TEST-P10-DOC-001": 3, "TEST-P10-DOC-002": 2, "TEST-P10-DOC-003": 0, "TEST-P10-DOC-004": 0, "TEST-P10-DOC-005": 0, "TEST-P10-DOC-006": 0}}
+  ]
+}

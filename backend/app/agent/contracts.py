@@ -1,149 +1,179 @@
-"""Public and internal contracts for the bounded agent harness."""
+"""Typed external request, tool-argument and response contracts."""
 
-from datetime import datetime
-from typing import Annotated, Literal
-from uuid import UUID
+from __future__ import annotations
 
-from pydantic import Field, JsonValue, StrictInt, StrictStr
+import re
+from typing import Literal
 
-from app.common.contracts import Contract
-
-ToolName = Literal[
-    "search_catalog",
-    "get_product_facts",
-    "get_offers",
-    "rank_laptops",
-    "solve_pc_builds",
-    "check_compatibility",
-    "retrieve_knowledge",
-]
-RunStatus = Literal[
-    "completed",
-    "clarifying",
-    "partial",
-    "failed",
-    "timed_out",
-    "provider_disabled",
-]
-PersistentRunStatus = Literal[
-    "queued",
-    "running",
-    "completed",
-    "clarifying",
-    "partial",
-    "failed",
-    "timed_out",
-    "provider_disabled",
-    "cancelled",
-]
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class AgentPreviewRequest(Contract):
-    profile_id: UUID
-    profile_revision: Annotated[StrictInt, Field(ge=1)]
-    message: Annotated[StrictStr, Field(min_length=1, max_length=2000)]
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class ToolCall(Contract):
-    name: ToolName
-    arguments: dict[str, JsonValue]
+class AgentQuestion(StrictModel):
+    question: str = Field(min_length=3, max_length=1_000)
 
 
-class AgentDecision(Contract):
-    kind: Literal["tool", "final", "clarify"]
-    tool_call: ToolCall | None = None
-    question: Annotated[StrictStr, Field(min_length=1, max_length=500)] | None = None
-    reason: Annotated[StrictStr, Field(min_length=1, max_length=200)] | None = None
-    final_text: Annotated[StrictStr, Field(min_length=1, max_length=2000)] | None = None
+class SearchPapersArgs(StrictModel):
+    query: str = Field(min_length=1, max_length=256)
+    limit: int = Field(ge=1, le=10)
 
 
-class ToolObservation(Contract):
-    name: ToolName
-    status: Literal["ok", "partial", "error"]
-    data: dict[str, JsonValue]
-    evidence_ids: list[UUID]
-    missing_fields: list[str]
-    data_version: UUID | None = None
-    error_code: str | None = None
-    deduplicated: bool = False
+class GetPaperArgs(StrictModel):
+    openalex_id: str = Field(pattern=r"^W\d+$")
 
 
-class AgentPreviewResponse(Contract):
-    status: RunStatus
-    profile_id: UUID
-    profile_revision: StrictInt
-    tool_calls_used: StrictInt
-    decision_rounds_used: StrictInt
-    observations: list[ToolObservation]
-    pending_question: str | None = None
-    reason: str | None = None
+class RelatedPapersArgs(StrictModel):
+    openalex_id: str = Field(pattern=r"^W\d+$")
+    limit: int = Field(ge=1, le=10)
 
 
-class AgentSession(Contract):
-    id: UUID
-    revision: StrictInt
-    created_at: datetime
+class OpenAlexSearchArgs(StrictModel):
+    query: str = Field(min_length=1, max_length=256)
+    limit: int = Field(ge=1, le=10)
 
 
-class AgentRunCreate(Contract):
-    profile_id: UUID
-    profile_revision: Annotated[StrictInt, Field(ge=1)]
-    message: Annotated[StrictStr, Field(min_length=1, max_length=2000)]
-    expected_revision: Annotated[StrictInt, Field(ge=1)]
-    client_request_id: Annotated[StrictStr, Field(min_length=1, max_length=200)]
+class OpenAlexAuthorSearchArgs(StrictModel):
+    query: str = Field(min_length=1, max_length=256)
+    limit: int = Field(ge=1, le=10)
 
 
-class AgentCandidate(Contract):
-    source_tool: Literal["rank_laptops", "solve_pc_builds"]
-    data: dict[str, JsonValue]
+class GetAuthorArgs(StrictModel):
+    openalex_author_id: str = Field(pattern=r"^A\d+$")
 
 
-class AgentCitation(Contract):
-    document_id: UUID
-    chunk_id: UUID
+class AuthorWorksArgs(GetAuthorArgs):
+    limit: int = Field(ge=1, le=10)
+
+
+class SearchArxivArgs(StrictModel):
+    query: str = Field(min_length=1, max_length=256)
+    limit: int = Field(ge=1, le=10)
+
+
+class GetArxivArgs(StrictModel):
+    arxiv_id: str = Field(min_length=4, max_length=64)
+
+
+class RetrieveEvidenceArgs(StrictModel):
+    query: str = Field(min_length=1, max_length=256)
+    limit: int = Field(ge=1, le=8)
+    source_type: Literal["openalex", "arxiv"] | None = None
+    source_id: str | None = Field(default=None, min_length=4, max_length=64)
+    retrieval_method: Literal["bm25", "dense", "hybrid"] = "bm25"
+
+    @model_validator(mode="after")
+    def validate_optional_source(self) -> RetrieveEvidenceArgs:
+        if (self.source_type is None) != (self.source_id is None):
+            raise ValueError("source_type and source_id must be supplied together")
+        if self.source_type == "openalex" and not re.fullmatch(r"W\d+", self.source_id or ""):
+            raise ValueError("invalid OpenAlex source ID")
+        if self.source_type == "arxiv":
+            from app.sources.arxiv import normalize_arxiv_id
+
+            normalize_arxiv_id(self.source_id or "")
+        return self
+
+
+class ComparePapersArgs(StrictModel):
+    openalex_ids: list[str] = Field(min_length=2, max_length=5)
+
+    @field_validator("openalex_ids")
+    @classmethod
+    def validate_ids(cls, values: list[str]) -> list[str]:
+        if len(set(values)) != len(values) or any(
+            not re.fullmatch(r"W\d+", item) for item in values
+        ):
+            raise ValueError("paper IDs must be unique OpenAlex work IDs")
+        return values
+
+
+class FinalAnswer(StrictModel):
+    answer: str = Field(max_length=4_000)
+    cited_openalex_ids: list[str] = Field(max_length=10)
+    cited_arxiv_ids: list[str] = Field(default_factory=list, max_length=10)
+    insufficient_evidence: bool
+
+    @field_validator("cited_openalex_ids")
+    @classmethod
+    def validate_citations(cls, values: list[str]) -> list[str]:
+        if len(set(values)) != len(values) or any(
+            not re.fullmatch(r"W\d+", item) for item in values
+        ):
+            raise ValueError("citations must be unique OpenAlex work IDs")
+        return values
+
+    @field_validator("cited_arxiv_ids")
+    @classmethod
+    def validate_arxiv_citations(cls, values: list[str]) -> list[str]:
+        from app.sources.arxiv import normalize_arxiv_id
+
+        normalized = [normalize_arxiv_id(item) for item in values]
+        if len(set(normalized)) != len(values):
+            raise ValueError("arXiv citations must be unique canonical IDs")
+        return normalized
+
+
+class EvidenceSpan(StrictModel):
+    chunk_id: str = Field(max_length=180)
+    locator: str = Field(max_length=240)
+    excerpt: str = Field(max_length=1_800)
+
+
+class Citation(StrictModel):
+    source: Literal["openalex", "arxiv"] = "openalex"
+    openalex_id: str | None = None
+    arxiv_id: str | None = None
     title: str
-    canonical_url: str
-    locator: str
+    source_url: str
+    license_id: str | None = None
+    license_url: str | None = None
+    attribution: str | None = None
+    evidence: list[EvidenceSpan] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def require_matching_source_identifier(self) -> Citation:
+        if self.source == "openalex" and (not self.openalex_id or self.arxiv_id):
+            raise ValueError("OpenAlex citation must contain only an OpenAlex ID")
+        if self.source == "arxiv" and (not self.arxiv_id or self.openalex_id):
+            raise ValueError("arXiv citation must contain only an arXiv ID")
+        return self
 
 
-class AgentAnswer(Contract):
-    summary: str
-    profile_revision: StrictInt
-    candidates: list[AgentCandidate]
-    tradeoffs: list[str]
-    warnings: list[str]
-    citations: list[AgentCitation]
-    missing_fields: list[str]
-    data_version: UUID | None
+class AgentTraceEvent(StrictModel):
+    """Redacted run span: no prompt, paper content, credentials or raw error."""
+
+    sequence: int = Field(ge=1)
+    kind: Literal["model", "tool"]
+    name: str = Field(max_length=80)
+    status: Literal["ok", "error", "refusal"]
+    duration_ms: int = Field(ge=0)
+    input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
 
 
-class AgentRun(Contract):
-    id: UUID
-    agent_session_id: UUID
-    profile_id: UUID
-    profile_revision: StrictInt
-    revision: StrictInt
-    status: PersistentRunStatus
-    answer: AgentAnswer | None = None
-    pending_question: str | None = None
-    reason: str | None = None
-    created_at: datetime
-    completed_at: datetime | None = None
-
-
-class AgentEvent(Contract):
-    event_id: StrictInt
-    run_id: UUID
-    revision: StrictInt
-    type: Literal[
-        "run.started",
-        "profile.updated",
-        "question.required",
-        "tool.started",
-        "tool.completed",
-        "result.validated",
-        "run.completed",
-        "run.failed",
-        "run.cancelled",
+class AgentResponse(StrictModel):
+    status: Literal[
+        "completed",
+        "insufficient_evidence",
+        "unverified_citations",
+        "max_steps_exceeded",
+        "tool_budget_exceeded",
+        "deadline_exceeded",
+        "model_disabled",
+        "model_unavailable",
+        "model_refusal",
+        "invalid_model_output",
     ]
-    data: dict[str, JsonValue]
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    tool_calls: int = 0
+    model_steps: int = 0
+    model_input_tokens: int = 0
+    model_output_tokens: int = 0
+    run_id: str | None = None
+    duration_ms: int = Field(default=0, ge=0)
+    trace: list[AgentTraceEvent] = Field(default_factory=list, max_length=32)

@@ -1,1 +1,1 @@
-"""Computer recommendation service."""
+"""PaperTrail backend application."""

@@ -1,0 +1,86 @@
+{
+  "dataset_id": "papertrail-p05-rag-retrieval-v1",
+  "dataset_version": 1,
+  "judgment_status": "assistant_seed_pending_human_review",
+  "judgment_protocol": "Read title and available abstract; relevance 0=not relevant, 1=background, 2=directly relevant, 3=highly relevant. Every query judges every frozen corpus work.",
+  "corpus": {
+    "source": "openalex",
+    "import_query": "retrieval augmented generation",
+    "page": 1,
+    "per_page": 10,
+    "work_ids": [
+      "W4406771321",
+      "W4416034797",
+      "W4411203672",
+      "W4393147129",
+      "W4402670290",
+      "W4400526126",
+      "W4411630045",
+      "W4389519118",
+      "W4317898419",
+      "W4389984066"
+    ],
+    "content_sha256": {
+      "W4406771321": "7c9ff3b1c7732d43c731066d635d6c3b1a4c28972f392cec1696031f13b649e4",
+      "W4416034797": "2c5c91df07f753e111d9d4f6c2c259f68872fd17279ada592f4d9f17e8b0fed2",
+      "W4411203672": "7db9cae5b5d9a3335d4615a853797405142e5b5756bdd45c22a26fd4c72deb57",
+      "W4393147129": "bece0007511df69a80c2f7f37d9a306910e3bbd8a5aacbe3872181d69b6c5058",
+      "W4402670290": "1b5f9d25adccf98648c1e1282ce5b279bf7b8cfbc5ea1a603cc4a837e5c18e6a",
+      "W4400526126": "132e5de3b18cb9c01d89802dbd1a6fade7d76d976d5b3b795c6d7f42d40db8fa",
+      "W4411630045": "d0e961166f12301fb278da6a40b33257b726672e91ec49c958dac3ddab7fc820",
+      "W4389519118": "2dc601794b26efea51cf8c7e1f9cd4adc030d8b0be517b1f35ca68d73981a87b",
+      "W4317898419": "c42ad1e61efbb7d968ed0124c7dc047e90bf3dbb0e304c1ff54c8f81fe715bea",
+      "W4389984066": "2db5e76d2b5e987534e773253411f00a5a035094b0d4b36de5feb019afb24f9f"
+    }
+  },
+  "queries": [
+    {
+      "query_id": "Q01",
+      "bucket": "evaluation",
+      "text": "evaluation methods and benchmarks for retrieval augmented generation",
+      "relevance": [3, 0, 0, 2, 1, 3, 3, 0, 0, 2]
+    },
+    {
+      "query_id": "Q02",
+      "bucket": "domain-medical",
+      "text": "medical question answering benchmarks for retrieval augmented generation",
+      "relevance": [0, 0, 3, 0, 3, 0, 0, 0, 0, 0]
+    },
+    {
+      "query_id": "Q03",
+      "bucket": "method-graph",
+      "text": "graph based retrieval augmented generation method LightRAG",
+      "relevance": [0, 3, 0, 0, 0, 0, 0, 0, 0, 1]
+    },
+    {
+      "query_id": "Q04",
+      "bucket": "method-active-retrieval",
+      "text": "active retrieval augmented generation methods",
+      "relevance": [0, 1, 0, 0, 0, 0, 0, 3, 0, 0]
+    },
+    {
+      "query_id": "Q05",
+      "bucket": "domain-adaptation",
+      "text": "domain adaptation for retrieval augmented generation in open domain question answering",
+      "relevance": [0, 0, 1, 1, 1, 0, 0, 0, 3, 0]
+    },
+    {
+      "query_id": "Q06",
+      "bucket": "retrieval-quality",
+      "text": "measuring retrieval quality in retrieval augmented generation systems",
+      "relevance": [2, 0, 0, 1, 0, 3, 2, 0, 0, 1]
+    },
+    {
+      "query_id": "Q07",
+      "bucket": "evaluation-automation",
+      "text": "automated evaluation of retrieval augmented generation systems",
+      "relevance": [2, 0, 0, 2, 1, 2, 3, 0, 0, 1]
+    },
+    {
+      "query_id": "Q08",
+      "bucket": "survey-overview",
+      "text": "survey of retrieval augmented generation paradigms for large language models",
+      "relevance": [1, 0, 0, 0, 0, 0, 0, 0, 0, 3]
+    }
+  ]
+}

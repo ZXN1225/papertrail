@@ -1,1 +1,1 @@
-"""Bounded product-agent orchestration over deterministic services."""
+"""Constrained PaperTrail research-assistant agent."""

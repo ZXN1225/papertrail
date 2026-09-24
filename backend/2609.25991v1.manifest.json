@@ -1,0 +1,10 @@
+{
+  "source_type": "arxiv",
+  "source_id": "2609.25991",
+  "text_source_url": "https://arxiv.org/pdf/2609.25991v1.pdf",
+  "license_id": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "license_evidence_url": "https://arxiv.org/abs/2609.25991v1",
+  "reviewer": "local-project-owner",
+  "attribution": "Jiangxu Wu, Knowledge-as-Skill: A Structural Design for Autonomous Knowledge-Base Use by LLM Agents, arXiv:2609.25991v1, CC BY 4.0"
+}
