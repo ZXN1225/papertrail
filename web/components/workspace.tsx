@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import type {
   AgentResponse,
+  AgentSearchContext,
+  AgentTurn,
   Citation,
   Paper,
   SearchResponse,
@@ -30,8 +32,13 @@ export function Workspace() {
   const [yearTo, setYearTo] = useState("");
   const [results, setResults] = useState<Paper[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [pageLimitReached, setPageLimitReached] = useState(false);
+  const [lastSearch, setLastSearch] = useState<AgentSearchContext | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>("checking");
   const [selected, setSelected] = useState<string[]>([]);
@@ -40,6 +47,7 @@ export function Workspace() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<AgentResponse | null>(null);
+  const [agentHistory, setAgentHistory] = useState<AgentTurn[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
 
@@ -78,19 +86,32 @@ export function Workspace() {
     [results, selected],
   );
 
-  async function search(event?: FormEvent<HTMLFormElement>) {
+  async function search(event?: FormEvent<HTMLFormElement>, requestedPage = 1) {
     event?.preventDefault();
     if (source !== "library" && !query.trim()) {
       setError("请输入主题、关键词或论文标题。");
       return;
     }
-    setLoading(true);
+    const append = requestedPage > 1;
+    setLoading(!append);
+    setLoadingMore(append);
     setError(null);
-    setHasSearched(true);
-    setSelected([]);
-    setTotal(null);
+    if (!append) {
+      setHasSearched(true);
+      setLastSearch(null);
+      setSelected([]);
+      setTotal(null);
+      setHasMore(false);
+      setPageLimitReached(false);
+    }
     try {
-      const params = new URLSearchParams({ source, q: query.trim() });
+      const params = new URLSearchParams({
+        source,
+        q: query.trim(),
+        page: String(requestedPage),
+      });
+      if (yearFrom) params.set("from_year", yearFrom);
+      if (yearTo) params.set("to_year", yearTo);
       const response = await fetch(`/api/search?${params.toString()}`, {
         cache: "no-store",
         signal: AbortSignal.timeout(20_000),
@@ -98,15 +119,41 @@ export function Workspace() {
       const body = await response.json();
       if (!response.ok) throw new Error(readError(body));
       const payload = body as SearchResponse;
-      setResults(payload.items);
+      const context: AgentSearchContext = {
+        source,
+        query: query.trim(),
+        from_year: yearFrom ? Number(yearFrom) : null,
+        to_year: yearTo ? Number(yearTo) : null,
+        pages: Math.min(requestedPage, 3),
+      };
+      setLastSearch(context);
+      if (append) {
+        setResults((current) => {
+          const known = new Set(current.map(paperKey));
+          const merged = [...current];
+          for (const paper of payload.items) {
+            const key = paperKey(paper);
+            if (known.has(key)) continue;
+            known.add(key);
+            merged.push(paper);
+          }
+          return merged;
+        });
+      } else {
+        setResults(payload.items);
+      }
       setTotal(payload.total);
+      setPage(payload.page || requestedPage);
+      setHasMore(Boolean(payload.hasMore));
+      setPageLimitReached(Boolean(payload.pageLimitReached));
     } catch (cause) {
-      setResults([]);
+      if (!append) setResults([]);
       setError(
         cause instanceof Error ? cause.message : "检索暂时失败，请重试。",
       );
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }
 
@@ -152,14 +199,28 @@ export function Workspace() {
     setAgentError(null);
     setAnswer(null);
     try {
+      const submittedQuestion = question.trim();
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: question.trim() }),
+        body: JSON.stringify({
+          question: submittedQuestion,
+          history: agentHistory.slice(-8),
+          search_context: lastSearch,
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(readError(body));
-      setAnswer(body as AgentResponse);
+      const nextAnswer = body as AgentResponse;
+      setAnswer(nextAnswer);
+      setAgentHistory((current) => {
+        const nextHistory: AgentTurn[] = [
+          ...current,
+          { role: "user", content: submittedQuestion },
+          { role: "assistant", content: nextAnswer.answer },
+        ];
+        return nextHistory.slice(-8);
+      });
     } catch (cause) {
       setAgentError(
         cause instanceof Error ? cause.message : "研究助理暂时不可用，请重试。",
@@ -209,15 +270,9 @@ export function Workspace() {
           <div className="intro-block">
             <div className="eyebrow">
               <span>研究工作区</span>
-              <i />
-              从问题出发，沿证据前进
             </div>
-            <h1>
-              把文献线索，<em>变成研究脉络。</em>
-            </h1>
-            <p>
-              搜索可信学术来源，比较关键研究，并让每个回答都能回到原文证据。
-            </p>
+            <h1>Agent 文献检索分析系统</h1>
+            <p>搜索可信学术来源，比较关键研究。</p>
           </div>
 
           <section
@@ -245,7 +300,11 @@ export function Workspace() {
                     setError(null);
                     setHasSearched(false);
                     setResults([]);
+                    setLastSearch(null);
                     setSelected([]);
+                    setPage(1);
+                    setHasMore(false);
+                    setPageLimitReached(false);
                   }}
                   type="button"
                 >
@@ -291,7 +350,10 @@ export function Workspace() {
                     ? "仅搜索本地已导入的元数据"
                     : `搜索 ${sourceLabels[source]} 学术元数据`}
                 </span>
-                <span>最多展示 10 条 · 不会自动下载全文</span>
+                <span>
+                  {source === "library" ? "本地资料按批载入" : "每次载入 10 条"}{" "}
+                  · 不会自动下载全文
+                </span>
               </div>
               <div className="filter-row" aria-label="发表年份筛选">
                 <span>年份范围</span>
@@ -322,7 +384,11 @@ export function Workspace() {
                     value={yearTo}
                   />
                 </label>
-                <span className="filter-explainer">仅筛选当前结果页</span>
+                <span className="filter-explainer">
+                  {source === "library"
+                    ? "仅筛选已载入结果"
+                    : "检索时按年份筛选；修改后请重新检索"}
+                </span>
               </div>
             </form>
           </section>
@@ -338,7 +404,7 @@ export function Workspace() {
               </div>
               {total !== null && (
                 <span className="result-count">
-                  匹配 {total.toLocaleString()} 条 · 当前显示{" "}
+                  匹配 {total.toLocaleString()} 条 · 当前列出{" "}
                   {visibleResults.length} 条
                 </span>
               )}
@@ -474,6 +540,25 @@ export function Workspace() {
                 })}
               </ol>
             )}
+            {!loading && !error && hasMore && (
+              <div className="load-more-row">
+                <button
+                  className="load-more-button"
+                  disabled={loadingMore}
+                  onClick={() => void search(undefined, page + 1)}
+                  type="button"
+                >
+                  {loadingMore
+                    ? "载入中…"
+                    : `加载更多论文（已载入 ${results.length} 条）`}
+                </button>
+              </div>
+            )}
+            {!loading && !error && pageLimitReached && (
+              <p className="page-limit-note">
+                已达到来源单次检索 10,000 条的上限，请缩小关键词或年份范围。
+              </p>
+            )}
           </section>
 
           {selectedPapers.length > 0 && (
@@ -581,6 +666,13 @@ export function Workspace() {
             <p className="assistant-intro">
               围绕论文提出问题。回答将基于本轮工具实际读取到的资料，并列出可追溯引用。
             </p>
+            <p className="agent-context-note" role="status">
+              {lastSearch
+                ? `已连接左侧 ${sourceLabels[lastSearch.source]} 检索：${lastSearch.query || "本地文献库"}${lastSearch.from_year || lastSearch.to_year ? `（${lastSearch.from_year ?? "不限"}–${lastSearch.to_year ?? "不限"}）` : ""}；Agent 会重新读取最多 30 条元数据。`
+                : "Agent 可读取左侧检索结果；请先检索文献，或直接在问题中说明检索主题。"}
+              {agentHistory.length > 0 &&
+                ` 已保留最近 ${Math.ceil(agentHistory.length / 2)} 轮对话。`}
+            </p>
             <div className="sample-prompts" aria-label="示例问题">
               {sampleQuestions.map((sample) => (
                 <button
@@ -612,6 +704,19 @@ export function Workspace() {
                   {agentLoading ? "正在研究…" : "询问研究助理"}
                   <span aria-hidden="true">↗</span>
                 </button>
+                {agentHistory.length > 0 && (
+                  <button
+                    className="clear-agent-history"
+                    onClick={() => {
+                      setAgentHistory([]);
+                      setAnswer(null);
+                      setQuestion("");
+                    }}
+                    type="button"
+                  >
+                    清空对话
+                  </button>
+                )}
               </div>
             </form>
             {agentError && (
@@ -758,7 +863,7 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
               ? "模型未启用"
               : answer.status}
       </div>
-      <p className="answer-text">{answer.answer}</p>
+      <div className="answer-text">{renderAnswer(answer.answer)}</div>
       {answer.warnings.map((warning) => (
         <p className="answer-warning" key={warning}>
           {warning}
@@ -796,7 +901,10 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
             <li key={event.sequence}>
               <span>{event.sequence.toString().padStart(2, "0")}</span>
               <strong>{event.name}</strong>
-              <em>{event.status}</em>
+              <em>
+                {event.status}
+                {event.error_code ? ` · ${event.error_code}` : ""}
+              </em>
             </li>
           ))}
         </ol>
@@ -804,6 +912,130 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
       </details>
     </div>
   );
+}
+
+function renderAnswer(text: string): ReactNode[] {
+  const lines = text.split(/\r?\n/);
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    if (!lines[index].trim()) {
+      index += 1;
+      continue;
+    }
+
+    const heading = lines[index].match(/^#{1,3}\s+(.+)$/);
+    if (heading) {
+      blocks.push(
+        <h4 key={`heading-${index}`}>
+          {renderInlineMarkdown(heading[1], index)}
+        </h4>,
+      );
+      index += 1;
+      continue;
+    }
+
+    const listItem = lines[index].match(/^([-*]|\d+[.)])\s+(.+)$/);
+    if (listItem) {
+      const ordered = /^\d/.test(listItem[1]);
+      const items: ReactNode[] = [];
+      while (index < lines.length) {
+        const current = lines[index].match(/^([-*]|\d+[.)])\s+(.+)$/);
+        if (!current || /^\d/.test(current[1]) !== ordered) break;
+        items.push(
+          <li key={`item-${index}`}>
+            {renderInlineMarkdown(current[2], index)}
+          </li>,
+        );
+        index += 1;
+      }
+      blocks.push(
+        ordered ? (
+          <ol key={`list-${index}`}>{items}</ol>
+        ) : (
+          <ul key={`list-${index}`}>{items}</ul>
+        ),
+      );
+      continue;
+    }
+
+    const paragraph: string[] = [];
+    while (index < lines.length && lines[index].trim()) {
+      if (/^(?:#{1,3}\s+|[-*]\s+|\d+[.)]\s+)/.test(lines[index])) break;
+      paragraph.push(lines[index]);
+      index += 1;
+    }
+    blocks.push(
+      <p key={`paragraph-${index}`}>
+        {paragraph.map((line, lineIndex) => (
+          <span key={`${index}-${lineIndex}`}>
+            {lineIndex > 0 && <br />}
+            {renderInlineMarkdown(line, index + lineIndex)}
+          </span>
+        ))}
+      </p>,
+    );
+  }
+
+  return blocks;
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: number): ReactNode[] {
+  const token =
+    /\[([^\]]+)\]\(([^)\s]+)\)|\*\*(.+?)\*\*|\*([^*]+?)\*|`([^`]+)`/g;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = token.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const key = `inline-${keyPrefix}-${match.index}`;
+    if (match[1] && match[2]) {
+      const safeUrl = approvedCitationUrl(match[2]);
+      nodes.push(
+        safeUrl ? (
+          <a key={key} href={safeUrl} target="_blank" rel="noreferrer">
+            {match[1]}
+          </a>
+        ) : (
+          match[0]
+        ),
+      );
+    } else if (match[3]) {
+      nodes.push(<strong key={key}>{match[3]}</strong>);
+    } else if (match[4]) {
+      nodes.push(<em key={key}>{match[4]}</em>);
+    } else if (match[5]) {
+      nodes.push(<code key={key}>{match[5]}</code>);
+    }
+    lastIndex = token.lastIndex;
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
+function approvedCitationUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const approvedHosts = new Set([
+      "openalex.org",
+      "arxiv.org",
+      "www.arxiv.org",
+      "doi.org",
+      "www.doi.org",
+    ]);
+    return url.protocol === "https:" &&
+      approvedHosts.has(url.hostname.toLowerCase())
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function CitationCard({
@@ -820,6 +1052,8 @@ function CitationCard({
         <span>REF {String(index + 1).padStart(2, "0")}</span>
         <span>
           {citation.source === "arxiv" ? "arXiv" : "OpenAlex"} · {evidenceId}
+          {citation.publication_year !== null &&
+            ` · ${citation.publication_year}`}
         </span>
       </div>
       <h4>
@@ -827,6 +1061,35 @@ function CitationCard({
           {citation.title} ↗
         </a>
       </h4>
+      {citation.doi && <p className="citation-doi">DOI: {citation.doi}</p>}
+      {citation.alternate_sources.length > 0 && (
+        <p className="citation-alternate-sources">
+          同一 DOI 的其他来源：
+          {citation.alternate_sources.map((source) => (
+            <a
+              href={source.source_url}
+              key={`${source.source}-${source.identifier}`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {source.source} · {source.identifier} ↗
+            </a>
+          ))}
+        </p>
+      )}
+      {citation.citation_relationships.length > 0 && (
+        <div className="citation-relationships" aria-label="引用关系">
+          {citation.citation_relationships.map((relationship) => (
+            <span
+              key={`${relationship.direction}-${relationship.seed_openalex_id}`}
+            >
+              {relationship.direction === "references"
+                ? `种子论文的参考文献 · ${relationship.seed_openalex_id}`
+                : `引用种子论文 · ${relationship.seed_openalex_id}`}
+            </span>
+          ))}
+        </div>
+      )}
       {citation.attribution && (
         <p className="citation-license">{citation.attribution}</p>
       )}

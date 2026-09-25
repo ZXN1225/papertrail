@@ -34,3 +34,31 @@
 - 发现 Windows 下由 Playwright 自己启动 Next dev server 时，所有断言结束后 runner 会挂起。开发说明现采用本机先启动 3001 服务、Playwright 复用已有 server 的方式。
 - 按该方式重新运行 `pnpm run test:e2e`，15/15 passed，命令正常以退出码 0 结束。GitHub Actions 在 Linux 设置 CI 环境变量，会独立启动并回收 web server。
 - P05 的 80 个 qrels 已于后续由用户审核；P13 的 3,000 个标签按用户决定保留 AI 标注、未人工核验。以上变化不改变本阶段离线测试结论或回答质量限制。
+
+## P18 离线场景矩阵扩展（2026-09-24）
+
+- 评测报告升级到 `papertrail-p12-offline-benchmark-v2`，Agent 场景扩为 8 项并全部通过：保守拒答、提示注入拒绝越权工具、错误参数、工具故障、未观察引用、格式错误终答、模型服务不可用、工具预算耗尽。
+- 统一字段为 `registered_tool_executions`；只读 synthetic 检索不再误称为“副作用执行”。越权尝试计数为 1，越权执行数为 0；参数错误/工具错误/模型错误均在单场景 trace 计数中体现。
+- P12/P14 CLI 报告现保存确切 `command_args`、解析后的 `output_path`、数据和 runner 哈希，便于保留多个运行结果。既有 P17 Large 报告不重跑、不改写；其输出路径由文件名可见，但其旧 reproduction 元数据没有 `output_path`。
+- 全部数据仍为 `TEST-*` synthetic、无网络/真实数据库/真实模型，质量声明禁用、费用未测量。该矩阵只验证 Harness 的确定性契约与失败边界。
+
+## P23 引用图发现工作流（2026-09-25）
+
+- 报告 schema 升级为 `papertrail-p12-offline-benchmark-v3`，增加第 9 个 Agent 场景：OpenAlex 主题检索、按约束双向扩展引用图，再生成带来源的 metadata-only 回答。
+- 合成 W900/W901 满足生产 OpenAlex Citation ID 校验；记录标题使用 `TEST-P23` 且 fixture 标记 `synthetic=true`，不对应实际作品。无网络、真实数据库或模型。
+- 用例断言仅引用本轮观察到的 seed/candidate，年份分别为 2023/2024，重复候选合并为一个 citation，`references` 与 `cited_by` 两条关系均保留 seed provenance；回答明确引用边不证明 findings 或 agreement。
+- P12 质量声明仍禁用、费用未测量。本场景测试生产 Harness 的引用校验与合成关系数据，不评估真实检索召回或回答质量。
+- P23 全量验证结果见 [P23 验收](P23-citation-graph-benchmark-acceptance.md)。
+
+## P24 逐场景诊断（2026-09-25）
+
+- P12 报告 schema 升级为 `papertrail-p12-offline-benchmark-v4`。每个场景现在列出 status 匹配、越权执行检查及每项期望指标的 expected/actual/passed；失败列表提供稳定 reason code。汇总含 `failed_case_count` 与 `failed_scenario_ids`。
+- 成功场景的 `failure_reasons` 是空列表。定向单元测试故意设置状态和执行数不匹配，验证分别生成 `status_mismatch` 和 `metric_mismatch:registered_tool_executions`。
+- 这一变化只作用于离线 CLI JSON 报告，不修改 API、OpenAPI、数据库或网络行为。全量验证及限制见 [P24 验收](P24-benchmark-diagnostics-acceptance.md)。
+
+## P25 跨来源发现与 DOI 归并（2026-09-25）
+
+- 报告 schema 升级到 `papertrail-p12-offline-benchmark-v5`，新增第 10 个 Agent 场景：模型按年份分别调用 OpenAlex 与 arXiv 搜索，同 DOI 记录合并为 OpenAlex 主引用并保留 arXiv 备用链接。
+- fixture 使用 `TEST-*` 标题、synthetic DOI 和 `synthetic=true`；来源 ID 保持生产 schema 要求的格式。10/10 场景通过，无网络、真实模型或数据库。不同 DOI/缺 DOI 时不跨源合并的策略由 Harness 单元测试覆盖。
+- `quality_claim_allowed=false` 与成本未测量保持不变；该场景只验证工具编排与引用契约，不代表来源检索质量。
+- 实施及完整检查结果见 [P25 验收](P25-cross-source-discovery-acceptance.md)。

@@ -136,6 +136,42 @@
               "default": 10,
               "title": "Per Page"
             }
+          },
+          {
+            "name": "from_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1400
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Year"
+            }
+          },
+          {
+            "name": "to_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1400
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Year"
+            }
           }
         ],
         "responses": {
@@ -416,7 +452,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 9975,
+              "maximum": 9999,
               "minimum": 0,
               "default": 0,
               "title": "Start"
@@ -432,6 +468,42 @@
               "minimum": 1,
               "default": 10,
               "title": "Max Results"
+            }
+          },
+          {
+            "name": "from_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1991
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From Year"
+            }
+          },
+          {
+            "name": "to_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 1991
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To Year"
             }
           }
         ],
@@ -977,6 +1049,24 @@
             "maxLength": 1000,
             "minLength": 3,
             "title": "Question"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTurn"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "History"
+          },
+          "search_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSearchContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1076,6 +1166,64 @@
         ],
         "title": "AgentResponse"
       },
+      "AgentSearchContext": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "openalex",
+              "arxiv",
+              "library"
+            ],
+            "title": "Source"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Query"
+          },
+          "from_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 1400.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Year"
+          },
+          "to_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 1400.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Year"
+          },
+          "pages": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Pages",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "query"
+        ],
+        "title": "AgentSearchContext"
+      },
       "AgentTraceEvent": {
         "properties": {
           "sequence": {
@@ -1110,6 +1258,18 @@
             "minimum": 0.0,
             "title": "Duration Ms"
           },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
           "input_tokens": {
             "type": "integer",
             "minimum": 0.0,
@@ -1134,6 +1294,31 @@
         ],
         "title": "AgentTraceEvent",
         "description": "Redacted run span: no prompt, paper content, credentials or raw error."
+      },
+      "AgentTurn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "AgentTurn"
       },
       "Citation": {
         "properties": {
@@ -1175,6 +1360,45 @@
           "source_url": {
             "type": "string",
             "title": "Source Url"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "publication_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Year"
+          },
+          "citation_relationships": {
+            "items": {
+              "$ref": "#/components/schemas/CitationRelationship"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Citation Relationships"
+          },
+          "alternate_sources": {
+            "items": {
+              "$ref": "#/components/schemas/CitationSourceLink"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Alternate Sources"
           },
           "license_id": {
             "anyOf": [
@@ -1225,6 +1449,61 @@
           "source_url"
         ],
         "title": "Citation"
+      },
+      "CitationRelationship": {
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "references",
+              "cited_by"
+            ],
+            "title": "Direction"
+          },
+          "seed_openalex_id": {
+            "type": "string",
+            "pattern": "^W\\d+$",
+            "title": "Seed Openalex Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "direction",
+          "seed_openalex_id"
+        ],
+        "title": "CitationRelationship"
+      },
+      "CitationSourceLink": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "openalex",
+              "arxiv"
+            ],
+            "title": "Source"
+          },
+          "identifier": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 4,
+            "title": "Identifier"
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Source Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "identifier",
+          "source_url"
+        ],
+        "title": "CitationSourceLink"
       },
       "EvidenceSpan": {
         "properties": {

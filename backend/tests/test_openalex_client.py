@@ -187,6 +187,54 @@ def test_work_search_accepts_official_maximum_page_size() -> None:
     assert requests[0].url.params["per_page"] == "100"
 
 
+def test_work_search_applies_only_explicit_bounded_research_filters() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=_payload())
+
+    with OpenAlexClient(transport=httpx.MockTransport(handler)) as client:
+        client.search_works(
+            "retrieval augmented generation",
+            from_year=2020,
+            to_year=2025,
+            open_access_only=True,
+        )
+        client.search_works("retrieval augmented generation")
+        with pytest.raises(ValueError):
+            client.search_works("agents", from_year=2025, to_year=2020)
+
+    assert requests[0].url.params["filter"] == (
+        "from_publication_date:2020-01-01,to_publication_date:2025-12-31,open_access.is_oa:true"
+    )
+    assert "filter" not in requests[1].url.params
+
+
+def test_citation_queries_use_fixed_works_filters_and_bounded_ids() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=_payload())
+
+    with OpenAlexClient(transport=httpx.MockTransport(handler)) as client:
+        client.get_referenced_works(["W1234567890", "W2345678901"], per_page=2)
+        client.get_citing_works("W1234567890", per_page=3)
+
+        with pytest.raises(ValueError):
+            client.get_citing_works("W123/../../evil")
+        with pytest.raises(ValueError):
+            client.get_referenced_works(["W1", "W1"], per_page=2)
+
+    assert [request.url.params["filter"] for request in requests] == [
+        "openalex:W1234567890|W2345678901",
+        "cites:W1234567890",
+    ]
+    assert all(request.url.host == "api.openalex.org" for request in requests)
+    assert all(request.url.params["per_page"] in {"2", "3"} for request in requests)
+
+
 def test_work_detail_and_author_workflows_use_fixed_allowlisted_endpoints() -> None:
     requests: list[httpx.Request] = []
 

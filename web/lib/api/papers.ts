@@ -19,6 +19,22 @@ export type SearchResponse = {
   source: Source;
   total: number;
   items: Paper[];
+  page: number;
+  hasMore: boolean;
+  pageLimitReached?: boolean;
+};
+
+export type AgentTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type AgentSearchContext = {
+  source: Source;
+  query: string;
+  from_year: number | null;
+  to_year: number | null;
+  pages: number;
 };
 
 export type Evidence = {
@@ -33,6 +49,17 @@ export type Citation = {
   arxiv_id: string | null;
   title: string;
   source_url: string;
+  doi: string | null;
+  publication_year: number | null;
+  citation_relationships: {
+    direction: "references" | "cited_by";
+    seed_openalex_id: string;
+  }[];
+  alternate_sources: {
+    source: "openalex" | "arxiv";
+    identifier: string;
+    source_url: string;
+  }[];
   license_id: string | null;
   license_url: string | null;
   attribution: string | null;
@@ -55,6 +82,7 @@ export type AgentResponse = {
     kind: "model" | "tool";
     name: string;
     status: string;
+    error_code: string | null;
     duration_ms: number;
     input_tokens: number;
     output_tokens: number;

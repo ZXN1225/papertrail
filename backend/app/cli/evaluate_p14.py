@@ -69,8 +69,18 @@ def main(argv: list[str] | None = None) -> int:
             client.close()
 
     report["reproducibility"] = {
-        "command": "python -m app.cli.evaluate_p14 --allow-provider-call",
+        "command_args": [
+            sys.executable,
+            "-m",
+            "app.cli.evaluate_p14",
+            "--dataset",
+            str(args.dataset),
+            "--output",
+            str(args.output),
+            "--allow-provider-call",
+        ],
         "dataset_path": args.dataset.as_posix(),
+        "output_path": args.output.resolve().as_posix(),
         "runner_sha256": hashlib.sha256(RUNNER_PATH.read_bytes()).hexdigest(),
         "python_version": platform.python_version(),
         "generated_at": datetime.now(UTC).isoformat(),

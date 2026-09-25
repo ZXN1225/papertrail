@@ -89,16 +89,18 @@ OpenAlex Works 单页最多可导入 100 条元数据；一次运行仍只处理
 确认 P04 的十条 OpenAlex 导入仍在本地 SQLite 后，在 `backend` 目录运行：
 
 ```powershell
-uv run --locked python -m app.cli.evaluate_bm25
+uv run --locked python -m app.cli.evaluate_bm25 `
+  --dataset data/evaluation/p05_human_reviewed_v2.json `
+  --output reports/p05-human-reviewed-bm25-report.json
 ```
 
-评测仅使用 `backend/data/evaluation/p05_gold_v1.json` 声明的固定 OpenAlex ID 与逐篇内容哈希；找不到完全匹配的快照或文档内容发生变化时会停止并报错。报告默认写到 `backend/reports/p05-bm25-report.json`，该目录已忽略，不会提交。报告包含 Hit@k、MRR@10、NDCG@k、分桶平均、空结果率、单查询均值/P95 延迟、数据集与语料哈希、BM25 和 tokenizer 版本。
+评测使用所选数据集声明的固定 OpenAlex ID 与逐篇内容哈希；找不到完全匹配的快照或文档内容发生变化时会停止并报错。上面的命令明确使用已人工复核的 P05 v2 并将报告写入 Git 忽略的 `backend/reports/`。报告包含 Hit@k、MRR@10、NDCG@k、分桶平均、空结果率、单查询均值/P95 延迟、数据集与语料哈希、BM25 和 tokenizer 版本。
 
-当前评测集只有 8 个 query / 10 篇论文，`exploratory_only=true`。qrels 是根据标题和可用摘要整理的候选标注，等待用户复核；复核说明见 `docs/research/P05-qrels-review.md`。它目前**不是已人工确认的金标**，结果不能作为简历中的检索质量成绩。该命令不访问 OpenAlex，不调用 OpenAI/embedding，也不下载全文。
+P05 数据集只有 8 个 query / 10 篇论文，80 个 qrels 已由用户人工复核并存入 `data/evaluation/p05_human_reviewed_v2.json`。报告仍标记 `exploratory_only=true`，小样本结果只用于基线和流程诊断，不能代表一般检索表现。人工分级及数据清单见 `docs/research/P05-qrels-review.md`。该命令不访问 OpenAlex，不调用 OpenAI/embedding，也不下载全文。
 
 ### P05 人工复核候选标签
 
-P05 的候选相关性分级需要你逐条审阅。先确认本机已导入与固定 P05 ID/内容哈希完全匹配的 10 篇快照，然后在 `backend` 运行：
+P05 候选标注复核流程（历史操作说明）。用户已完成 80 项逐条审阅；若需在另一份未审阅的候选包上复用该流程，先确认本机已导入与固定 P05 ID/内容哈希完全匹配的 10 篇快照，再在 `backend` 运行：
 
 ```powershell
 uv run --frozen python -m app.cli.review_qrels export
@@ -121,6 +123,8 @@ uv run --frozen python -m app.cli.review_qrels import `
 ## P06 Agent 本地运行
 
 Agent 默认关闭 LLM。若要做后续真实模型烟测，可在服务端 `.env` 配置 `LLM_PROVIDER=openai`、`LLM_API_KEY` 和账户可用且支持 function calling/structured outputs 的 `LLM_MODEL`，并按需调整 `AGENT_MAX_STEPS`、`AGENT_MAX_TOOL_CALLS`、`AGENT_DEADLINE_SECONDS`；默认限制分别为 4 轮、8 次工具调用和 45 秒。保存 `.env` 后重启后端。
+
+Web 的 `/api/agent` 代理最多等待 125 秒，以覆盖后端可配置的最长 120 秒 Agent deadline；普通元数据与状态代理仍使用 15 秒超时。若 Agent 返回 `max_steps_exceeded`，它已在模型轮数预算内完成调用但未产出最终答案，可提高 `AGENT_MAX_STEPS`；这会增加潜在模型调用次数和耗时。若最终 JSON 格式错误，Harness 只在还有剩余轮数时追加一次无工具格式修复，并重新核验所有引用；这次修复可能增加一次模型调用及对应费用。若前端显示连接失败且 Web 终端正好记录 15 秒 503，先确认 Web 代码已重启/热更新，再查看后端 Agent deadline 与模型响应。
 
 请求 `POST http://127.0.0.1:8001/api/v1/agent/ask`，JSON 格式例如：
 
@@ -173,16 +177,16 @@ Invoke-RestMethod 'http://127.0.0.1:8001/api/v1/evidence/search?q=your%20researc
 
 ### P10 Dense / Hybrid 检索
 
-BM25 仍是默认且不产生 embedding API 调用。OpenAI 官方 Embeddings 指南当前推荐候选 `text-embedding-3-small`（1536 维，单输入最多 8192 token；当前标价每百万输入 token $0.02），项目首次实验固定用 1536 维，不裁剪。开始前需自行确认账户可用性与当前数据处理设置；启用后，获准全文片段和检索问题会发送到 OpenAI Embeddings API。来源：[OpenAI Embeddings 指南](https://developers.openai.com/api/docs/guides/embeddings)。
+BM25 仍是默认且不产生 embedding API 调用。可选 Dense/Hybrid 的当前推荐模型为 `text-embedding-3-large`：官方将其描述为英语和非英语任务中能力最强的 Embedding 模型，默认 3072 维，单条输入最多 8192 tokens；官方指南列出的 MTEB 为 64.6%（Small 为 62.3%）。标准输入价格当前为每百万 tokens $0.13（Small 为 $0.02），所以 Large 成本约为 6.5 倍。本项目检索中英文混合文献，选择 Large 作为质量优先的可选模型；BM25 仍是免费、稳定的默认路径，Large 的模型卡成绩不代表 PaperTrail 的实际质量提升。启用前需自行确认账户可用性与数据处理设置；获准全文片段和检索问题会发送到 OpenAI Embeddings API。来源：[Large 模型页](https://developers.openai.com/api/docs/models/text-embedding-3-large)、[OpenAI Embeddings 指南](https://developers.openai.com/api/docs/guides/embeddings)。
 
 启用前将服务端 `.env` 配置如下。Embedding API Key 单独放 `EMBEDDING_API_KEY`；默认保持 disabled。
 
 ```dotenv
 EMBEDDING_PROVIDER=openai
 EMBEDDING_API_KEY=你的OpenAI_API_Key
-EMBEDDING_MODEL=text-embedding-3-small
-EMBEDDING_DIMENSIONS=1536
-EMBEDDING_PRICE_PER_MILLION_USD=0.02
+EMBEDDING_MODEL=text-embedding-3-large
+EMBEDDING_DIMENSIONS=3072
+EMBEDDING_PRICE_PER_MILLION_USD=0.13
 ```
 
 `EMBEDDING_PRICE_PER_MILLION_USD` 用于本机估算报告，需按当前账户/模型价格手动维护；留空则费用估算为 null。该字段不决定实际账单。
@@ -193,7 +197,7 @@ EMBEDDING_PRICE_PER_MILLION_USD=0.02
 uv run --directory backend --frozen python -m app.cli.index_fulltext_embeddings --source-type arxiv --source-id 2609.25991
 ```
 
-然后 API 可按 `retrieval_method=bm25|dense|hybrid` 检索。Dense/Hybrid 的每个搜索问题也会发一次 embedding 请求；Hybrid 使用 BM25 与 Dense 的 RRF（k=60）。若某模型/维度索引不完整，接口返回 `embeddings_missing`，不会悄悄退回 BM25 冒充混合结果。没有启用 Provider 时 Dense/Hybrid 返回 503。Agent 全文工具包含相同检索方法参数；默认仍选 BM25，模型可明确请求 Dense/Hybrid。
+升级模型或维度后需为当前批准全文重新运行索引命令。旧的 Small/1536 向量按模型与维数隔离保留，不会被 Large/3072 查询误用；重新索引只追加/更新 Large 向量，不会改动原文或许可记录。然后 API 可按 `retrieval_method=bm25|dense|hybrid` 检索。Dense/Hybrid 的每个搜索问题也会发一次 embedding 请求；Hybrid 使用 BM25 与 Dense 的 RRF（k=60）。若某模型/维度索引不完整，接口返回 `embeddings_missing`，不会悄悄退回 BM25 冒充混合结果。没有启用 Provider 时 Dense/Hybrid 返回 503。Agent 全文工具包含相同检索方法参数；默认仍选 BM25，模型可明确请求 Dense/Hybrid。
 
 独立 synthetic pipeline 不请求外部 provider，也不读写真实论文库：
 
@@ -211,9 +215,9 @@ uv run --directory backend --frozen python -m app.cli.evaluate_hybrid
 uv run --frozen python -m app.cli.evaluate_p12
 ```
 
-默认输出为 Git 忽略的 `backend/reports/p12-offline-report.json`。报告包含夹具与 runner SHA-256、BM25/Dense/RRF Hit/MRR/NDCG、TEST 证据 span 的精确位置/支持断言、工具错误恢复、拒答与注入用例、mock token、Agent 调用数和本机 mock pipeline p50/p95。运行不需要 `.env`、SQLite、OpenAlex 或 OpenAI，不会联网。所有 mock 论文均为 TEST 数据；`quality_claim_allowed=false`、费用为 `null/not_measured_mock_mode`。mock 延迟不是 API/服务端延迟，mock token 不产生账单。
+默认输出为 Git 忽略的 `backend/reports/p12-offline-report.json`。报告 schema 为 v5，包含夹具与 runner SHA-256、BM25/Dense/RRF Hit/MRR/NDCG、TEST 证据 span 的精确位置/支持断言，以及 10 个 Agent Harness 用例：证据不足、论文内提示注入与越权工具、错误工具参数、工具异常、伪造引用、结构错误终答、模型不可用、调用预算耗尽、主题发现到双向引用扩展，以及 OpenAlex + arXiv 跨源发现与同 DOI 归并。报告验证年份/引用关系来源、保留备用 arXiv 链接和 metadata-only 回答。每个场景记录状态与指标断言的实际/期望值、稳定失败原因、观察到的引用摘要、工具尝试/执行、拦截与错误计数、mock token 和本机 mock pipeline p50/p95；聚合区显示失败场景 ID。`reproducibility.command_args` 与 `output_path` 保存真实 CLI 参数和报告位置。运行不需要 `.env`、SQLite、OpenAlex 或 OpenAI，不会联网。OpenAlex 形状的 W900/W901/W920 与 arXiv 形状的 2401.99999 均为 `TEST-*` 标题且 `synthetic=true` 的合成记录，不对应实际作品。`quality_claim_allowed=false`、费用为 `null/not_measured_mock_mode`。mock 延迟不是 API/服务端延迟，mock token 不产生账单。
 
-运行完整自动测试仍用 `uv run --frozen pytest -q`。其中现有全文集成测试另覆盖许可门禁、真实存储 span locator、引用 lineage 与伪造引用拒绝；P12 报告里的固定 span 检查不替代这些测试。P05 qrels 人工复核与用户单独确认的小批量 live OpenAI 评测尚未完成，不能对外宣称真实检索/Agent 质量提升或真实模型成本。
+运行完整自动测试仍用 `uv run --frozen pytest -q`。其中现有全文集成测试另覆盖许可门禁、真实存储 span locator、引用 lineage 与伪造引用拒绝；P12 报告里的固定 span 检查不替代这些测试。P05 人工复核已完成，但小样本仍只支持流程诊断；真实模型在线质量与成本评估尚未完成，也不能对外宣称真实检索/Agent 质量提升。
 
 撤销某篇论文的全文并清除其所有版本和切片：
 

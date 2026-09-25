@@ -36,8 +36,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"P12 offline evaluation failed: {type(error).__name__}", file=sys.stderr)
         return 2
     report["reproducibility"] = {
-        "command": "python -m app.cli.evaluate_p12",
+        "command_args": [
+            sys.executable,
+            "-m",
+            "app.cli.evaluate_p12",
+            "--dataset",
+            str(args.dataset),
+            "--output",
+            str(args.output),
+        ],
         "dataset_path": args.dataset.as_posix(),
+        "output_path": args.output.resolve().as_posix(),
         "runner_sha256": hashlib.sha256(RUNNER_PATH.read_bytes()).hexdigest(),
         "python_version": platform.python_version(),
         "generated_at": datetime.now(UTC).isoformat(),

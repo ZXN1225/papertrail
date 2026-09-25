@@ -54,6 +54,7 @@ def test_arxiv_search_parses_atom_and_uses_fixed_host_and_bounded_query() -> Non
     assert seen[0].url.path == "/api/query"
     assert b"research%20paper" in seen[0].url.query
     assert b"+" not in seen[0].url.query
+    assert seen[0].headers["accept-encoding"] == "identity"
     assert seen[0].url.params["max_results"] == "1"
     assert seen[0].headers["user-agent"].startswith("Python/")
     assert page.total_results == 1
@@ -77,6 +78,52 @@ def test_arxiv_client_identifies_python_runtime_for_export_gateway() -> None:
 
     assert seen[0].headers["user-agent"].startswith(f"Python/{platform.python_version()}")
     assert b"retrieval%20augmented%20generation" in seen[0].url.query
+
+
+def test_arxiv_search_applies_submission_year_range_in_fixed_query() -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=_feed())
+
+    with ArxivClient(transport=httpx.MockTransport(handler)) as client:
+        client.search("retrieval augmented generation", from_year=2020, to_year=2024)
+
+    assert seen[0].url.params["search_query"] == (
+        'all:"retrieval augmented generation" AND submittedDate:[202001010000 TO 202412312359]'
+    )
+
+
+def test_arxiv_search_allows_last_bounded_ten_result_page() -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=_feed())
+
+    with ArxivClient(transport=httpx.MockTransport(handler)) as client:
+        client.search("retrieval augmented generation", start=9_990, max_results=10)
+
+    assert seen[0].url.params["start"] == "9990"
+    assert seen[0].url.params["max_results"] == "10"
+
+
+def test_arxiv_search_rejects_invalid_year_range_before_network() -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+    requests: list[httpx.Request] = []
+    with (
+        ArxivClient(
+            transport=httpx.MockTransport(
+                lambda request: requests.append(request) or httpx.Response(200, content=_feed())
+            )
+        ) as client,
+        pytest.raises(ValueError),
+    ):
+        client.search("retrieval", from_year=2025, to_year=2020)
+    assert requests == []
 
 
 def test_id_normalization_handles_version_and_rejects_untrusted_hosts() -> None:

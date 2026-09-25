@@ -9,14 +9,15 @@ from app.retrieval.vectors import cosine_similarity, dense_rank, reciprocal_rank
 
 
 def _settings(**kwargs) -> Settings:
-    return Settings(
-        _env_file=None,
-        embedding_provider="openai",
-        embedding_api_key="unit-test-secret",
-        embedding_model="text-embedding-3-small",
-        embedding_dimensions=3,
-        **kwargs,
-    )
+    values = {
+        "_env_file": None,
+        "embedding_provider": "openai",
+        "embedding_api_key": "unit-test-secret",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dimensions": 3,
+    }
+    values.update(kwargs)
+    return Settings(**values)
 
 
 def test_openai_embedding_client_sends_bounded_fixed_host_request_and_orders_results() -> None:
@@ -46,6 +47,34 @@ def test_openai_embedding_client_sends_bounded_fixed_host_request_and_orders_res
     assert '"dimensions":3' in observed["body"]
     assert batch.vectors == [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
     assert batch.input_tokens == 9
+    http.close()
+
+
+def test_openai_embedding_client_supports_large_model_with_full_dimensions() -> None:
+    observed = {}
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        observed["body"] = request.read().decode()
+        return httpx.Response(
+            200,
+            json={
+                "model": "text-embedding-3-large",
+                "data": [{"index": 0, "embedding": [0.0, 1.0] * 1_536}],
+                "usage": {"prompt_tokens": 4},
+            },
+        )
+
+    settings = _settings(
+        embedding_model="text-embedding-3-large",
+        embedding_dimensions=3_072,
+    )
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    batch = OpenAIEmbeddingClient(settings, http_client=http).embed(["retrieval query"])
+
+    assert '"model":"text-embedding-3-large"' in observed["body"]
+    assert '"dimensions":3072' in observed["body"]
+    assert batch.model == "text-embedding-3-large"
+    assert len(batch.vectors[0]) == 3_072
     http.close()
 
 

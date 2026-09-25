@@ -173,7 +173,16 @@ class OpenAlexClient:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def search_works(self, query: str, *, page: int = 1, per_page: int = 10) -> OpenAlexPage:
+    def search_works(
+        self,
+        query: str,
+        *,
+        page: int = 1,
+        per_page: int = 10,
+        from_year: int | None = None,
+        to_year: int | None = None,
+        open_access_only: bool = False,
+    ) -> OpenAlexPage:
         normalized_query = " ".join(query.split()) if isinstance(query, str) else ""
         if not normalized_query:
             raise ValueError("query must not be empty")
@@ -184,12 +193,15 @@ class OpenAlexClient:
         if page < 1 or page * per_page > 10_000:
             raise ValueError("page must be positive and within OpenAlex's 10,000-result page limit")
 
+        filters = _research_filters(from_year, to_year, open_access_only)
         params = {
             "search": normalized_query,
             "page": page,
             "per_page": per_page,
             "select": WORKS_SELECT,
         }
+        if filters:
+            params["filter"] = ",".join(filters)
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
         response = self._get_with_retry(path="/works", params=params, headers=headers)
         return _parse_response(response, OpenAlexPage)
@@ -207,6 +219,56 @@ class OpenAlexClient:
             return OpenAlexWork.model_validate(payload)
         except (ValueError, ValidationError):
             raise OpenAlexProtocolError from None
+
+    def get_referenced_works(
+        self,
+        work_ids: list[str],
+        *,
+        per_page: int = 10,
+        from_year: int | None = None,
+        to_year: int | None = None,
+        open_access_only: bool = False,
+    ) -> OpenAlexPage:
+        """Fetch a bounded batch of works referenced by a seed work."""
+        normalized = _normalize_work_ids(work_ids)
+        if not 1 <= per_page <= 10 or len(normalized) > per_page:
+            raise ValueError("reference lookup accepts at most 10 unique work IDs")
+        return self._works_filter_page(
+            "openalex:" + "|".join(normalized),
+            per_page=per_page,
+            extra_filters=_research_filters(from_year, to_year, open_access_only),
+        )
+
+    def get_citing_works(
+        self,
+        work_id: str,
+        *,
+        per_page: int = 10,
+        from_year: int | None = None,
+        to_year: int | None = None,
+        open_access_only: bool = False,
+    ) -> OpenAlexPage:
+        """Fetch a bounded page of works that cite one seed work."""
+        normalized = _normalize_work_ids([work_id])[0]
+        if not 1 <= per_page <= 10:
+            raise ValueError("citation lookup page size must be between 1 and 10")
+        return self._works_filter_page(
+            f"cites:{normalized}",
+            per_page=per_page,
+            extra_filters=_research_filters(from_year, to_year, open_access_only),
+        )
+
+    def _works_filter_page(
+        self, filter_value: str, *, per_page: int, extra_filters: list[str] | None = None
+    ) -> OpenAlexPage:
+        headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
+        filters = [filter_value, *(extra_filters or [])]
+        response = self._get_with_retry(
+            path="/works",
+            params={"filter": ",".join(filters), "per_page": per_page, "select": WORKS_SELECT},
+            headers=headers,
+        )
+        return _parse_response(response, OpenAlexPage)
 
     def search_authors(
         self, query: str, *, page: int = 1, per_page: int = 10
@@ -336,3 +398,33 @@ def _optional_int_header(response: httpx.Response, name: str) -> int | None:
         return int(response.headers[name])
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _normalize_work_ids(work_ids: list[str]) -> list[str]:
+    if not 1 <= len(work_ids) <= 10:
+        raise ValueError("between 1 and 10 OpenAlex Work IDs are required")
+    normalized = [item.strip().removeprefix("https://openalex.org/") for item in work_ids]
+    if any(not re.fullmatch(r"W\d+", item) for item in normalized):
+        raise ValueError("work_ids must contain canonical OpenAlex Work IDs")
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("work_ids must be unique")
+    return normalized
+
+
+def _research_filters(
+    from_year: int | None, to_year: int | None, open_access_only: bool
+) -> list[str]:
+    filters = []
+    if from_year is not None:
+        if not 1400 <= from_year <= 2100:
+            raise ValueError("from_year must be between 1400 and 2100")
+        filters.append(f"from_publication_date:{from_year}-01-01")
+    if to_year is not None:
+        if not 1400 <= to_year <= 2100:
+            raise ValueError("to_year must be between 1400 and 2100")
+        filters.append(f"to_publication_date:{to_year}-12-31")
+    if from_year is not None and to_year is not None and from_year > to_year:
+        raise ValueError("from_year must not be greater than to_year")
+    if open_access_only:
+        filters.append("open_access.is_oa:true")
+    return filters

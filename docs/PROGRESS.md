@@ -1,6 +1,169 @@
 # 进度
 
-更新日期：2026-09-24。PaperTrail 已迁移为仓库根目录项目，并发布至 [GitHub](https://github.com/ZXN1225/papertrail)；默认分支 `main` 是唯一远程分支，旧项目开放 PR 已清理。旧电脑推荐项目源码从当前 Git 工作树移除并保存在本机忽略目录 `.local/legacy-computer-project/`。P11 用户本机验收修复并验证 arXiv 检索；P12 离线评测与展示资料完成；P05 80 条人工复核 qrels 已导入；P13/P14 结果仅为 AI 标签探索性诊断。后端 99 项自动测试、Web 15 项 E2E 及静态检查通过；GitHub Actions 最终运行通过。
+更新日期：2026-09-25。PaperTrail 已迁移为仓库根目录项目，并发布至 [GitHub](https://github.com/ZXN1225/papertrail)；默认分支 `main` 是唯一远程分支，旧项目开放 PR 已清理。旧电脑推荐项目源码从当前 Git 工作树移除并保存在本机忽略目录 `.local/legacy-computer-project/`。P11 用户本机验收修复并验证 arXiv 检索；P12/P18 离线 Harness 评测完成；P05 80 条人工复核 qrels 已导入；P13/P14/P17 检索结果仅为 AI 标签探索诊断。P19 后端 106 项自动测试、Web 18 项 E2E 及构建检查通过；GitHub Actions 最终运行通过。P29 arXiv 请求修复、P30 元数据回答修复已由用户验收。P31 检索结果分页已实现并通过自动验证。
+
+P36 已完成人工盲审及候选池内评测：8 个困难查询、101 个候选判断，保持未入池论文为未判断。Large Dense 在该挑战集分数最高，但报告明确 `exploratory_only=true`、`quality_claim_allowed=false`。P37 已在同 101 对候选上完成助手建议与人工评分的一致性诊断：完全一致率 30.7%、MAE 1.218、二次加权 Kappa 0.310；这不是独立 LLM-as-judge 校准，仍为探索分析。
+
+## 最终收尾核验（2026-09-25）
+
+- 实施范围 P01–P38 已完成；README 已整理策略选型、检索质量证据和限制，开发说明及阶段记录已同步。改动准备创建本地提交，尚未推送。
+- 后端全量 pytest 133 passed；Ruff check/format、Web Prettier、TypeScript、隔离生产构建、npm/pip 依赖审计及 `git diff --check` 均通过。前端本地依赖目录已按锁文件恢复并确认 Next/Playwright 可执行文件存在。
+- 用户提供的最终 E2E 运行结果为 21/21 通过且退出码 0，干净退出确认完成；此前 teardown 异常的重跑不作为通过依据。本轮未更改 Web 应用代码。
+- 最终独立复核发现 Agent 读取本地文献库时会将 OpenAlex 与 arXiv 各自的 30 条相加，可能超过界面承诺的 30 条上限。现改为合并后按年份降序排序并截取最多 30 条；新增回归测试。全量后端 pytest 134 passed，Ruff check/format 和根目录 `git diff --check` 通过。`uv run` 被本机 uv 缓存权限拒绝，因此使用已存在的锁定虚拟环境直接运行等效命令。
+- 代码与验证现已完成；本轮创建本地提交，推送仍待用户明确授权。
+
+## P37 既有助手标签与人工评分一致性（已完成）
+
+- 重建并核验 P36 的冻结候选池与来源审计，将每个人工 query-paper 对与 P13 `suggested_grade` 配对；不发起模型 API 调用，不生成新标签。
+- 101 对评分完全一致率 30.7%，相差不超过 1 级为 64.4%，MAE 1.218，二次加权 Cohen's kappa 0.310。助手给 81 项标 0，人工仅给 20 项标 0，提示明显的等级分布差异。
+- 困难查询按旧 AI 标签分歧选择，候选也来自各排序器前五，且仅一位评审；因此结果不能视为一般性 judge 质量、校准或检索质量证据。JSON 报告位于 Git 忽略的 `backend/reports/p37-assistant-human-grade-agreement.json`。
+- 详见 [P37 一致性诊断](research/P37-assistant-human-grade-agreement.md)。
+
+## P35 README 策略选型与检索质量迭代（已完成）
+
+- 参考 [car-selection-assistant README](https://github.com/CN-Discretemathematics/car-selection-assistant) 的组织方式，补充 PaperTrail 按研究需求选择元数据检索、BM25、可选 Dense/Hybrid、引用扩展和跨来源 DOI 去重的理由与证据边界。
+- 将 P05、P14、P17 整理为评测迭代表，呈现题集范围、当阶段回答的问题与限制；没有虚构 v2/v3/v4 的质量提升，也没有把 AI 生成标签或 Embedding 厂商基准写成 PaperTrail 的质量证明。
+- 增补说明：未来质量声明需要人工审核或独立校准的标签、多主题查询与全文证据准确性评估；当前未校准 LLM-as-judge 不计作标注。
+- `pnpm run format:check` 与根目录 `git diff --check` 均通过；本轮只验证文档格式与差异空白，不需要运行代码测试。
+
+## P36 盲审候选池与人工相关性复评（已完成）
+
+- 从同一 P13 冻结数据的 P14/P17 结果中，选取 P14 方法分歧较大的查询并按意图桶分层；BM25、Small Dense/Hybrid、Large Dense/Hybrid 各取前 5 名后按 query-paper pair 去重。
+- 新增有界池生成器和 CLI，严格检查数据集标签状态、SHA、snapshot、查询 ID 与论文元数据哈希；最大 8 个查询、每种配置前 5 名、总候选判断不超过 200。本次生成 8 个查询、101 个候选项。
+- 评审 CSV 及机器 JSON 不含单篇排序来源、名次或 AI 建议等级；来源映射、选择方法和输入报告 SHA 单独保存在本机忽略审计文件。记录明确该样本由旧 AI qrels 的系统分歧选择，只能作为 challenge set。
+- 用户完成人工盲审，101 项均有 0–3 等级；导入器验证 row ID、完整性、评分范围、人工审核标记和来源元数据。Excel Windows-936 保存造成的 5 个摘要 codepage 转换已明确记录。
+- 仅针对盲审池 top-5 产生 MRR/NDCG 对照，未入池论文保持未判断，不计算全语料 Recall。Large Dense 在这 8 个定向困难查询上领先；单评审和旧 AI 标签分歧抽样使结果只能作为探索诊断，不能声称总体质量提升。
+- 全量后端测试 `130 passed`；Ruff check/format、Web 格式检查和 `git diff --check` 通过。`uv run` 因本机 uv 缓存目录权限失败，使用 backend 已存在的 `.venv` 运行相同工具；pytest 临时目录改到仓库内以避开系统 Temp 权限拒绝。
+
+## P34 首页文案调整（已完成）
+
+- 删除眉题“从问题出发，沿证据前进”。
+- 首页主标题改为“Agent 文献检索分析系统”；副标题保留“搜索可信学术来源，比较关键研究。”，移除“并让每个回答都能回到原文证据”。
+- 仅调整展示文案；Web 格式与类型检查通过。
+
+## P33 研究助理上下文衔接（已完成）
+
+- 根因：Web Agent 代理之前只发送当前问题，未附左侧检索条件，也不保留前序问答；“根据刚才的检索结果”因此没有可引用的上下文。
+- 前端现在随 Agent 请求发送最近 4 轮对话和最近一次成功的左侧搜索来源、查询词、年份范围及已载入页数。后端依照这些结构化条件重新从固定来源获取最多 30 篇书目元数据并作为本轮证据；不信任浏览器直接提交的论文文本。对话历史只帮助解析指代，不作为事实证据。
+- 新检索开始时先清空旧上下文；若新检索失败，Agent 不会误把上一次成功搜索当作当前结果。
+- 运行记录新增 `current_search_context`，界面展示当前附带的来源和范围并允许清空对话。元数据只用于书目型回答；论文结论仍要求许可全文证据。arXiv 多页重读遵守现有限流节奏。
+- 后端 118 项测试、Ruff、OpenAPI、Web 格式/类型检查及隔离 Webpack 生产构建通过。Playwright 复用用户已运行的开发服务，三视口 21/21 E2E 通过；具体执行范围见 [P33 Agent 上下文记录](research/P33-agent-context-acceptance.md)。
+
+## P32 远程来源年份检索过滤（已完成）
+
+- 用户截图证明 P31 首版年份筛选只作用于已载入页：例如 OpenAlex 命中总数仍是全年份，已载入 30 条恰好均不在区间内，造成“当前 0 条”的误导。用户质疑正确；不能据此认为范围内没有论文。
+- OpenAlex 搜索代理与后端端点现在传递 `from_year/to_year`，由 OpenAlex 按出版日期过滤并返回过滤后的匹配数；arXiv 由 `submittedDate` 按提交日期过滤。翻页请求继续携带相同范围。UI 明确说明远程检索年份语义，并提示改范围后重新搜索；本地库仍只对已载入元数据筛选。
+- 后端 API 测试锁定年份参数传递，Web E2E 锁定首批和下一页均携带年份范围。后端 116 项测试、Ruff check/format、Web 18 项 E2E、Prettier/TypeScript 和 OpenAPI 导出均通过。完整验收见 [P32 记录](research/P32-year-filter-acceptance.md)。
+
+## P31 检索结果逐批加载（已完成）
+
+- 初始界面每个远程来源固定查询第一页 10 条，虽然后端来源 API 支持分页，用户无法看到后续结果。新增“加载更多”：OpenAlex 和 arXiv 每次拉取 10 条，本地库按来源 offset 分批拉取并保留已展示记录；跨页按来源 ID 去重。
+- 进度信息显示匹配总数与当前列表数。分页受单次最多 10,000 条的现有边界约束，到达上限会提示缩小查询范围。年份仅作用于已载入结果的 P31 初版限制已在 P32 修复。
+- arXiv 尾页原有 start 上界与 10 条分页不对齐；已允许最后一个不超过 10,000 范围的请求，并同步 OpenAPI。
+- Web Prettier/TypeScript、18/18 三视口 Playwright E2E、隔离 Webpack 生产构建通过；后端 116 项测试、Ruff 与 OpenAPI 导出通过。E2E 复用了用户 3000 端口开发服务，没有停止或改写 `.next`。
+
+## P30 引用扩展终答格式失败诊断（已验收）
+
+- 用户复测截图显示 OpenAlex 检索与引用扩展工具均成功，返回 6 篇来源；首次终答是无效 JSON，单次结构修复得到有效 JSON，但仍将元数据任务标记为 `insufficient_evidence`。当前可见问题是 Agent 对仅要求标题/年份/链接/引用关系的任务过度拒答，不是来源 API 或引用拓展工具故障。
+- 系统提示与修复提示现明确：只要至少一部分请求字段由成功工具观察支持，就回答可用子集并标明缺失项；没有全文本身不构成元数据任务证据不足。论文 findings/methods 结论仍须有许可全文证据。
+- 本地回归覆盖输出诊断类别和元数据充分性提示；用户确认引用扩展回答已正常，P30 验收完成。
+
+## P29 arXiv HTTPX 406 请求差异（已验收）
+
+- 复现证据：同一个 arXiv 查询 URL、相同的 `Accept: application/atom+xml` 与 `User-Agent: Python/<version>` 下，用户本机 `urllib` 返回 HTTP 200，而 HTTPX 0.28.1 返回 HTTP 406；PaperTrail 将非 2xx（除 429）包装成 502 `arxiv_unavailable`。
+- HTTPX 明确发送 `Accept-Encoding: identity` 并由 mock 单测锁定；用户本机确认 arXiv 检索成功，P29 live 验收完成。详情见 [`research/P29-arxiv-http-406-diagnostics.md`](research/P29-arxiv-http-406-diagnostics.md)。
+- 定向测试：`tests/test_arxiv_client.py` 8 passed；目标文件 Ruff check/format 通过。未从自动化环境再次请求 arXiv。
+- 验收文档：[P29 诊断与验收](research/P29-arxiv-http-406-diagnostics.md)。
+
+## P28 生产构建与依赖安全审计（已完成）
+
+- 为避免影响用户正在使用的 Next 开发服务，在忽略目录 `.local/p28-build-check` 复制 Web 源码，排除 `.env.local`、缓存和测试产物；构建结束后已删除临时副本。
+- Turbopack 拒绝了临时副本指向仓库依赖目录的 junction。改用 Webpack 构建后通过：优化生产编译成功、TypeScript 成功、8 个静态页面生成成功、全部 App 路由产物完成。
+- 构建检查的是当前 P27 源码，没有覆盖开发服务的 `.next`；详情见 [P28 验收](research/P28-isolated-production-build-acceptance.md)。
+- `pnpm audit --audit-level moderate` 与通过 `uvx` 临时启动的 `pip-audit --path .venv\Lib\site-packages` 均报告未发现已知漏洞；`uv.lock` 与 `pnpm-lock.yaml` 未改动。
+
+## P27 Agent 回答安全 Markdown 渲染（已完成）
+
+- P26 本机复验截图显示双来源搜索成功，用户确认进入下一步。
+- Agent 回答现支持安全渲染标题、列表、加粗/斜体、行内代码和 HTTPS 链接；链接只允许 OpenAlex、arXiv 与 DOI 官方域名。用 React 节点渲染，不将模型输出当作 HTML。
+- E2E 覆盖格式渲染和 `javascript:` 链接不生成可点击元素；15/15 三视口通过。Web format/typecheck 通过。
+- 根 `git diff --check` 通过；验收条件与边界见 [P27 验收](research/P27-safe-agent-answer-markdown-acceptance.md)。未引入依赖或调用外部服务。
+
+## P26 arXiv 工具错误诊断（已完成）
+
+- 用户在运行 trace 中观察到两次 `search_arxiv_metadata error`。根因表现为运行中的后端返回 `arxiv_unavailable`；项目客户端在允许外网访问的进程中用同一年份查询可成功，因此检索查询构造有效，当前后端进程出站访问失败。
+- Agent trace 现在记录安全白名单错误码，UI 显示例如 `error · arxiv_unavailable`。同一次 Agent 执行中某来源失败后，Harness 拦截该来源后续外呼并记录 `source_unavailable_after_failure`。系统指令要求停止重复调用并说明来源不可用/回答不完整。
+- 后端全量 114 passed（2 条上游弃用 warning），Ruff check/format 与 OpenAPI 导出通过；Web Prettier、TypeScript、15 项 E2E 全通过；根 git diff --check 通过。E2E 用例确认 trace 展开后显示错误码。生产构建随后在 P28 隔离目录完成。
+- 用户随后在本机重启后端并成功完成 arXiv 检索，运行记录可见成功结果；P26 本机验收完成。实现与诊断记录见 [P26 验收](research/P26-arxiv-tool-diagnostics-acceptance.md)。
+
+## P25 跨来源补充检索（已完成）
+
+- 验收条件见 [P25 验收](research/P25-cross-source-discovery-acceptance.md)。Agent 指引在广泛发现时结合 OpenAlex 与 arXiv；工具仅在各来源客户端启用时提供。OpenAlex 结构化年份/OA 过滤保持原样，arXiv 新增 `submittedDate` 年份范围，二者年份语义不同，且 arXiv 不提供 OpenAlex OA 保证。
+- Citation 契约加入 DOI 与 `alternate_sources`；仅规范化 DOI 完全一致才归并，OpenAlex 作为主记录并保留 arXiv 链接。不同 DOI、缺 DOI 记录分开。研究工作区卡片显示 DOI 与备用来源；新增 E2E 覆盖该链接展示。
+- P12 benchmark 升至 v5，新增 `cross_source_discovery_deduplicates_only_matching_doi` 场景，报告 10/10 通过；夹具标题使用 `TEST-*` 并标记 `synthetic=true`，来源 ID 保持生产契约所需格式，质量声明仍关闭。
+- 验证：后端 113 passed（2 个依赖弃用 warning）、Ruff check/format 与 OpenAPI 导出通过；Web Prettier、TypeScript 与 15/15 E2E 通过；根 `git diff --check` 通过。E2E 复用了用户已运行的 localhost:3000 开发服务。未运行 Next 生产构建，因为它会与该服务共享 `.next` 输出目录。Python 环境未安装 `pip-audit`；`pnpm audit` 访问 npm registry 被 EACCES/fetch failed 拒绝。
+- 未调用 OpenAlex/arXiv 或 LLM/embedding API，未读取/更改用户数据库或报告。P25 功能与现有自动化验收已完成；生产构建留待服务停止后执行，依赖审计须在相应工具/网络可用时重试。
+
+## P24 离线评测逐场景诊断（已完成）
+
+- P23 已将引用图检索闭环加入 P12；本阶段补充逐场景的结构化通过检查与明确失败原因，方便从报告直接区分预期状态错误、越权执行及指标不符。验收条件见 [P24 验收](research/P24-benchmark-diagnostics-acceptance.md)。
+- P12 schema 升级至 v4。每个 case 会列出 status match、无越权执行、期望指标逐项 expected/actual/passed；若失败，会给出稳定的 `status_mismatch`、`unauthorized_tool_execution` 或 `metric_mismatch:<field>`。Agent 汇总提供 failed count 与场景 ID 列表；`passed` 由这些检查推导。
+- 定向测试 4 passed；后端全量 pytest 110 passed，Ruff check/format、OpenAPI 导出与根 `git diff --check` 通过。pytest 有 2 条依赖弃用 warning。Web 源码未改，未重跑 Web 格式/类型/构建/E2E；没有依赖变更，未跑 pip/pnpm 审计。根 foundation/source-review 脚本缺失，未运行。
+- 未访问外部 API/模型/真实数据库，未改既有 ignored reports；P24 已完成。README、开发说明、P12/P24 验收记录与任务台账已同步。
+
+## P23 Citation graph 离线 benchmark（已完成）
+
+- 用户已验收引用扩展 UI：种子与候选来源卡片显示年份、OpenAlex ID 和引用方向，回答将 citation links 限定为 discovery metadata；筛选后的参考候选为空时也明确说明。
+- 本阶段把上述工作流加入 P12 固定离线评测，使用生产 Harness 与受控工具/模型，不访问 OpenAlex、真实数据库或模型服务。验收条件见 [P23 验收](research/P23-citation-graph-benchmark-acceptance.md)。
+- 已升级至 P12 report v3，新增第 9 个 Agent 场景；synthetic W900/W901 只用于满足生产 ID schema，不对应真实作品。重复候选合并成一个 citation，2023/2024 年份和两个方向关系均在报告中保留；回答注明引用边仅为发现元数据。
+- 验证：P12 定向测试 3 passed；后端全量 pytest 109 passed，Ruff check/format 与 OpenAPI 导出通过，根 `git diff --check` 通过。Web 源码未改，本阶段未重跑 Web 构建/E2E。根 foundation/source-review 检查脚本在当前检出中不存在，未运行。未访问外部 API/数据库/模型；P12 质量声明关闭、费用未测。
+- P23 已完成。README、开发说明及 P12/P23 验收文档已同步；不增加人工审核负担或 LLM-as-judge 标签。
+
+## P20 Agent 请求超时对齐（已完成）
+
+- 用户本机日志显示 `POST /api/agent` 在 15 秒以 503 结束，而后端 Agent 仍在处理；根因是 Web 通用代理固定 15 秒超时，短于 Agent 的默认 45 秒/可配置最高 120 秒期限。
+- 保留搜索、健康等 API 的 15 秒超时，只将 Agent 到后端请求上限改为 125 秒，为 Agent 允许的最长运行时间留 5 秒响应编码余量。前端 Agent 调用本身没有更短的客户端 timeout。
+- 验证：Web Prettier、TypeScript、生产构建和根 `git diff --check` 通过。E2E 未运行成功：Playwright 启动额外 Next dev 实例时遇到现有用户开发服务占用共享 `.next` dev 锁；未停止用户服务。当前前端状态代理和后端健康接口返回 ready。没有重复发起真实模型请求，以免增加用户 API 费用；需用户本机重试超过 15 秒的 Agent 请求验收代理等待行为。
+- 后续用户本机实测成功生成带种子及引用候选的研究回答，超过旧代理限制的 Agent 流程现可完整返回；P20 本机验收完成。
+
+## P21 引用卡片 provenance（已完成）
+
+- 先定义 [P21 验收](research/P21-citation-provenance-ui-acceptance.md)：Agent 引用对象需保留 OpenAlex 元数据中已观察到的出版年份和引用方向；UI 来源卡片展示“参考文献/被引”及年份。
+- `Citation` 响应新增年份和有类型的关系字段；Harness 只从工具 observation 采集这些值，并跨重复 observation 合并关系，忽略无效关系，缺失年份保留 null。
+- 来源卡片显示可用年份、引用方向与种子 ID。普通搜索/作者条目没有引用关系字段时不生成关系标签。OpenAPI schema 已同步。
+- 验证：后端 107 passed；Ruff check/format、OpenAPI 导出通过。Web Prettier、TypeScript、生产构建通过；15 项 E2E 在现有 3000 开发服务上通过三种视口运行。E2E 采用一次性临时配置并已删除，不覆盖用户现有 Playwright 配置。无真实来源/模型 API 调用。
+
+## P22 Agent 结构化终答恢复（已完成）
+
+- P21 后用户本机复验显示 Agent 偶发返回 `invalid_model_output`。Harness 现仅在剩余步数内追加一次格式修复 user turn，并向模型隐藏工具定义；修复结果仍须通过原 JSON schema 和引用 allow-list。若无剩余步数、修复仍错或模型试图调用工具，继续安全拒绝并返回脱敏 warning。
+- 增加 FakeModel 测试覆盖修复成功、格式修复二次失败、预算耗尽与修复轮次工具调用拦截。后端 109 passed；Ruff check/format 通过。未调用真实模型、OpenAlex 或 embedding API；验收条件和结果见 [P22 验收](research/P22-agent-structured-output-recovery-acceptance.md)。
+
+## P19 研究闭环与 README（已完成）
+
+- 按 [P19 验收](research/P19-workflow-readme-acceptance.md)实施。用户希望 Agent 从研究问题出发提升文献集合，并可沿论文参考文献/被引关系拓展，完善 README 的策略取舍和检索质量展示；本阶段不制作图片/视频演示素材。
+- OpenAlex 官方 API 文档确认 Works 提供 `referenced_works`、`cited_by_api_url` 与 `filter=cites:W…` 路径；已新增固定 Works API 上的受限引用拓展，以及年份范围和 OA 条件的结构化筛选。
+- Agent 系统指令指导先检索、再按需扩展一跳并去重比较；引用边只作为发现线索，OA 标记不等于全文许可，论文方法/结论仍需已批准全文证据。
+- 新增 API 客户端和 Harness 离线契约测试，涵盖年份/OA 过滤、参考/被引方向、流程决策、参数拒绝和来源引用。后端全量测试 106 passed；Ruff、格式、OpenAPI 导出通过。Web format/typecheck/build 通过；E2E 15/15 通过。根 `scripts/check_foundation.py` 与 `scripts/check_source_review.py` 在当前检出中不存在，未运行；依赖警告仅为 Starlette/httpx 上游弃用提示。
+- README 加入 v1 BM25、v2 全文 RAG、v3 Dense/Hybrid、v4 引用图发现能力演进；并列展示 Small 与 Large 同一 100 Works/30 queries 数据对照。指标对应 assistant-labeled qrels，明确仅作探索诊断；Large 的某项指标提升不能称为总体质量改进。未实现 LLM-as-judge，因为没有可校准的 judge 数据集，自动评分不能作为人工标注。
+- 本阶段未发起真实 OpenAI/Embedding API 调用，未改动/读取用户私有数据库或新增全文。详细结果见 [P19 验收](research/P19-workflow-readme-acceptance.md)。
+
+## P17 Embedding 模型升级（已验收）
+
+- 验收条件见 [P17 验收](research/P17-embedding-model-upgrade-acceptance.md)。根据论文语料与问题可能中英文混合，选择 OpenAI `text-embedding-3-large` 作为 Dense/Hybrid 可选模型：官方称其为英语和非英语任务中当前能力最强的 Embedding，MTEB 64.6%（Small 62.3%）；标准输入价 `$0.13/百万 tokens`，约为 Small 的 6.5 倍。BM25 继续是默认，不会自动触发 Embedding API。
+- 示例配置、开发说明、README 和本机 `.env` 已切换到 Large、3072 维、`$0.13/百万 tokens`；本机 API key 原值保留且未输出。索引按模型/维度隔离；Small 旧索引保留，Large 查询需先重新索引。
+- 新增 Large/3072 请求契约测试；后端全测 100 passed，Ruff check/format、OpenAPI 导出、Web Prettier/typecheck、`git diff --check` 通过。测试只用 HTTP mock，没有调用 OpenAI。
+- P14 Small 历史结果未覆盖。用户已在独立报告中完成同数据集 Large 复评：100 篇、30 queries、23,960 tokens，估算 `$0.0031148`；数据 SHA/snapshot 一致，报告仍是 AI qrels 探索分析。Dense 的 NDCG@10 提升但 Hit@1/MRR 略降；Hybrid MRR/NDCG 提升。不能宣称 Large 普遍更好。
+- 报告的 `reproducibility.command` 未记录自定义输出参数；数据与结果本身无异常。此项在 P18 修复 CLI provenance 时解决，不重复产生 API 费用。根 `scripts/check_foundation.py` / `check_source_review.py` 当前检出缺失，已在 P17 验收记录中如实注明。
+
+## P18 Agent 离线失败场景矩阵（已完成）
+
+- 先定义 [P18 验收](research/P18-agent-eval-acceptance.md)，再扩展 P12 生产 Harness mock 评测：加入参数错误、伪造引用、结构错误终答、模型不可用和工具预算耗尽等场景，并保留提示注入和工具错误恢复。
+- 同步修复 P12/P14 CLI 报告中的可复现参数：记录真实 argv 和解析后的输出路径；不改写既有忽略报告，不调用外部模型/API。
+
+- P12 benchmark schema 升级到 v2，使用生产 `AgentHarness` 加受控 mock，8/8 场景通过：保守拒答、提示注入和越权工具拦截、非法参数、工具失败、伪造引用、无效终答 JSON、模型不可用、工具预算耗尽。总越权执行为 0；该结果仅验证确定性 Harness 契约，不代表真实模型回答质量。
+- 将含义不准确的 `tool_side_effect_executions` 改为 `registered_tool_executions`。P12/P14 新报告保存实际命令参数、解析后的输出路径、runner 哈希和数据哈希；新增 CLI 定向回归测试。P17 已产生的 Large 报告不修改、不重跑。
+- 离线报告在 Git 忽略的 `backend/reports/p18-agent-eval-report.json`，synthetic、无网络/真实数据库/真实模型，费用为 null，质量声明禁用。
+- 后端全量测试 101 passed；Ruff check/format、OpenAPI 导出、Web Prettier/typecheck、`git diff --check` 通过。Web build/E2E 未重跑（无 Web 运行代码变更）；根检查脚本因当前检出缺少 `scripts/check_foundation.py` 与 `scripts/check_source_review.py` 而未执行。详见 [P18 验收](research/P18-agent-eval-acceptance.md)。
 ## P01 已完成
 
 - 用户确认将项目方向改为论文检索与研究助理 Agent。

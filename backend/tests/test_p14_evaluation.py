@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from app.cli import evaluate_p14
+from app.config import Settings
 from app.evaluation.p14 import P14EvaluationError, run_p14_comparison
 from app.sources.openalex import OpenAlexMeta, OpenAlexPage, OpenAlexWork
 from app.storage.repository import PaperStore
@@ -118,3 +121,60 @@ def test_p14_rejects_snapshot_mismatch_before_provider_call(tmp_path: Path) -> N
     with pytest.raises(P14EvaluationError, match="snapshot ID"):
         run_p14_comparison(store, dataset, "hash", embedder, price_per_million_usd=None)
     assert embedder.batch_sizes == []
+
+
+def test_p14_cli_records_custom_output_path_and_exact_arguments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset_path = tmp_path / "dataset.json"
+    dataset_path.write_text("{}", encoding="utf-8")
+    output_path = tmp_path / "p17-large.json"
+    settings = Settings(
+        _env_file=None,
+        embedding_provider="openai",
+        embedding_api_key="test-key",
+        embedding_model="text-embedding-3-large",
+        embedding_dimensions=3_072,
+    )
+
+    class FakeClient:
+        model = "text-embedding-3-large"
+
+        def close(self) -> None:
+            pass
+
+    def fake_run(*args, **kwargs):
+        return {
+            "dataset": {"sha256": "dataset-hash", "quality_claim_allowed": False},
+            "corpus": {"snapshot_id": "snapshot", "document_count": 100, "query_count": 30},
+            "embedding": {
+                "model": "text-embedding-3-large",
+                "input_tokens": 12,
+                "estimated_cost_usd": 0.00000156,
+            },
+            "methods": {},
+        }
+
+    monkeypatch.setattr(evaluate_p14, "get_settings", lambda: settings)
+    monkeypatch.setattr(evaluate_p14, "OpenAIEmbeddingClient", lambda _: FakeClient())
+    monkeypatch.setattr(evaluate_p14, "PaperStore", lambda _: object())
+    monkeypatch.setattr(evaluate_p14, "run_p14_comparison", fake_run)
+
+    status = evaluate_p14.main(
+        [
+            "--dataset",
+            str(dataset_path),
+            "--output",
+            str(output_path),
+            "--allow-provider-call",
+        ]
+    )
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert status == 0
+    assert report["reproducibility"]["output_path"] == output_path.resolve().as_posix()
+    assert report["reproducibility"]["command_args"][-3:] == [
+        "--output",
+        str(output_path),
+        "--allow-provider-call",
+    ]

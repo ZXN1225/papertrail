@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.agent.contracts import AgentResponse
+from app.agent.contracts import AgentResponse, AgentSearchContext, AgentTurn
 from app.agent.harness import AgentHarness
 from app.agent.model import ModelClient, OpenAIResponsesClient
 from app.agent.tools import PaperToolRegistry
@@ -29,10 +29,16 @@ class AgentService:
         self.openalex = openalex
         self.arxiv = arxiv
 
-    def ask(self, question: str) -> AgentResponse:
+    def ask(
+        self,
+        question: str,
+        *,
+        history: list[AgentTurn] | None = None,
+        search_context: AgentSearchContext | None = None,
+    ) -> AgentResponse:
         if self.model is not None:
             harness = self._harness(self.model, self.openalex, self.arxiv)
-            return harness.run(question)
+            return harness.run(question, history=history, search_context=search_context)
         if self.settings.llm_provider == "disabled":
             return AgentResponse(
                 status="model_disabled",
@@ -55,7 +61,11 @@ class AgentService:
         )
         arxiv = self.arxiv or ArxivClient(timeout_seconds=4)
         try:
-            return self._harness(client, openalex, arxiv, embeddings).run(question)
+            return self._harness(client, openalex, arxiv, embeddings).run(
+                question,
+                history=history,
+                search_context=search_context,
+            )
         finally:
             client.close()
             if embeddings is not None:

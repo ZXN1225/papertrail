@@ -19,13 +19,14 @@ function apiBaseUrl(): string {
 export async function backendRequest(
   path: string,
   init?: RequestInit,
+  timeoutMs = 15_000,
 ): Promise<Response> {
   try {
     return await fetch(`${apiBaseUrl()}${path}`, {
       ...init,
       cache: "no-store",
       redirect: "error",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { Accept: "application/json", ...init?.headers },
     });
   } catch {

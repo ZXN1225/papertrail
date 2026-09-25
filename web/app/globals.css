@@ -506,6 +506,37 @@ textarea::placeholder {
   display: grid;
   gap: 12px;
 }
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 4px;
+}
+.load-more-button {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 1px solid #c9d8ce;
+  border-radius: 5px;
+  background: #fffefa;
+  color: var(--green);
+  font-size: 11px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.load-more-button:hover:not(:disabled) {
+  border-color: var(--green);
+  background: var(--green-pale);
+}
+.load-more-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.page-limit-note {
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
 .paper-card {
   padding: 20px 23px 16px;
   border: 1px solid var(--line);
@@ -738,6 +769,16 @@ textarea::placeholder {
   font-size: 11px;
   line-height: 1.8;
 }
+.agent-context-note {
+  margin: 10px 0 0;
+  padding: 8px 9px;
+  border-left: 2px solid #a8c6b1;
+  color: #6e7e73;
+  background: #f4f7f2;
+  font-size: 9px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
 .sample-prompts {
   margin-top: 17px;
   display: grid;
@@ -808,6 +849,15 @@ textarea::placeholder {
 .ask-button span {
   font-size: 14px;
 }
+.clear-agent-history {
+  border: 0;
+  padding: 5px 0;
+  color: #718078;
+  background: transparent;
+  font-size: 9px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .assistant-empty,
 .answer-state {
   margin-top: 17px;
@@ -877,12 +927,36 @@ textarea::placeholder {
 }
 .answer-text {
   margin: 12px 0;
-  white-space: pre-wrap;
   color: #354239;
   font:
     13px/1.85 Georgia,
     "Noto Serif SC",
     serif;
+}
+.answer-text p,
+.answer-text h4,
+.answer-text ul,
+.answer-text ol {
+  margin: 0 0 10px;
+}
+.answer-text h4 {
+  color: var(--ink);
+  font-size: 1em;
+}
+.answer-text ul,
+.answer-text ol {
+  padding-left: 22px;
+}
+.answer-text a {
+  color: var(--green-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.answer-text code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--green-pale);
+  font-size: 0.92em;
 }
 .answer-warning {
   margin: 8px 0;
@@ -935,6 +1009,31 @@ textarea::placeholder {
 .citation-card h4 a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.citation-relationships {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 5px 0;
+}
+.citation-relationships span {
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: #526d5b;
+  background: #edf3ed;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.citation-doi,
+.citation-alternate-sources {
+  margin: 4px 0;
+  color: #78847c;
+  font-size: 9px;
+  line-height: 1.6;
+}
+.citation-alternate-sources a {
+  margin-left: 5px;
+  color: #286b50;
 }
 .citation-license {
   margin: 5px 0;

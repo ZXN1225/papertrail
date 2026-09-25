@@ -18,8 +18,22 @@ def test_search_route_passes_key_only_to_server_client(monkeypatch) -> None:
         def __exit__(self, *_args: object) -> None:
             return None
 
-        def search_works(self, query: str, *, page: int, per_page: int) -> OpenAlexPage:
-            assert (query, page, per_page) == ("agent research", 1, 10)
+        def search_works(
+            self,
+            query: str,
+            *,
+            page: int,
+            per_page: int,
+            from_year: int | None,
+            to_year: int | None,
+        ) -> OpenAlexPage:
+            assert (query, page, per_page, from_year, to_year) == (
+                "agent research",
+                1,
+                10,
+                2022,
+                2024,
+            )
             return OpenAlexPage.model_validate(
                 {
                     "meta": {"count": 0, "page": page, "per_page": per_page},
@@ -31,7 +45,7 @@ def test_search_route_passes_key_only_to_server_client(monkeypatch) -> None:
     monkeypatch.setattr("app.main.OpenAlexClient", FakeOpenAlexClient)
     client = TestClient(create_app(Settings(_env_file=None, openalex_api_key="test-openalex-key")))
 
-    response = client.get("/api/v1/papers/search?q=agent%20research")
+    response = client.get("/api/v1/papers/search?q=agent%20research&from_year=2022&to_year=2024")
 
     assert response.status_code == 200
     assert response.json()["meta"]["count"] == 0

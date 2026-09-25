@@ -10,12 +10,14 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.agent.contracts import (
+    AgentSearchContext,
     AuthorWorksArgs,
     ComparePapersArgs,
     GetArxivArgs,
     GetAuthorArgs,
     GetPaperArgs,
     OpenAlexAuthorSearchArgs,
+    OpenAlexCitationArgs,
     OpenAlexSearchArgs,
     RelatedPapersArgs,
     RetrieveEvidenceArgs,
@@ -30,6 +32,7 @@ from app.storage.repository import PaperStore, StoreError
 
 MAX_CORPUS_SCAN = 50
 MAX_ABSTRACT_CHARS = 3_000
+MAX_SEARCH_CONTEXT_ITEMS = 30
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
@@ -40,8 +43,11 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "properties": {
                 "query": {"type": "string", "minLength": 1, "maxLength": 256},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                "from_year": {"type": ["integer", "null"], "minimum": 1400, "maximum": 2100},
+                "to_year": {"type": ["integer", "null"], "minimum": 1400, "maximum": 2100},
+                "open_access_only": {"type": ["boolean", "null"]},
             },
-            "required": ["query", "limit"],
+            "required": ["query", "limit", "from_year", "to_year", "open_access_only"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -69,6 +75,35 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "limit": {"type": "integer", "minimum": 1, "maximum": 10},
             },
             "required": ["openalex_id", "limit"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+    {
+        "type": "function",
+        "name": "expand_openalex_citations",
+        "description": (
+            "Discover a bounded citation neighborhood for one OpenAlex seed: its references, "
+            "works that cite it, or both. Citation edges show metadata links only, not agreement."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "openalex_id": {"type": "string", "pattern": "^W[0-9]+$"},
+                "direction": {"type": "string", "enum": ["references", "cited_by", "both"]},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                "from_year": {"type": ["integer", "null"], "minimum": 1400, "maximum": 2100},
+                "to_year": {"type": ["integer", "null"], "minimum": 1400, "maximum": 2100},
+                "open_access_only": {"type": ["boolean", "null"]},
+            },
+            "required": [
+                "openalex_id",
+                "direction",
+                "limit",
+                "from_year",
+                "to_year",
+                "open_access_only",
+            ],
             "additionalProperties": False,
         },
         "strict": True,
@@ -138,6 +173,10 @@ class PaperToolRegistry:
         if openalex is not None:
             self._handlers.update(
                 {
+                    "expand_openalex_citations": (
+                        OpenAlexCitationArgs,
+                        self._expand_openalex_citations,
+                    ),
                     "search_openalex_works": (OpenAlexSearchArgs, self._search_openalex_works),
                     "get_openalex_work": (GetPaperArgs, self._get_openalex_work),
                     "search_openalex_authors": (
@@ -186,6 +225,143 @@ class PaperToolRegistry:
             return {"status": "error", "code": error.code}
         except Exception:
             return {"status": "error", "code": "tool_failed"}
+
+    def load_search_context(self, context: AgentSearchContext) -> dict[str, Any]:
+        """Re-fetch the visible search scope from trusted sources for the Agent."""
+        try:
+            if context.source == "openalex":
+                if self.openalex is None:
+                    return {"status": "error", "code": "openalex_unavailable"}
+                items = []
+                total = 0
+                for page_number in range(1, context.pages + 1):
+                    page = self.openalex.search_works(
+                        context.query,
+                        page=page_number,
+                        per_page=10,
+                        from_year=context.from_year,
+                        to_year=context.to_year,
+                    )
+                    total = page.meta.count
+                    items.extend(_openalex_work_observation(work) for work in page.results)
+                    if not page.results:
+                        break
+                return {
+                    "status": "ok" if items else "no_results",
+                    "source": "openalex",
+                    "query": context.query,
+                    "from_year": context.from_year,
+                    "to_year": context.to_year,
+                    "visible_page_count": context.pages,
+                    "total_matching_count": total,
+                    "items": [self._compact_context_item(item) for item in items],
+                }
+            if context.source == "arxiv":
+                if self.arxiv is None:
+                    return {"status": "error", "code": "arxiv_unavailable"}
+                items = []
+                total = 0
+                for page_number in range(context.pages):
+                    page = self.arxiv.search(
+                        context.query,
+                        start=page_number * 10,
+                        max_results=10,
+                        from_year=context.from_year,
+                        to_year=context.to_year,
+                    )
+                    total = page.total_results
+                    items.extend(_arxiv_work_observation(work) for work in page.works)
+                    if not page.works:
+                        break
+                return {
+                    "status": "ok" if items else "no_results",
+                    "source": "arxiv",
+                    "query": context.query,
+                    "from_year": context.from_year,
+                    "to_year": context.to_year,
+                    "visible_page_count": context.pages,
+                    "total_matching_count": total,
+                    "items": [self._compact_context_item(item) for item in items],
+                }
+
+            openalex_result = self.store.list_papers(
+                query=context.query or None,
+                limit=context.pages * 10,
+                offset=0,
+            )
+            arxiv_result = self.store.list_arxiv_papers(
+                query=context.query or None,
+                limit=context.pages * 10,
+                offset=0,
+            )
+            items = []
+            for paper in openalex_result["items"]:
+                year = paper.get("publication_year")
+                if context.from_year is not None and (year is None or year < context.from_year):
+                    continue
+                if context.to_year is not None and (year is None or year > context.to_year):
+                    continue
+                items.append(self._compact_context_item(_paper_observation(paper)))
+            for paper in arxiv_result["items"]:
+                try:
+                    year = int(paper["published_at"][:4])
+                except (KeyError, TypeError, ValueError):
+                    year = None
+                if context.from_year is not None and (year is None or year < context.from_year):
+                    continue
+                if context.to_year is not None and (year is None or year > context.to_year):
+                    continue
+                items.append(
+                    self._compact_context_item(
+                        {
+                            "arxiv_id": paper["arxiv_id"],
+                            "title": paper["title"],
+                            "publication_year": year,
+                            "doi": paper.get("doi"),
+                            "source_url": paper["source_url"],
+                        }
+                    )
+                )
+            # The local UI pages each source independently, so three loaded
+            # pages can contain up to 60 rows. Keep the Agent context within
+            # the documented 30-item budget and mirror the UI's year-descending
+            # merged order (stable ties retain OpenAlex before arXiv).
+            items.sort(
+                key=lambda item: item.get("publication_year") or 0,
+                reverse=True,
+            )
+            return {
+                "status": "ok" if items else "no_results",
+                "source": "library",
+                "query": context.query,
+                "from_year": context.from_year,
+                "to_year": context.to_year,
+                "total_matching_count": openalex_result["total"] + arxiv_result["total"],
+                "items": items[: min(context.pages * 20, MAX_SEARCH_CONTEXT_ITEMS)],
+            }
+        except (sqlite3.Error, StoreError):
+            return {"status": "error", "code": "catalog_unavailable"}
+        except OpenAlexError as error:
+            return {"status": "error", "code": error.code}
+        except ArxivError as error:
+            return {"status": "error", "code": error.code}
+        except Exception:
+            return {"status": "error", "code": "tool_failed"}
+
+    @staticmethod
+    def _compact_context_item(item: dict[str, Any]) -> dict[str, Any]:
+        """Keep only bibliography fields needed for answer grounding and citations."""
+        keys = {
+            "openalex_id",
+            "arxiv_id",
+            "title",
+            "publication_year",
+            "published_at",
+            "doi",
+            "source_url",
+            "cited_by_count",
+        }
+        return {key: value for key, value in item.items() if key in keys}
 
     def _list_catalog(self) -> tuple[list[dict[str, Any]], int]:
         catalog = self.store.list_papers(query=None, limit=MAX_CORPUS_SCAN, offset=0)
@@ -289,7 +465,13 @@ class PaperToolRegistry:
 
     def _search_openalex_works(self, args: OpenAlexSearchArgs) -> dict[str, Any]:
         assert self.openalex is not None
-        page = self.openalex.search_works(args.query, per_page=args.limit)
+        page = self.openalex.search_works(
+            args.query,
+            per_page=args.limit,
+            from_year=args.from_year,
+            to_year=args.to_year,
+            open_access_only=args.open_access_only is True,
+        )
         items = [_openalex_work_observation(work) for work in page.results]
         return {
             "status": "ok" if items else "no_results",
@@ -302,6 +484,57 @@ class PaperToolRegistry:
         assert self.openalex is not None
         work = self.openalex.get_work(args.openalex_id)
         return {"status": "ok", "paper": _openalex_work_observation(work)}
+
+    def _expand_openalex_citations(self, args: OpenAlexCitationArgs) -> dict[str, Any]:
+        assert self.openalex is not None
+        seed = self.openalex.get_work(args.openalex_id)
+        candidates: dict[str, dict[str, Any]] = {}
+
+        if args.direction in {"references", "both"}:
+            reference_ids = [
+                value.rsplit("/", maxsplit=1)[-1] for value in seed.referenced_works[: args.limit]
+            ]
+            if reference_ids:
+                page = self.openalex.get_referenced_works(
+                    reference_ids,
+                    per_page=args.limit,
+                    from_year=args.from_year,
+                    to_year=args.to_year,
+                    open_access_only=args.open_access_only is True,
+                )
+                for work in page.results:
+                    item = _citation_candidate_observation(work)
+                    candidates[item["openalex_id"]] = {
+                        **item,
+                        "citation_relationships": [
+                            {"direction": "references", "seed_openalex_id": args.openalex_id}
+                        ],
+                    }
+
+        if args.direction in {"cited_by", "both"}:
+            page = self.openalex.get_citing_works(
+                args.openalex_id,
+                per_page=args.limit,
+                from_year=args.from_year,
+                to_year=args.to_year,
+                open_access_only=args.open_access_only is True,
+            )
+            for work in page.results:
+                work_id = work.id.rsplit("/", maxsplit=1)[-1]
+                item = candidates.get(work_id) or _citation_candidate_observation(work)
+                relations = list(item.get("citation_relationships", []))
+                relations.append({"direction": "cited_by", "seed_openalex_id": args.openalex_id})
+                candidates[work_id] = {**item, "citation_relationships": relations}
+
+        items = list(candidates.values())[: args.limit * (2 if args.direction == "both" else 1)]
+        return {
+            "status": "ok" if items else "no_results",
+            "source": "openalex",
+            "seed_openalex_id": args.openalex_id,
+            "direction": args.direction,
+            "items": items,
+            "metadata_only_relationships": True,
+        }
 
     def _search_openalex_authors(self, args: OpenAlexAuthorSearchArgs) -> dict[str, Any]:
         assert self.openalex is not None
@@ -329,12 +562,22 @@ class PaperToolRegistry:
 
     def _search_arxiv(self, args: SearchArxivArgs) -> dict[str, Any]:
         assert self.arxiv is not None
-        page = self.arxiv.search(args.query, max_results=args.limit)
+        page = self.arxiv.search(
+            args.query,
+            max_results=args.limit,
+            from_year=args.from_year,
+            to_year=args.to_year,
+        )
         return {
             "status": "ok" if page.works else "no_results",
             "items": [_arxiv_work_observation(work) for work in page.works],
             "total_matching_count": page.total_results,
             "source": "arxiv",
+            "submitted_date_filter": {
+                "from_year": args.from_year,
+                "to_year": args.to_year,
+                "semantics": "arXiv submission date; not a journal publication year or license",
+            },
         }
 
     def _get_arxiv(self, args: GetArxivArgs) -> dict[str, Any]:
@@ -372,10 +615,24 @@ def _openalex_work_observation(work: Any) -> dict[str, Any]:
         "abstract_truncated": bool(abstract and len(abstract) > MAX_ABSTRACT_CHARS),
         "abstract_status": abstract_status,
         "source_url": work.id,
+        "doi": work.doi,
         "metadata_license": "CC0-1.0",
         "cited_by_count": work.cited_by_count,
+        "is_open_access": (
+            work.open_access.get("is_oa") if isinstance(work.open_access, dict) else None
+        ),
         "referenced_works": work.referenced_works[:50],
     }
+
+
+def _citation_candidate_observation(work: Any) -> dict[str, Any]:
+    item = _openalex_work_observation(work)
+    abstract = item.get("abstract")
+    if isinstance(abstract, str) and len(abstract) > 1_000:
+        item["abstract"] = abstract[:1_000]
+        item["abstract_truncated"] = True
+    item.pop("referenced_works", None)
+    return item
 
 
 def _arxiv_work_observation(work: Any) -> dict[str, Any]:
@@ -407,6 +664,50 @@ def _search_tool(name: str, description: str) -> dict[str, Any]:
                 "limit": {"type": "integer", "minimum": 1, "maximum": 10},
             },
             "required": ["query", "limit"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    }
+
+
+def _openalex_search_tool() -> dict[str, Any]:
+    return {
+        "type": "function",
+        "name": "search_openalex_works",
+        "description": "Search OpenAlex Works metadata with optional year and open-access filters.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "minLength": 1, "maxLength": 256},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                "from_year": {"type": ["integer", "null"], "minimum": 1400, "maximum": 2100},
+                "to_year": {"type": ["integer", "null"], "minimum": 1400, "maximum": 2100},
+                "open_access_only": {"type": ["boolean", "null"]},
+            },
+            "required": ["query", "limit", "from_year", "to_year", "open_access_only"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    }
+
+
+def _arxiv_search_tool() -> dict[str, Any]:
+    return {
+        "type": "function",
+        "name": "search_arxiv_metadata",
+        "description": (
+            "Search arXiv metadata only. Optional year filters apply to arXiv submission date; "
+            "arXiv search does not certify OpenAlex OA status or reuse license."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "minLength": 1, "maxLength": 256},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                "from_year": {"type": ["integer", "null"], "minimum": 1991, "maximum": 2100},
+                "to_year": {"type": ["integer", "null"], "minimum": 1991, "maximum": 2100},
+            },
+            "required": ["query", "limit", "from_year", "to_year"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -463,7 +764,7 @@ def _author_works_tool() -> dict[str, Any]:
 
 TOOL_DEFINITIONS.extend(
     [
-        _search_tool("search_openalex_works", "Search live OpenAlex Works metadata; no full text."),
+        _openalex_search_tool(),
         _get_tool("get_openalex_work", "Read one live OpenAlex Work by ID."),
         _search_tool("search_openalex_authors", "Search live OpenAlex author metadata."),
         _get_author_tool(),
@@ -473,9 +774,7 @@ TOOL_DEFINITIONS.extend(
 
 TOOL_DEFINITIONS.extend(
     [
-        _search_tool(
-            "search_arxiv_metadata", "Search arXiv metadata only; never fetch paper files."
-        ),
+        _arxiv_search_tool(),
         {
             "type": "function",
             "name": "get_arxiv_metadata",

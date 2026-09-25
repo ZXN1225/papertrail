@@ -119,9 +119,11 @@ class ArxivClient:
             follow_redirects=False,
             limits=httpx.Limits(max_connections=1, max_keepalive_connections=1),
             # arXiv's API gateway returns HTTP 406 for the generic project UA.
-            # Keep the XML preference and let httpx send its standard UA.
+            # Keep request negotiation conservative: urllib (which succeeds
+            # against this gateway) advertises identity encoding by default.
             headers={
                 "Accept": "application/atom+xml",
+                "Accept-Encoding": "identity",
                 # arXiv's gateway rejects httpx's default `python-httpx/...` UA
                 # with HTTP 406 for normal result pages. Identify the actual
                 # runtime truthfully; don't impersonate a browser or urllib.
@@ -138,18 +140,40 @@ class ArxivClient:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def search(self, query: str, *, start: int = 0, max_results: int = 10) -> ArxivPage:
+    def search(
+        self,
+        query: str,
+        *,
+        start: int = 0,
+        max_results: int = 10,
+        from_year: int | None = None,
+        to_year: int | None = None,
+    ) -> ArxivPage:
         normalized = " ".join(query.split()) if isinstance(query, str) else ""
         if not normalized or len(normalized) > 256:
             raise ValueError("query must contain 1 to 256 non-whitespace characters")
-        if start < 0 or start > 9_975 or not 1 <= max_results <= 25:
+        if (
+            (from_year is not None and not 1991 <= from_year <= 2100)
+            or (to_year is not None and not 1991 <= to_year <= 2100)
+            or (from_year is not None and to_year is not None and from_year > to_year)
+        ):
+            raise ValueError("arXiv year range must be within 1991-2100 and ordered")
+        if start < 0 or start + max_results > 10_000 or not 1 <= max_results <= 25:
             raise ValueError("arXiv page must be within the bounded 10,000 result range")
+        search_query = f'all:"{_escape_query(normalized)}"'
+        if from_year is not None or to_year is not None:
+            start_year = from_year or 1991
+            end_year = to_year or datetime.now(UTC).year
+            date_filter = f"submittedDate:[{start_year}01010000 TO {end_year}12312359]"
+            search_query += f" AND {date_filter}"
         id_match = re.fullmatch(r"id:\s*(\S+)", normalized, flags=re.IGNORECASE)
-        if id_match:
+        if id_match and from_year is None and to_year is None:
             arxiv_id = normalize_arxiv_id(id_match.group(1))
             return self._query(search_query=f"id:{arxiv_id}", start=0, max_results=1)
         return self._query(
-            search_query=f'all:"{_escape_query(normalized)}"', start=start, max_results=max_results
+            search_query=search_query,
+            start=start,
+            max_results=max_results,
         )
 
     def get_work(self, arxiv_id: str) -> ArxivWork | None:

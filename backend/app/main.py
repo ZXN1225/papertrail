@@ -35,7 +35,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         result = AgentService(
             app_settings,
             PaperStore(app_settings.resolved_data_storage_path),
-        ).ask(body.question)
+        ).ask(
+            body.question,
+            history=body.history,
+            search_context=body.search_context,
+        )
         if result.status in {"model_disabled", "model_unavailable"}:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return result
@@ -78,6 +82,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         q: str = Query(min_length=1, max_length=256),
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=10, ge=1, le=100),
+        from_year: int | None = Query(default=None, ge=1400, le=2100),
+        to_year: int | None = Query(default=None, ge=1400, le=2100),
     ) -> dict[str, object]:
         if not q.strip():
             raise HTTPException(status_code=422, detail="q must contain non-whitespace characters")
@@ -85,7 +91,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         secret = api_key.get_secret_value() if api_key else None
         try:
             with OpenAlexClient(api_key=secret) as client:
-                result = client.search_works(q, page=page, per_page=per_page)
+                result = client.search_works(
+                    q,
+                    page=page,
+                    per_page=per_page,
+                    from_year=from_year,
+                    to_year=to_year,
+                )
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from None
         except OpenAlexError as error:
@@ -161,12 +173,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/api/v1/arxiv/search", tags=["arxiv"])
     def search_arxiv(
         q: str = Query(min_length=1, max_length=256),
-        start: int = Query(default=0, ge=0, le=9_975),
+        start: int = Query(default=0, ge=0, le=9_999),
         max_results: int = Query(default=10, ge=1, le=25),
+        from_year: int | None = Query(default=None, ge=1991, le=2100),
+        to_year: int | None = Query(default=None, ge=1991, le=2100),
     ) -> dict[str, object]:
         try:
             with ArxivClient(timeout_seconds=15) as client:
-                result = client.search(q, start=start, max_results=max_results)
+                result = client.search(
+                    q,
+                    start=start,
+                    max_results=max_results,
+                    from_year=from_year,
+                    to_year=to_year,
+                )
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from None
         except ArxivError as error:

@@ -15,14 +15,14 @@
 
 ## 评测范围声明
 
-P05 最初建立 benchmark 草案和可复现 BM25 baseline，使用 8 个 query / 10 篇文献。候选 qrels 后续由用户逐项复核，形成 `p05_human_reviewed_v2.json`，因此本项目有一份小规模 human-reviewed 评测集。由于规模仍只有 8 queries / 10 papers，报告保持 `exploratory_only=true`，不支持统计泛化或对外检索质量承诺。P13/P14 的 3,000 对则仍是助手候选分数，未人工核验，与 P05 v2 明确分开。
+P05 最初建立 benchmark 草案和可复现 BM25 baseline，使用 8 个 query / 10 篇文献。候选 qrels 后续由用户逐项复核，形成 `p05_human_reviewed_v2.json`，因此本项目有一份小规模 human-reviewed 评测集。由于规模仍只有 8 queries / 10 papers，报告保持 `exploratory_only=true`，不支持统计泛化或对外检索质量承诺。P13/P14 的 3,000 对仍是助手候选分数，未人工核验，与 P05 v2 明确分开。
 
 ## 当前实现验收结果
 
 - [x] 确定性 Okapi BM25 和版本化英语/CJK tokenizer 已实现，无新增运行时依赖。
 - [x] 报告绑定完整 OpenAlex work ID、冻结快照与每篇 metadata hash；数据变化或缺快照时拒绝评测。
 - [x] Hit@k、MRR@10、NDCG@k、分桶宏平均、平均/P95 延迟与空结果率均已实现。
-- [x] 本机 CLI 已运行：10 篇、8 个查询；每项实验 `exploratory_only=true`，qrels 待人工复核。
+- [x] 本机 CLI 已运行：10 篇、8 个查询；每项实验 `exploratory_only=true`；候选版和人审 v2 均有独立报告。
 - [x] 测试覆盖分词、并列排序、分级指标、空排名、语料哈希漂移；后端 `36 passed`，ruff 通过。
 - [x] 用户导入 80 项人审 qrels，生成 v2 数据集；复核清单见 [P05 qrels 复核](P05-qrels-review.md)。
 - [x] OpenAI、embedding 与全文下载均未调用；报告保存在本地忽略目录。

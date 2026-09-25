@@ -12,8 +12,39 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class AgentTurn(StrictModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4_000)
+
+
+class AgentSearchContext(StrictModel):
+    source: Literal["openalex", "arxiv", "library"]
+    query: str = Field(max_length=256)
+    from_year: int | None = Field(default=None, ge=1400, le=2100)
+    to_year: int | None = Field(default=None, ge=1400, le=2100)
+    pages: int = Field(default=1, ge=1, le=3)
+
+    @model_validator(mode="after")
+    def validate_search_context(self) -> AgentSearchContext:
+        if self.source != "library" and not self.query.strip():
+            raise ValueError("remote search context requires a query")
+        if self.source == "arxiv" and any(
+            year is not None and year < 1991 for year in (self.from_year, self.to_year)
+        ):
+            raise ValueError("arXiv search years must be 1991 or later")
+        if (
+            self.from_year is not None
+            and self.to_year is not None
+            and self.from_year > self.to_year
+        ):
+            raise ValueError("from_year must not be greater than to_year")
+        return self
+
+
 class AgentQuestion(StrictModel):
     question: str = Field(min_length=3, max_length=1_000)
+    history: list[AgentTurn] = Field(default_factory=list, max_length=8)
+    search_context: AgentSearchContext | None = None
 
 
 class SearchPapersArgs(StrictModel):
@@ -33,6 +64,30 @@ class RelatedPapersArgs(StrictModel):
 class OpenAlexSearchArgs(StrictModel):
     query: str = Field(min_length=1, max_length=256)
     limit: int = Field(ge=1, le=10)
+    from_year: int | None = Field(default=None, ge=1400, le=2100)
+    to_year: int | None = Field(default=None, ge=1400, le=2100)
+    open_access_only: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_year_range(self) -> OpenAlexSearchArgs:
+        if self.from_year and self.to_year and self.from_year > self.to_year:
+            raise ValueError("from_year must not be greater than to_year")
+        return self
+
+
+class OpenAlexCitationArgs(StrictModel):
+    openalex_id: str = Field(pattern=r"^W\d+$")
+    direction: Literal["references", "cited_by", "both"]
+    limit: int = Field(ge=1, le=10)
+    from_year: int | None = Field(default=None, ge=1400, le=2100)
+    to_year: int | None = Field(default=None, ge=1400, le=2100)
+    open_access_only: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_year_range(self) -> OpenAlexCitationArgs:
+        if self.from_year and self.to_year and self.from_year > self.to_year:
+            raise ValueError("from_year must not be greater than to_year")
+        return self
 
 
 class OpenAlexAuthorSearchArgs(StrictModel):
@@ -51,6 +106,14 @@ class AuthorWorksArgs(GetAuthorArgs):
 class SearchArxivArgs(StrictModel):
     query: str = Field(min_length=1, max_length=256)
     limit: int = Field(ge=1, le=10)
+    from_year: int | None = Field(default=None, ge=1991, le=2100)
+    to_year: int | None = Field(default=None, ge=1991, le=2100)
+
+    @model_validator(mode="after")
+    def validate_year_range(self) -> SearchArxivArgs:
+        if self.from_year and self.to_year and self.from_year > self.to_year:
+            raise ValueError("from_year must not be greater than to_year")
+        return self
 
 
 class GetArxivArgs(StrictModel):
@@ -122,12 +185,27 @@ class EvidenceSpan(StrictModel):
     excerpt: str = Field(max_length=1_800)
 
 
+class CitationSourceLink(StrictModel):
+    source: Literal["openalex", "arxiv"]
+    identifier: str = Field(min_length=4, max_length=120)
+    source_url: str = Field(max_length=500)
+
+
+class CitationRelationship(StrictModel):
+    direction: Literal["references", "cited_by"]
+    seed_openalex_id: str = Field(pattern=r"^W\d+$")
+
+
 class Citation(StrictModel):
     source: Literal["openalex", "arxiv"] = "openalex"
     openalex_id: str | None = None
     arxiv_id: str | None = None
     title: str
     source_url: str
+    doi: str | None = Field(default=None, max_length=500)
+    publication_year: int | None = None
+    citation_relationships: list[CitationRelationship] = Field(default_factory=list, max_length=8)
+    alternate_sources: list[CitationSourceLink] = Field(default_factory=list, max_length=4)
     license_id: str | None = None
     license_url: str | None = None
     attribution: str | None = None
@@ -150,6 +228,7 @@ class AgentTraceEvent(StrictModel):
     name: str = Field(max_length=80)
     status: Literal["ok", "error", "refusal"]
     duration_ms: int = Field(ge=0)
+    error_code: str | None = Field(default=None, max_length=64)
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
 

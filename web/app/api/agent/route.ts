@@ -7,7 +7,9 @@ import {
   unavailableResponse,
 } from "@/lib/api/backend";
 
-const MAX_REQUEST_BYTES = 16_384;
+const MAX_REQUEST_BYTES = 65_536;
+// The backend Agent deadline can be configured up to 120 seconds.
+const AGENT_REQUEST_TIMEOUT_MS = 125_000;
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -42,19 +44,30 @@ export async function POST(request: NextRequest) {
     typeof (body as { question?: unknown }).question !== "string" ||
     !(body as { question: string }).question.trim() ||
     (body as { question: string }).question.length > 1_000 ||
-    Object.keys(body).some((key) => key !== "question")
+    Object.keys(body).some(
+      (key) => !["question", "history", "search_context"].includes(key),
+    )
   ) {
     return invalidResponse("问题需为 1–1000 个字符。");
   }
   try {
     return await jsonResponse(
-      await backendRequest("/api/v1/agent/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          question: (body as { question: string }).question.trim(),
-        }),
-      }),
+      await backendRequest(
+        "/api/v1/agent/ask",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({
+            question: (body as { question: string }).question.trim(),
+            history: Array.isArray((body as { history?: unknown }).history)
+              ? (body as { history: unknown[] }).history
+              : [],
+            search_context:
+              (body as { search_context?: unknown }).search_context ?? null,
+          }),
+        },
+        AGENT_REQUEST_TIMEOUT_MS,
+      ),
     );
   } catch {
     return unavailableResponse();
