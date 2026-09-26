@@ -164,6 +164,8 @@ class AgentHarness:
         skill_registry = RuntimeSkillRegistry()
         active_skill: str | None = None
         active_tool_names: set[str] | None = None
+        active_skill_tool_budget: int | None = None
+        active_skill_tool_calls = 0
         tool_calls = 0
         input_tokens = 0
         output_tokens = 0
@@ -318,6 +320,14 @@ class AgentHarness:
 
             input_items.extend(turn.continuation_items)
             for call in turn.tool_calls:
+                if (
+                    active_skill is not None
+                    and active_skill_tool_budget is not None
+                    and active_skill_tool_calls >= active_skill_tool_budget
+                ):
+                    return _failure(
+                        "tool_budget_exceeded", tool_calls, steps, input_tokens, output_tokens
+                    )
                 call_ids.add(call.call_id)
                 tool_calls += 1
                 tool_started = self.clock()
@@ -332,6 +342,7 @@ class AgentHarness:
                         if observation.get("status") == "ok":
                             active_skill = observation["skill"]
                             active_tool_names = set(observation["available_tool_names"])
+                            active_skill_tool_budget = observation["max_tool_calls"]
                             available_tools = [
                                 paper_tools_by_name[name]
                                 for name in active_tool_names
@@ -350,6 +361,8 @@ class AgentHarness:
                     observation = {"status": "error", "code": "source_unavailable_after_failure"}
                 else:
                     observation = self.tools.execute(call.name, call.arguments)
+                    if active_skill is not None:
+                        active_skill_tool_calls += 1
                     if observation.get("status") == "error" and observation.get("code") not in {
                         "invalid_arguments",
                         "tool_not_allowed",
@@ -378,6 +391,20 @@ class AgentHarness:
                     observation = {"status": "error", "code": "observation_too_large"}
                 _collect_citations(observation, citations_seen)
                 input_items.append(encode_tool_result(call.call_id, observation))
+                if (
+                    active_skill is not None
+                    and active_skill_tool_budget is not None
+                    and active_skill_tool_calls >= active_skill_tool_budget
+                ):
+                    available_tools = []
+                    input_items.append(
+                        {
+                            "role": "user",
+                            "content": "This skill's read-only tool-call budget is exhausted. "
+                            "Answer from the observations already collected and state any gaps; "
+                            "do not request more tools.",
+                        }
+                    )
                 if self.clock() - started >= self.deadline_seconds:
                     return _failure(
                         "deadline_exceeded", tool_calls, steps, input_tokens, output_tokens

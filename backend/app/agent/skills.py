@@ -23,6 +23,7 @@ class RuntimeSkill(BaseModel):
     description: str = Field(min_length=1, max_length=240)
     instructions: str = Field(min_length=1, max_length=_MAX_SKILL_CHARS)
     allowed_tools: tuple[str, ...] = Field(min_length=1, max_length=16)
+    max_tool_calls: int = Field(ge=1, le=8)
 
 
 class RuntimeSkillRegistry:
@@ -86,4 +87,5 @@ class RuntimeSkillRegistry:
             "skill": skill.name,
             "instructions": skill.instructions,
             "available_tool_names": permitted,
+            "max_tool_calls": skill.max_tool_calls,
         }

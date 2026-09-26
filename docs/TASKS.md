@@ -54,8 +54,9 @@
 | P48 | 实现受控运行时 Agent Skills 注册、调用与安全验收         | P47                     | done   |
 | P49 | 汇总可公开评测材料、README 与 GitHub 最终交付             | P46–P48                 | done   |
 | P50 | 明确 README 中 P14 Small 与 P17 Large 的历史结果关系     | P14、P17                | done   |
+| P51 | 扩展三个运行时 Skill 现场验收并限制重复检索预算           | P48                     | done   |
 
-六阶段路线状态：①能力与证据边界已说明；②10 篇许可全文、8 问题、127 个候选评分和 2 个不可回答判断已完成；③BM25/Dense/Hybrid top-5/10 真实全文基线已完成，仅属单评审探索结果；④P47 已完成一项冻结基线反事实重排试验，但未观察到目标质量改善，默认检索不变；⑤P48 已完成 Skill 目录、激活和工具范围约束的离线实现，并通过一次真实模型现场验收；⑥README 已更新基线表格、完成最终变更审查并推送到 GitHub。Web 单 worker E2E（21/21）及 Web/后端依赖审计均已完成；细节见进度记录。不得把 P44 的 UI/Agent 修复或 P01–P44 历史任务表视为六阶段路线结束。
+六阶段路线状态：①能力与证据边界已说明；②10 篇许可全文、8 问题、127 个候选评分和 2 个不可回答判断已完成；③BM25/Dense/Hybrid top-5/10 真实全文基线已完成，仅属单评审探索结果；④P47 已完成一项冻结基线反事实重排试验，但未观察到目标质量改善，默认检索不变；⑤P48/P51 已实现 Skill 目录、激活、工具范围和每 Skill 调用预算约束，`evidence_synthesis` 与 `citation_analysis` 现场样例通过，`literature_discovery` 一次探索失败后新增硬预算回归；⑥README 已更新基线表格、完成最终变更审查并推送到 GitHub。Web 单 worker E2E（21/21）及 Web/后端依赖审计均已完成；细节见进度记录。不得把 P44 的 UI/Agent 修复或 P01–P44 历史任务表视为六阶段路线结束。
 
 P40 当前第 `10` 篇已替换为 arXiv `2310.11511v1`（Self-RAG），对应 TXT 和 manifest 已重建；用户已验收 P42 修复，02 与 10 元数据均解析成功。用户确认完成 02–10 许可复核和全文导入；本机数据库核验 10/10 文档 approved、共 417 个片段且向量全部覆盖。用户完成 40 条盲审评分与 2 条不可回答性判断；P41 的 BM25/Dense/Hybrid 探索性基线已生成。P43 的工具/引用契约测试及用户 live 双论文验收均已完成：两个来源各有成功的全文检索和对应证据摘录，单篇缺证据场景仅有 mock 覆盖。P44 已完成功能实现和用户 live 浏览器验收：表格行列、横向滚动及来源显示正常；输出预算设为 4096，显式 arXiv ID 内容请求直接查许可全文。后端测试 141 项与静态检查通过；Playwright E2E 受隔离副本 pnpm 符号链接解析问题阻塞，未执行。扩展候选池和新增人工判断须先得到用户明确同意。
 
@@ -64,6 +65,8 @@ P46 已按用户授权扩至 129 项人工判断：127 个候选评分 + 2 个�
 P47 已完成一项针对多论文问题的受控反事实检查：来源轮转重排未改善 Q05/Q06 Hybrid top-2 的 grade≥2 来源覆盖（重排前后为 0/2、1/2），top-5 均为 2/2；六题总体指标基本不变。因此不改生产排序，也不声称质量改善。基线评测细节见 [`research/P39-rag-evaluation-protocol.md`](research/P39-rag-evaluation-protocol.md)。
 
 P48 第一版运行时 Skills 已实现并完成现场验收：`backend/app/agent/skills.json` 定义三个提示词工作流和固定工具子集；Harness 以 `activate_skill` 载入目录，激活后只向模型展示已启用且被该 Skill 允许的工具，每次运行最多一个 Skill。目录拒绝未知工具；没有脚本执行、任意 URL、文件、SQL 或写库权限。根 `skills/` 开发工作流与运行时目录明确分离。三项定向安全回归及后端全量 144 项测试通过；Ruff check/format 通过。用户提供的真实模型 trace 显示 `evidence_synthesis` 成功激活并按两个来源 ID 分别检索证据，工具均返回 `ok`，回答附带两条来源证据卡片。结论仅限于此现场样例，不代表普遍模型遵从率。详见 [`research/P48-agent-runtime-skills.md`](research/P48-agent-runtime-skills.md)。
+
+P51 扩展 P48 的真实模型验收：`citation_analysis` 对 W7118085507 执行一次 references 一跳扩展，工具 trace 三次均 `ok`，返回 3 篇参考文献并正确说明引用关系边界；`literature_discovery` 一次探索样例在 8 次工具调用/模型轮次上限失败，trace 出现重复主题搜索和一次参数错误，消耗 135,992 tokens。没有重跑。为避免再现长循环，三个 Skill 增加 3/4/3 次数据工具预算；预算用尽后模型不再获得工具定义，只能总结已收集结果，Harness 仍强制拦截越界调用。新增自动回归覆盖该路径。真实样例不代表一般模型行为；详见 P48 阶段报告。
 
 P05 的 80 项 qrels 已由用户导入为 human-reviewed v2，且 BM25 候选/人审对照已完成；小样本报告仍为 exploratory-only。细节见 [`research/P05-acceptance.md`](research/P05-acceptance.md) 与 [`research/P05-qrels-review.md`](research/P05-qrels-review.md)。P09 本机验收记录见 [`research/P09-acceptance.md`](research/P09-acceptance.md)。P10 实现、自动测试和用户本机 live smoke 均已完成。已增加本地 qrels 复核包工具，详见 [`research/P05-review-workflow-acceptance.md`](research/P05-review-workflow-acceptance.md) 与 [`research/P10-acceptance.md`](research/P10-acceptance.md)。P12 离线 benchmark、mock Agent 安全评测和作品集文档已完成，结果及 E2E 清理限制见 [`research/P12-acceptance.md`](research/P12-acceptance.md)。
 

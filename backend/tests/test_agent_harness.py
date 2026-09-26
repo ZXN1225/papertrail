@@ -179,6 +179,7 @@ def test_runtime_skill_activation_limits_available_tools() -> None:
         assert [tool["name"] for tool in model.tool_sets[1]] == ["retrieve_paper_evidence"]
         assert "Active runtime skill: evidence_synthesis" in model.instructions[1]
         assert any(event.name == "activate_skill" for event in response.trace)
+        assert RuntimeSkillRegistry().skills[1].max_tool_calls == 4
     finally:
         temporary.cleanup()
 
@@ -212,6 +213,93 @@ def test_runtime_skill_blocks_tool_outside_its_allowlist() -> None:
         blocked = next(event for event in response.trace if event.name == "search_papers")
         assert blocked.error_code == "tool_not_allowed"
         assert "search_papers" not in [tool["name"] for tool in model.tool_sets[1]]
+    finally:
+        temporary.cleanup()
+
+
+def test_runtime_skill_tool_budget_stops_repeated_searches() -> None:
+    temporary, store = _store_in_tempdir()
+    try:
+        model = FakeModel(
+            [
+                _call_turn(
+                    ModelToolCall(
+                        call_id="skill-1",
+                        name="activate_skill",
+                        arguments='{"name":"literature_discovery"}',
+                    )
+                ),
+                _call_turn(
+                    ModelToolCall(
+                        call_id="search-1",
+                        name="search_papers",
+                        arguments='{"query":"retrieval","limit":5}',
+                    )
+                ),
+                _call_turn(
+                    ModelToolCall(
+                        call_id="search-2",
+                        name="search_papers",
+                        arguments='{"query":"retrieval assistant","limit":5}',
+                    )
+                ),
+                _call_turn(
+                    ModelToolCall(
+                        call_id="search-3",
+                        name="search_papers",
+                        arguments='{"query":"research assistant","limit":5}',
+                    )
+                ),
+                _final_turn("Found metadata.", ["W100"]),
+            ]
+        )
+        response = AgentHarness(model, PaperToolRegistry(store), max_steps=6).run(
+            "Find literature about research assistants"
+        )
+
+        assert response.status == "completed"
+        assert response.tool_calls == 4  # includes activation; only three data tools ran
+        assert {tool["name"] for tool in model.tool_sets[3]} == {
+            "search_papers",
+            "find_related_papers",
+            "get_paper_details",
+        }
+        assert model.tool_sets[4] == []
+        assert "budget is exhausted" in model.inputs[4][-1]["content"]
+
+        over_budget_model = FakeModel(
+            [
+                _call_turn(
+                    ModelToolCall(
+                        call_id="skill-1",
+                        name="activate_skill",
+                        arguments='{"name":"literature_discovery"}',
+                    )
+                ),
+                *[
+                    _call_turn(
+                        ModelToolCall(
+                            call_id=f"search-{index}",
+                            name="search_papers",
+                            arguments='{"query":"retrieval","limit":5}',
+                        )
+                    )
+                    for index in range(1, 4)
+                ],
+                _call_turn(
+                    ModelToolCall(
+                        call_id="search-over-budget",
+                        name="search_papers",
+                        arguments='{"query":"retrieval agents","limit":5}',
+                    )
+                ),
+            ]
+        )
+        rejected = AgentHarness(over_budget_model, PaperToolRegistry(store), max_steps=6).run(
+            "Find literature about research assistants"
+        )
+        assert rejected.status == "tool_budget_exceeded"
+        assert rejected.tool_calls == 4  # activation plus three executed data tools
     finally:
         temporary.cleanup()
 

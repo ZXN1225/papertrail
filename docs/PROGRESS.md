@@ -10,7 +10,7 @@
 2. **可复现全文评测集：已完成本轮标注。** 本地有 10 篇获准全文、8 个问题、127 条人工相关性判断及 2 条不可回答判断；原始全文与逐条标签不进 Git。
 3. **BM25/Dense/Hybrid 真实全文基线：已完成探索性 top-5/10 对照。** 结果已按总体和问题桶列入 README；只有 6 个可回答问题和单评审，不能外推为总体质量提升。延迟只作本机运行记录，不作生产基准。
 4. **基于错误分析的受控 RAG 改进：已完成一项试验。** 冻结 Hybrid top-10 的来源轮转重排没有改善 Q05/Q06 的相关来源覆盖；不调用外部服务，不改生产策略。结论是该尝试无质量收益，不声称检索质量提升。
-5. **运行时 Agent Skills：第一版已通过现场验收。** 三个受控 Skill 已注册并可被激活；用户现场 trace 确认 `evidence_synthesis` 被真实模型选中，随后两次按来源 ID 的授权全文检索均成功，答案展示了对应来源证据。此单次样例不代表模型普遍遵从率。
+5. **运行时 Agent Skills：已实现独立调用预算并完成样例验收。** 三个受控 Skill 已注册；`evidence_synthesis` 与 `citation_analysis` 的真实模型样例成功。`literature_discovery` 的一次探索运行重复搜索至预算耗尽，不能算通过；据此加入每 Skill 数据工具调用上限及预算耗尽后的无工具终答，自动回归验证硬限制。单次样例不代表模型普遍遵从率。
 6. **可信 GitHub 交付：已完成。** README 已列试点结果与限制，代码、测试和阶段文档已推送到当前 GitHub 工作分支；静态检查、构建、E2E 与依赖审计均已完成。
 
 P44 仅代表最近的回答渲染/Agent 工作流任务完成，不代表上述路线整体完成。用户已授权适当增加人工预算，P46 按完整 top-10 候选并集生成新增盲审表；原 40 条评分和 2 条不可回答判断保留不变。
@@ -24,6 +24,8 @@ P48 第一版运行时 Skills 已实现并通过现场验收：`backend/app/agen
 P49 最终审查与交付完成：README 中保留 BM25/Dense/Hybrid 总体及分桶对照表、指标定义和小样本限制；P39/P47/P48 阶段记录与源代码、测试一并推送到当前 GitHub 工作分支。验证结果：后端 Ruff、格式检查、144 项 pytest 和 OpenAPI 导出通过；Web Prettier、TypeScript、生产构建及单 worker E2E（21/21）通过；根 `git diff --check` 通过。E2E 使用 3001 端口的独立生产预览复用，未停止用户在 3000 端口运行的开发服务。Web `pnpm audit --audit-level moderate` 和后端 pip-audit（扫描锁定 venv）均报告无已知漏洞。GitHub 只包含源代码、文档和汇总结果；本机 `.env`、数据库、全文、PDF 和逐条评分文件未纳入提交。
 
 P50 根据用户对 Embedding 选型表的疑问，在 README 并列展示 P14 Small 与 P17 Large 的 Dense/Hybrid 指标和估算费用，并说明二者是同一冻结元数据评测集上的先后实验；P14 表保留 Small 历史结果，Large 已在 P17 单独复评。再次强调 qrels 未经人工核验，这些结果不支持模型质量优劣结论，也与 P39/P46 全文盲审评测分开解释。
+
+P51 扩展 P48 的 Skill 现场验收。`citation_analysis` 对 W7118085507 执行 references 方向一跳扩展，trace 中 `activate_skill`、`get_openalex_work`、`expand_openalex_citations` 均为 `ok`；共 3 次工具调用（含激活）、4 个模型轮次、11,445 tokens，答案列出 3 篇参考文献并指出引用边不代表结论互相支持。`literature_discovery` 的一次主题检索探索未完成：8 次工具调用/模型轮次后 `max_steps_exceeded`，135,992 tokens，出现重复搜索和一次 `search_papers` 参数错误。未重跑。随后为 Skills 增加 3/4/3 次数据工具调用硬预算，耗尽后隐藏工具并要求总结已有证据，Harness 对后续工具请求拒绝执行；新增回归覆盖。详见 [`research/P48-agent-runtime-skills.md`](research/P48-agent-runtime-skills.md)。
 
 ## P40 本地试点语料准备（文件已就绪；导入待逐篇复核）
 
