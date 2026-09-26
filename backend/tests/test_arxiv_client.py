@@ -151,6 +151,42 @@ def test_search_accepts_exact_arxiv_id_query_without_treating_it_as_keywords() -
     assert page.works[0].arxiv_id == "2609.25991"
 
 
+def test_get_work_page_uses_id_list_without_paging_parameters() -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=_feed("2604.14572v4"))
+
+    with ArxivClient(transport=httpx.MockTransport(handler)) as client:
+        page = client.get_work_page("2604.14572v4")
+
+    assert dict(seen[0].url.params) == {"id_list": "2604.14572"}
+    assert page.total_results == 1
+    assert page.works[0].arxiv_id == "2604.14572"
+
+
+def test_get_work_page_accepts_fewer_id_list_matches_than_declared_page_capacity() -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        # The export API may declare its default capacity (10) even when an
+        # exact id_list lookup returns only one matching entry.
+        feed = _feed("2604.14572v4").replace(
+            b"<opensearch:itemsPerPage>1</opensearch:itemsPerPage>",
+            b"<opensearch:itemsPerPage>10</opensearch:itemsPerPage>",
+        )
+        return httpx.Response(200, content=feed)
+
+    with ArxivClient(transport=httpx.MockTransport(handler)) as client:
+        page = client.get_work_page("2604.14572v4")
+
+    assert page.items_per_page == 10
+    assert len(page.works) == 1
+    assert page.works[0].arxiv_id == "2604.14572"
+
+
 def test_dtd_entity_payload_and_malformed_atom_are_rejected() -> None:
     arxiv_module._LAST_REQUEST_AT = None
     responses = [

@@ -50,6 +50,7 @@ class ModelTurn:
     refusal: bool
     input_tokens: int
     output_tokens: int
+    incomplete_reason: str | None = None
 
 
 class ModelClient(Protocol):
@@ -154,6 +155,19 @@ class OpenAIResponsesClient:
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
         input_tokens = _nonnegative_int(usage.get("input_tokens"))
         output_tokens = _nonnegative_int(usage.get("output_tokens"))
+        incomplete = (
+            body.get("incomplete_details")
+            if isinstance(body.get("incomplete_details"), dict)
+            else {}
+        )
+        incomplete_reason = (
+            incomplete.get("reason")
+            if body.get("status") == "incomplete"
+            and incomplete.get("reason") in {"max_output_tokens", "content_filter"}
+            else "unknown"
+            if body.get("status") == "incomplete"
+            else None
+        )
         return ModelTurn(
             tool_calls=calls,
             continuation_items=[item for item in output_items if isinstance(item, dict)],
@@ -161,6 +175,7 @@ class OpenAIResponsesClient:
             refusal=refusal,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            incomplete_reason=incomplete_reason,
         )
 
 

@@ -177,11 +177,27 @@ class ArxivClient:
         )
 
     def get_work(self, arxiv_id: str) -> ArxivWork | None:
-        normalized = normalize_arxiv_id(arxiv_id)
-        page = self._query(id_list=normalized, start=0, max_results=1)
+        page = self.get_work_page(arxiv_id)
         return page.works[0] if page.works else None
 
-    def _query(self, *, start: int, max_results: int, **params: str | int) -> ArxivPage:
+    def get_work_page(self, arxiv_id: str) -> ArxivPage:
+        """Fetch a single known work through id_list without paging parameters."""
+        normalized = normalize_arxiv_id(arxiv_id)
+        return self._query(
+            id_list=normalized,
+            start=0,
+            max_results=1,
+            include_paging=False,
+        )
+
+    def _query(
+        self,
+        *,
+        start: int,
+        max_results: int,
+        include_paging: bool = True,
+        **params: str | int,
+    ) -> ArxivPage:
         global _LAST_REQUEST_AT
         with _REQUEST_LOCK:
             now = self._clock()
@@ -191,11 +207,9 @@ class ArxivClient:
                     self._sleep(delay)
             _LAST_REQUEST_AT = self._clock()
             try:
-                request_params = {
-                    **params,
-                    "start": start,
-                    "max_results": max_results,
-                }
+                request_params: dict[str, str | int] = dict(params)
+                if include_paging:
+                    request_params.update(start=start, max_results=max_results)
                 # arXiv's export gateway rejects form-style '+' spaces (HTTP 406).
                 # Encode spaces as %20 while preserving the fixed endpoint and params.
                 query = urlencode(request_params, quote_via=quote)
@@ -257,7 +271,9 @@ def _parse_atom(content: bytes, *, start: int) -> ArxivPage:
                     source_url=source_url,
                 )
             )
-        if page_size != len(entries) or len(entries) > 25:
+        # id_list lookups can return fewer entries than the feed's declared
+        # page capacity (for example, one match with itemsPerPage=10).
+        if page_size < len(entries) or page_size > 25 or len(entries) > 25:
             raise ValueError
         return ArxivPage(
             total_results=total,

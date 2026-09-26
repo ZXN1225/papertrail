@@ -98,12 +98,17 @@ def test_ingest_is_idempotent_and_returns_license_and_exact_evidence_locator() -
         first = _ingest(store, text)
         repeat = _ingest(store, text)
         result = store.search_fulltext_evidence("evidence passages support answers")
+        evaluation_top_10 = store.search_fulltext_evidence(
+            "evidence passages support answers", limit=10
+        )
 
         assert first["status"] == "approved"
         assert repeat["status"] == "unchanged"
         assert first["content_sha256"] == repeat["content_sha256"]
         assert first["chunk_count"] == 2
         assert result["status"] == "ok"
+        assert evaluation_top_10["status"] == "ok"
+        assert 1 <= len(evaluation_top_10["items"]) <= 2
         hit = result["items"][0]
         assert hit["source_type"] == "openalex"
         assert hit["openalex_id"] == "W900"
@@ -111,6 +116,8 @@ def test_ingest_is_idempotent_and_returns_license_and_exact_evidence_locator() -
         assert hit["attribution"].startswith("A. Author")
         assert hit["locator"].startswith("Findings · 字符")
         assert text.strip()[hit["char_start"] : hit["char_end"]].strip() == hit["excerpt"]
+        with pytest.raises(ValueError, match="limit must be 1-10"):
+            store.search_fulltext_evidence("evidence passages support answers", limit=11)
         with closing(sqlite3.connect(store.database_path)) as connection:
             assert connection.execute("SELECT COUNT(*) FROM fulltext_chunks").fetchone()[0] == 2
             row = connection.execute(

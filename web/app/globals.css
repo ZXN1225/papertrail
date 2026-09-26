@@ -947,6 +947,37 @@ textarea::placeholder {
 .answer-text ol {
   padding-left: 22px;
 }
+.answer-table-wrap {
+  max-width: 100%;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.answer-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font:
+    11px/1.6 Inter,
+    "Noto Sans SC",
+    sans-serif;
+  text-align: left;
+}
+.answer-table-wrap th,
+.answer-table-wrap td {
+  min-width: 88px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.answer-table-wrap th {
+  color: var(--ink);
+  background: var(--green-pale);
+  font-weight: 600;
+}
+.answer-table-wrap tr:last-child td {
+  border-bottom: 0;
+}
 .answer-text a {
   color: var(--green-dark);
   text-decoration: underline;

@@ -15,6 +15,7 @@ htmlcov/
 *.sqlite*
 reports/
 backend/*.pdf
+backend/paper_doc/
 node_modules/
 .pnpm-store/
 .next/

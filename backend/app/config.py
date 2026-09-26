@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_model: str | None = None
     llm_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
-    llm_max_output_tokens: int = Field(default=800, ge=64, le=4_096)
+    llm_max_output_tokens: int = Field(default=4_096, ge=64, le=4_096)
     agent_max_steps: int = Field(default=4, ge=1, le=8)
     agent_max_tool_calls: int = Field(default=8, ge=1, le=16)
     agent_deadline_seconds: float = Field(default=45.0, gt=0, le=120)

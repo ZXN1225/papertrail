@@ -936,6 +936,53 @@ function renderAnswer(text: string): ReactNode[] {
       continue;
     }
 
+    const tableHeader = parseMarkdownTableRow(lines[index]);
+    const tableSeparator = lines[index + 1];
+    if (
+      tableHeader &&
+      tableSeparator &&
+      /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(tableSeparator)
+    ) {
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length) {
+        const row = parseMarkdownTableRow(lines[index]);
+        if (!row) break;
+        rows.push(row);
+        index += 1;
+      }
+      blocks.push(
+        <div className="answer-table-wrap" key={`table-${index}`}>
+          <table>
+            <thead>
+              <tr>
+                {tableHeader.map((cell, cellIndex) => (
+                  <th key={`header-${cellIndex}`} scope="col">
+                    {renderInlineMarkdown(cell, index + cellIndex)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`row-${rowIndex}`}>
+                  {tableHeader.map((_, cellIndex) => (
+                    <td key={`cell-${cellIndex}`}>
+                      {renderInlineMarkdown(
+                        row[cellIndex] ?? "",
+                        index + rowIndex + cellIndex,
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+
     const listItem = lines[index].match(/^([-*]|\d+[.)])\s+(.+)$/);
     if (listItem) {
       const ordered = /^\d/.test(listItem[1]);
@@ -962,7 +1009,15 @@ function renderAnswer(text: string): ReactNode[] {
 
     const paragraph: string[] = [];
     while (index < lines.length && lines[index].trim()) {
-      if (/^(?:#{1,3}\s+|[-*]\s+|\d+[.)]\s+)/.test(lines[index])) break;
+      if (
+        /^(?:#{1,3}\s+|[-*]\s+|\d+[.)]\s+)/.test(lines[index]) ||
+        (parseMarkdownTableRow(lines[index]) &&
+          lines[index + 1] &&
+          /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(
+            lines[index + 1],
+          ))
+      )
+        break;
       paragraph.push(lines[index]);
       index += 1;
     }
@@ -979,6 +1034,16 @@ function renderAnswer(text: string): ReactNode[] {
   }
 
   return blocks;
+}
+
+function parseMarkdownTableRow(line: string): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return null;
+  return trimmed
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
 }
 
 function renderInlineMarkdown(text: string, keyPrefix: number): ReactNode[] {

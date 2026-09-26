@@ -1,16 +1,85 @@
 # 进度
 
-更新日期：2026-09-25。PaperTrail 已迁移为仓库根目录项目，并发布至 [GitHub](https://github.com/ZXN1225/papertrail)；默认分支 `main` 是唯一远程分支，旧项目开放 PR 已清理。旧电脑推荐项目源码从当前 Git 工作树移除并保存在本机忽略目录 `.local/legacy-computer-project/`。P11 用户本机验收修复并验证 arXiv 检索；P12/P18 离线 Harness 评测完成；P05 80 条人工复核 qrels 已导入；P13/P14/P17 检索结果仅为 AI 标签探索诊断。P19 后端 106 项自动测试、Web 18 项 E2E 及构建检查通过；GitHub Actions 最终运行通过。P29 arXiv 请求修复、P30 元数据回答修复已由用户验收。P31 检索结果分页已实现并通过自动验证。
+更新日期：2026-09-26。PaperTrail 已迁移为仓库根目录项目，并发布至 [GitHub](https://github.com/ZXN1225/papertrail)；默认分支为 `main`，当前工作分支 `codex/paper-research-agent` 已推送至远程。旧电脑推荐项目源码从当前 Git 工作树移除并保存在本机忽略目录 `.local/legacy-computer-project/`。P11 用户本机验收修复并验证 arXiv 检索；P12/P18 离线 Harness 评测完成；P05 80 条人工复核 qrels 已导入；P13/P14/P17 检索结果仅为 AI 标签探索诊断。P19 后端 106 项自动测试、Web 18 项 E2E 及构建检查通过；GitHub Actions 最终运行通过。P29 arXiv 请求修复、P30 元数据回答修复已由用户验收。P31 检索结果分页已实现并通过自动验证。
+
+## 六阶段 RAG 路线复核（2026-09-26）
+
+对照用户确认的路线，当前不是整体收尾状态：
+
+1. **能力/证据边界：已完成。** README 和项目规格区分元数据、合成测试与许可全文评测，并限制结论范围。
+2. **可复现全文评测集：已完成本轮标注。** 本地有 10 篇获准全文、8 个问题、127 条人工相关性判断及 2 条不可回答判断；原始全文与逐条标签不进 Git。
+3. **BM25/Dense/Hybrid 真实全文基线：已完成探索性 top-5/10 对照。** 结果已按总体和问题桶列入 README；只有 6 个可回答问题和单评审，不能外推为总体质量提升。延迟只作本机运行记录，不作生产基准。
+4. **基于错误分析的受控 RAG 改进：已完成一项试验。** 冻结 Hybrid top-10 的来源轮转重排没有改善 Q05/Q06 的相关来源覆盖；不调用外部服务，不改生产策略。结论是该尝试无质量收益，不声称检索质量提升。
+5. **运行时 Agent Skills：第一版已通过现场验收。** 三个受控 Skill 已注册并可被激活；用户现场 trace 确认 `evidence_synthesis` 被真实模型选中，随后两次按来源 ID 的授权全文检索均成功，答案展示了对应来源证据。此单次样例不代表模型普遍遵从率。
+6. **可信 GitHub 交付：部分完成。** README 已列试点结果与限制；当前还有本地未提交改动，最终审查、适当验证和同步尚未完成。
+
+P44 仅代表最近的回答渲染/Agent 工作流任务完成，不代表上述路线整体完成。用户已授权适当增加人工预算，P46 按完整 top-10 候选并集生成新增盲审表；原 40 条评分和 2 条不可回答判断保留不变。
+
+P46 新增的 top-k 评估器已验证拒绝空表；用户现已完成评分，全部 129 项通过完整性与支持说明校验。完整 top-10 并集为 127 个候选（原评分 40 + 新增 87），再加两项不可回答判断；无第二评审。完整 overall/per-bucket top-5/10 指标已写入 README 和 P39 协议。Dense 在 NDCG/候选池内 Recall 较高，Hybrid 在 Hit@1/MRR 较高；结论仍为小样本探索性且 `quality_claim_allowed=false`。本机报告记录完整逐题指标、输入 SHA、估算嵌入费用和非生产单次延迟。
+
+P47 在冻结 Hybrid top-10 上执行按来源轮转重排，不调用外部服务、不修改运行时代码。Q05/Q06 的 top-2 grade≥2 来源覆盖在重排前后分别保持 0/2、1/2，top-5 都是 2/2；总体 top-10 指标无实质变化。该受控试验没有改善多论文问题的证据完整性，不发布为检索质量提升，也不改变默认策略；记录为无收益的探索消融。
+
+P48 第一版运行时 Skills 已实现并通过现场验收：`backend/app/agent/skills.json` 定义三个提示词工作流和固定工具子集；Harness 以 `activate_skill` 载入目录，激活后只向模型展示当前已启用且被该 Skill 允许的工具，每次运行最多一个 Skill。目录拒绝未登记工具；不执行脚本，也不授予任意 URL、文件、SQL 或写库权限。开发者的根 `skills/` 工作流与运行时目录明确分离。离线安全回归和后端全量 144 项测试通过，Ruff check/format 通过。用户现场真实模型 trace 显示 `evidence_synthesis` 激活成功、两次按来源 ID 检索全文证据均为 `ok`，并展示两篇来源卡片。该单次验收仅证明样例工作流可用，不代表一般模型遵从率。详见 [`research/P48-agent-runtime-skills.md`](research/P48-agent-runtime-skills.md)。
+
+P49 最终审查与交付完成：README 中保留 BM25/Dense/Hybrid 总体及分桶对照表、指标定义和小样本限制；P39/P47/P48 阶段记录与源代码、测试一并推送到当前 GitHub 工作分支。验证结果：后端 Ruff、格式检查、144 项 pytest 和 OpenAPI 导出通过；Web Prettier、TypeScript 与生产构建通过；根 `git diff --check` 通过。E2E 未能启动，因为本机现有 Next dev 服务持有共享 `.next` 开发锁；未停止该进程。依赖审计未能执行：npm registry 请求失败，`uv run` 因本机 uv 缓存权限失败，当前 backend venv 也没有 `pip-audit` 模块。因此依赖漏洞审计仍未验证，不记为通过。GitHub 只包含源代码、文档和汇总结果；本机 `.env`、数据库、全文、PDF 和逐条评分文件未纳入提交。
+
+## P40 本地试点语料准备（文件已就绪；导入待逐篇复核）
+
+- 检测到用户提供的 `backend/paper_doc/01`–`10`；保留 `01` 原有 PDF/TXT/manifest 和既有批准记录，对 `02`–`10` 的 PDF 文字层提取 UTF-8 TXT 与对应 manifest 草稿，共 9 组。第 `10` 篇后来由用户替换为 arXiv `2310.11511v1`（Self-RAG），已重新生成 `10.txt`（30 页）和 manifest；首面标题与正文已抽查。该本机目录被 `.gitignore` 忽略，原文不会进入提交。
+- 本地元数据目录已有 `01`、`03`–`10`。用户本机运行 `prepare_import.py --resolve` 后确认 `02` 成功解析为 `2604.14572`、最新 `10` 成功解析为 `2310.11511`；此步骤只导入元数据，不代表许可已复核或全文已导入。
+- arXiv `02`、`10` 官方记录提供 CC BY 4.0 许可入口，ACL Anthology 2016 年后材料适用 CC BY 4.0；每篇本地 PDF 与许可依据仍须论文所有者核对，尤其留意第三方材料。新 manifest 的 `reviewer` 保持 `PENDING_HUMAN_REVIEW`；没有运行全文导入命令或启用 Embedding API。
+- 在忽略目录保存逐篇导入条件、运行步骤与 8 个问题草案。问题草案尚未冻结，两个不可回答案例和可回答问题的支持片段仍须在批准后的语料内确认；没有新增人工评分或质量结果。
+
+## P41 许可全文盲审与探索性基线（已完成）
+
+- 用户确认完成 `02`–`10` 的许可/来源复核和全文导入；截图及本机只读数据库核验显示 10/10 篇均为 `approved`，共 417 个当前片段。许可复核者为 `local-project-owner`；没有改动全文或许可记录。
+- 为 6 个可回答问题生成 8 个 BM25 支持片段候选，存于 Git 忽略目录 `backend/paper_doc/p39-evidence-candidates.draft.json`。它们只是候选，不是人工相关性标签。修正 Q04 的措辞以准确指向 Query2doc 假设文档，并将 Q08 限定为 PaperTrail 本地方法比较，避免与论文自身报告的 citation precision 混淆。
+- 用户本机已执行 `uv run --directory backend --frozen python -m app.cli.index_fulltext_embeddings` 成功：417 个片段使用 `text-embedding-3-large` / 3072 维完成索引，输入 157,814 tokens，估算费用约 USD 0.02051852。Codex 环境只读核验确认 417/417 当前片段有匹配向量。
+- 新增仅位于 Git 忽略目录的 `backend/paper_doc/build_p39_pool.py`，用于批量嵌入 8 个问题、为 BM25/Dense/Hybrid 各取 top-2、合并去重、注入最多 6 个支持锚点并输出盲审 CSV 和独立审计映射；自动拒绝超过 54 候选的池，评分预算仍不超过 64。脚本不会给候选打分。
+- Codex 执行环境生成问题向量遇到 `provider_unavailable`；用户随后在本机成功运行忽略目录生成器，输出 40 个候选。检查确认 8 个问题都有候选、每个候选均有审计 lineage、CSV 留空评分且不含方法/排名/分数/来源 ID 列；审计 CSV 哈希一致。4 个支持锚点被额外注入，仍只视作候选提示而非正例标签。
+- 用户已完成全部 40 条候选 0–3 分人工评分及 Q07/Q08 两条语料内不可回答性判断；40 条评分完整，所有 2/3 分均附支持说明，两条不可回答判断均为“否”且附理由。总计 42/64 人工项目，没有第二评审。
+- 按冻结审计映射计算探索性 top-2 基线（宏平均，6 个可回答问题；相关阈值 grade≥2，NDCG gain=2^grade−1）：BM25 Hit@1/Hit@2/MRR@2/NDCG@2/候选池内 Recall@2 = 0.333/0.500/0.417/0.287/0.108；Dense = 0.667/1.000/0.833/0.783/0.522；Hybrid = 0.833/1.000/0.917/0.713/0.397。
+- 在这组小样本中 Dense 的 NDCG@2 与候选池内 Recall@2 较高，Hybrid 的 Hit@1 与 MRR@2 较高，Dense 和 Hybrid 的六题 Hit@2 均为 1.0。该结果受 8 题/10 篇语料/单评审和候选池构造限制，只是错误分析基线，不能宣称普遍质量提升或方法胜出。Q07/Q08 各只有一例，单独记录判断，不汇总为稳定拒答率。
+- 本机忽略目录保存已填写盲审表、回答性判断、检索审计映射和 `p39-baseline-report.draft.json`，报告记录了输入 SHA-256。检索调用耗时没有采集；基线只评测证据检索，不评价生成忠实度或引用精确率。查询向量 265 tokens，估算费用约 USD 0.00003445；全文索引 157,814 tokens，估算费用约 USD 0.02051852。
+- 首轮错误定位显示 BM25 在 Q01/Q04/Q06 top-2 未命中相关片段。补充的未预注册双来源覆盖诊断还发现：Q05/Q06 的三种方法都没有在 top-2 同时找齐两篇来源的支持片段。该分析用来确定下一阶段目标，不支持新指标或方法的质量宣传。
+
+## P43 多论文问题的证据集合完整性（已完成）
+
+- 目标是让比较多篇论文的问题在回答前收集到每篇所需的支持证据；目前的 Hit@2 只代表命中至少一段相关内容，不能代表多论文证据完整。
+- 已更新 Agent 系统指引：比较多篇论文的方法/发现时，应按每篇论文的确切来源 ID 分别检索许可全文证据；某篇没有支持片段时须说明比较不完整，不能用一篇论文的段落代表另一篇。工具契约不变，没有开放额外权限。
+- 新增两篇 synthetic TEST 全文的 Harness 回归：分别按 source ID 检索，检查两条工具观察互不串文，最终引用分别回到对应来源和片段；另测一篇有证据、一篇无证据时，回答明确说明比较不完整，缺证据论文只保留已核验的书目链接且没有全文片段引用。后端全量 `pytest` 138 项通过，Ruff check/format 通过。
+- 用户使用两篇已导入且获准全文的论文进行了 live Agent 验收：运行记录显示两次 `retrieve_paper_evidence` 均为 `ok`；来源卡片分别显示 Knowledge-as-Skill 与 Corpus2Skill 的授权全文摘录，内容和论文归属对应。该次验收支持 Agent 能在这组样例中为两篇论文分别取证，不代表普遍模型遵从率，也未验证真实模型的单篇缺证据部分回答场景。
+- 没有改变 BM25/Dense/Hybrid 排名实现或默认策略，也不据单次 live 对话宣称检索质量提升。P39 固定盲审已完成；扩池或新增人工判断须先由用户明确同意。
+
+## P44 Agent Markdown 表格与多论文回答（已完成）
+
+- 用户 live Agent 比较答案正确产出 Markdown 表格，但 Web 安全渲染器最初将 `|...|` 表格语法作为普通文字展示。
+- 为支持常见 GFM pipe table，增加安全的 React 表格节点解析、横向滚动样式和 E2E 回归；单元格继续经过现有内联格式与允许域名链接过滤，不解释为 HTML。
+- 用户现场验收期间发现结构化输出预算不足，Responses API 返回不完整输出。后端现读取 `incomplete_details` 并以不含回答内容的 warning 区分输出上限、内容过滤和未知中断，避免对同一受限响应做无效重试；默认值、模板和本机忽略 `.env` 均设为 4096，并明确要求模型将表格回答保持精简。
+- 下一次现场 trace 显示：显式 arXiv ID 的比较题仍先调用不可用的元数据 API，占用 Agent 步数，再因这些错误误判证据不足。现对“显式 arXiv ID + 内容/方法/证据请求”隐藏 arXiv 元数据搜索/详情工具，直接按 ID 检索授权全文；元数据 API 失败不再被视为全文证据缺失。
+- 用户最新 live 验收截图确认 Agent 成功返回 `completed`，比较表显示为真实行列，窄栏支持横向滚动，比较依据段落和两条来源卡片均正常显示。后端测试 141 项通过，Ruff check/format、Web TypeScript、Prettier 与 `git diff --check` 通过。Playwright E2E 命令在隔离副本中受 pnpm 符号链接解析问题阻塞，未覆盖；本轮未触碰 `web/.next`。P44 按 live 页面验收完成，自动化 E2E 环境限制已记录。
+
+## P42 arXiv 精确 ID 元数据查询修复
+
+- 用户诊断显示：Python 对 `id_list=2604.14572` 单独请求返回 HTTP 200；相同请求附加 `start=0&max_results=1` 时，httpx 与 urllib 均返回 HTTP 406。此前将其归为传输头差异不准确。
+- `ArxivClient.get_work_page()` 对已知 ID 使用不带分页参数的 `id_list` 请求。用户重跑后确认 HTTP 请求已通过，但 02 和 10 都触发 `ArxivProtocolError`；根因是 arXiv 响应将 `itemsPerPage` 声明为 10，而精确 ID 结果仅有 1 条，解析器错误要求二者严格相等。校验现改为允许实际条目数小于声明页容量，同时仍拒绝条目数大于容量；新增回归测试模拟该响应。
+- 修复后的后端全量 pytest 136 passed；Ruff check/format 与根目录 `git diff --check` 通过。用户随后在本机确认 02 与替换后的 10 均成功解析并写入元数据快照。没有导入全文、复核许可或变更评测数据。
+
+## P39 全文 RAG 小规模评测协议与基线（已完成）
+
+- 制定小规模全文证据检索试点评测协议：8 个问题、四类各 2 个；BM25/Dense/Hybrid 各取 top-2，盲化候选池最多 54 项（含最多 6 个已知支持片段），最多 8 项双评，两条不可回答性判断；人工评分/判断总量硬上限 64。
+- 指标限定 Hit@1/2、MRR@2、NDCG@2 和候选池内 Recall；试点只作探索诊断，不足以支持普遍质量提升声明。检索质量和生成答案忠实度分开评估。
+- P41 已在明确批准的 10 篇全文上完成 40 项候选人工评分和两项不可回答性判断，生成 6 个可回答问题的 BM25/Dense/Hybrid top-2 探索性基线；结果和限制见 P41 记录及 [`research/P39-rag-evaluation-protocol.md`](research/P39-rag-evaluation-protocol.md)。全文、片段正文和逐条标签仍仅存本机忽略目录。
 
 P36 已完成人工盲审及候选池内评测：8 个困难查询、101 个候选判断，保持未入池论文为未判断。Large Dense 在该挑战集分数最高，但报告明确 `exploratory_only=true`、`quality_claim_allowed=false`。P37 已在同 101 对候选上完成助手建议与人工评分的一致性诊断：完全一致率 30.7%、MAE 1.218、二次加权 Kappa 0.310；这不是独立 LLM-as-judge 校准，仍为探索分析。
 
 ## 最终收尾核验（2026-09-25）
 
-- 实施范围 P01–P38 已完成；README 已整理策略选型、检索质量证据和限制，开发说明及阶段记录已同步。改动准备创建本地提交，尚未推送。
+- 实施范围 P01–P38 已完成并提交为 `bde769c`，分支已推送；README 已整理策略选型、检索质量证据和限制，开发说明及阶段记录已同步。
 - 后端全量 pytest 133 passed；Ruff check/format、Web Prettier、TypeScript、隔离生产构建、npm/pip 依赖审计及 `git diff --check` 均通过。前端本地依赖目录已按锁文件恢复并确认 Next/Playwright 可执行文件存在。
 - 用户提供的最终 E2E 运行结果为 21/21 通过且退出码 0，干净退出确认完成；此前 teardown 异常的重跑不作为通过依据。本轮未更改 Web 应用代码。
 - 最终独立复核发现 Agent 读取本地文献库时会将 OpenAlex 与 arXiv 各自的 30 条相加，可能超过界面承诺的 30 条上限。现改为合并后按年份降序排序并截取最多 30 条；新增回归测试。全量后端 pytest 134 passed，Ruff check/format 和根目录 `git diff --check` 通过。`uv run` 被本机 uv 缓存权限拒绝，因此使用已存在的锁定虚拟环境直接运行等效命令。
-- 代码与验证现已完成；本轮创建本地提交，推送仍待用户明确授权。
+- P38 复核改动已提交并推送；后续阶段按单独任务推进。
 
 ## P37 既有助手标签与人工评分一致性（已完成）
 
@@ -164,6 +233,7 @@ P36 已完成人工盲审及候选池内评测：8 个困难查询、101 个候�
 - 将含义不准确的 `tool_side_effect_executions` 改为 `registered_tool_executions`。P12/P14 新报告保存实际命令参数、解析后的输出路径、runner 哈希和数据哈希；新增 CLI 定向回归测试。P17 已产生的 Large 报告不修改、不重跑。
 - 离线报告在 Git 忽略的 `backend/reports/p18-agent-eval-report.json`，synthetic、无网络/真实数据库/真实模型，费用为 null，质量声明禁用。
 - 后端全量测试 101 passed；Ruff check/format、OpenAPI 导出、Web Prettier/typecheck、`git diff --check` 通过。Web build/E2E 未重跑（无 Web 运行代码变更）；根检查脚本因当前检出缺少 `scripts/check_foundation.py` 与 `scripts/check_source_review.py` 而未执行。详见 [P18 验收](research/P18-agent-eval-acceptance.md)。
+
 ## P01 已完成
 
 - 用户确认将项目方向改为论文检索与研究助理 Agent。
@@ -331,6 +401,7 @@ P36 已完成人工盲审及候选池内评测：8 个困难查询、101 个候�
 - 后端回归 `67 passed`；Ruff check 与 format check 通过；OpenAPI 当前生成值与已保存契约一致。根目录 foundation/source-review 和 `git diff --check` 通过。Starlette/httpx 有两条上游弃用警告。BM25 本机报告可重跑：8 queries、10 篇元数据，Hit@1=0.75、MRR@10=0.875、NDCG@10=0.875894；仍标记 `exploratory_only=true`，不能作为人工金标或泛化质量结论。
 - `uv run` 受本机 uv 缓存目录权限拒绝，改用项目已存在的 `.venv` 直接运行相同 pytest/Ruff 工具，结果通过。OpenAI 请求未由本轮验收触发；用户此前提供的实时 Agent 输出作为 live smoke evidence，不等于完整模型质量评测。
 - P09 本机验收完成。下一步建议开始 P10：先冻结可重复数据/查询集，选择可用 embedding 后端与向量存储方案，再实现 BM25、dense、hybrid 的同题对照；P05 qrels 人工复核仍是质量结论的前置条件。
+
 ## P10 本轮实施
 
 - 按 [P10 验收](research/P10-acceptance.md) 增加 OpenAI Embedding Provider、approved/current 全文分块向量索引、Dense cosine、RRF@60 Hybrid 和 BM25/Dense/Hybrid 检索选择；默认 Provider 关闭，BM25 仍为默认，不自动访问付费 API。

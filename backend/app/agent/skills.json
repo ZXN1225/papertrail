@@ -1,0 +1,39 @@
+[
+  {
+    "name": "literature_discovery",
+    "description": "发现与筛选论文元数据，必要时查看有限引用脉络。",
+    "instructions": "先把研究主题拆成简洁查询，再使用可用的学术元数据来源检索；明确区分未检索来源和空结果。按需要核验书目字段或扩展一跳引用。开放获取标记不是全文许可，摘要不能支撑论文结论。",
+    "allowed_tools": [
+      "search_papers",
+      "get_paper_details",
+      "find_related_papers",
+      "search_openalex_works",
+      "get_openalex_work",
+      "search_openalex_authors",
+      "get_openalex_author",
+      "list_openalex_author_works",
+      "search_arxiv_metadata",
+      "get_arxiv_metadata"
+    ]
+  },
+  {
+    "name": "evidence_synthesis",
+    "description": "根据获准全文片段总结、比较论文方法或研究发现。",
+    "instructions": "只用 retrieve_paper_evidence 返回的全文片段支持论文内容主张。比较多篇论文时，逐一按精确来源 ID 检索；没有对应来源支持时明确标记缺口，不用其他论文的片段代替。引用只能来自本轮成功工具结果。",
+    "allowed_tools": [
+      "retrieve_paper_evidence",
+      "get_openalex_work",
+      "get_arxiv_metadata"
+    ]
+  },
+  {
+    "name": "citation_analysis",
+    "description": "沿 OpenAlex 的有限引用关系发现相关工作并解释引用边界。",
+    "instructions": "先取得或确认精确 OpenAlex 种子 ID，再按问题选择 references、cited_by 或 both 执行一次有界引用拓展。引用边只表示元数据关联，不证明方法相同、结论一致或研究质量。对论文内容的主张仍需获准全文证据。",
+    "allowed_tools": [
+      "search_openalex_works",
+      "get_openalex_work",
+      "expand_openalex_citations"
+    ]
+  }
+]

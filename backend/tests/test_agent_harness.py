@@ -22,6 +22,7 @@ from app.agent.model import (
     ModelUnavailable,
     OpenAIResponsesClient,
 )
+from app.agent.skills import RuntimeSkillRegistry
 from app.agent.tools import PaperToolRegistry
 from app.config import Settings
 from app.main import create_app
@@ -145,6 +146,94 @@ def test_tool_registry_is_allowlisted_and_validates_arguments() -> None:
         assert invalid["code"] == "invalid_arguments"
     finally:
         temporary.cleanup()
+
+
+def test_runtime_skill_activation_limits_available_tools() -> None:
+    temporary, store = _store_in_tempdir()
+    try:
+        model = FakeModel(
+            [
+                _call_turn(
+                    ModelToolCall(
+                        call_id="skill-1",
+                        name="activate_skill",
+                        arguments='{"name":"evidence_synthesis"}',
+                    )
+                ),
+                _final_turn("", [], insufficient=True),
+            ]
+        )
+        response = AgentHarness(model, PaperToolRegistry(store)).run(
+            "Summarize the findings in these papers"
+        )
+
+        assert response.status == "insufficient_evidence"
+        assert [tool["name"] for tool in model.tool_sets[0]] == [
+            "activate_skill",
+            "search_papers",
+            "get_paper_details",
+            "find_related_papers",
+            "compare_papers",
+            "retrieve_paper_evidence",
+        ]
+        assert [tool["name"] for tool in model.tool_sets[1]] == ["retrieve_paper_evidence"]
+        assert "Active runtime skill: evidence_synthesis" in model.instructions[1]
+        assert any(event.name == "activate_skill" for event in response.trace)
+    finally:
+        temporary.cleanup()
+
+
+def test_runtime_skill_blocks_tool_outside_its_allowlist() -> None:
+    temporary, store = _store_in_tempdir()
+    try:
+        model = FakeModel(
+            [
+                _call_turn(
+                    ModelToolCall(
+                        call_id="skill-1",
+                        name="activate_skill",
+                        arguments='{"name":"evidence_synthesis"}',
+                    )
+                ),
+                _call_turn(
+                    ModelToolCall(
+                        call_id="search-1",
+                        name="search_papers",
+                        arguments='{"query":"retrieval","limit":5}',
+                    )
+                ),
+                _final_turn("", [], insufficient=True),
+            ]
+        )
+        response = AgentHarness(model, PaperToolRegistry(store)).run(
+            "Summarize the findings in these papers"
+        )
+
+        blocked = next(event for event in response.trace if event.name == "search_papers")
+        assert blocked.error_code == "tool_not_allowed"
+        assert "search_papers" not in [tool["name"] for tool in model.tool_sets[1]]
+    finally:
+        temporary.cleanup()
+
+
+def test_runtime_skill_catalog_rejects_unregistered_tools(tmp_path: Path) -> None:
+    path = tmp_path / "skills.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "unsafe",
+                    "description": "Invalid skill",
+                    "instructions": "Try arbitrary shell access.",
+                    "allowed_tools": ["run_shell"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="runtime_skill_catalog_invalid"):
+        RuntimeSkillRegistry(path)
 
 
 def test_agent_uses_server_refreshed_search_context_and_prior_conversation() -> None:
@@ -636,6 +725,24 @@ def test_agent_can_call_arxiv_metadata_tool_and_validate_arxiv_citation() -> Non
         temporary.cleanup()
 
 
+def test_explicit_arxiv_content_question_prefers_local_evidence_over_metadata_api() -> None:
+    temporary, store = _store_in_tempdir()
+    model = FakeModel([_final_turn("", [], insufficient=True)])
+    try:
+        with ArxivClient(transport=httpx.MockTransport(lambda _: httpx.Response(503))) as arxiv:
+            result = AgentHarness(model, PaperToolRegistry(store, arxiv=arxiv)).run(
+                "请比较 arXiv:2609.25991 和 arXiv:2604.14572 的知识库结构与方法，并给出全文证据。"
+            )
+
+        assert result.status == "insufficient_evidence"
+        available_names = {tool["name"] for tool in model.tool_sets[0]}
+        assert "retrieve_paper_evidence" in available_names
+        assert "get_arxiv_metadata" not in available_names
+        assert "search_arxiv_metadata" not in available_names
+    finally:
+        temporary.cleanup()
+
+
 def test_arxiv_tool_failure_is_traced_without_exposing_exception_or_retrying() -> None:
     import app.sources.arxiv as arxiv_module
 
@@ -927,6 +1034,21 @@ def test_failed_structured_answer_repair_still_rejects_invalid_output() -> None:
         temporary.cleanup()
 
 
+def test_incomplete_model_output_is_reported_without_repeating_same_limited_request() -> None:
+    temporary, store = _store_in_tempdir()
+    try:
+        incomplete = ModelTurn([], [], '{"answer":"partial', False, 10, 8, "max_output_tokens")
+        model = FakeModel([incomplete])
+        result = AgentHarness(model, PaperToolRegistry(store)).run("Compare two papers in a table")
+
+        assert result.status == "invalid_model_output"
+        assert result.model_steps == 1
+        assert result.warnings == ["model_output_incomplete_max_output_tokens"]
+        assert len(model.inputs) == 1
+    finally:
+        temporary.cleanup()
+
+
 def test_structured_output_diagnostics_are_content_free_and_classify_schema_errors() -> None:
     assert _output_diagnostic_warnings(None) == ["structured_output_empty"]
     assert _output_diagnostic_warnings("not json") == ["structured_output_invalid_json"]
@@ -1062,6 +1184,34 @@ def test_responses_adapter_uses_fixed_endpoint_strict_tools_and_server_secret() 
     assert (turn.input_tokens, turn.output_tokens) == (20, 5)
 
 
+def test_responses_adapter_classifies_incomplete_output_without_exposing_provider_details() -> None:
+    def respond(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "status": "incomplete",
+                "incomplete_details": {"reason": "max_output_tokens"},
+                "output": [],
+            },
+        )
+
+    settings = Settings(
+        _env_file=None,
+        llm_provider="openai",
+        llm_api_key="api-secret",
+        llm_model="test-model",
+    )
+    client = httpx.Client(transport=httpx.MockTransport(respond))
+    provider = OpenAIResponsesClient(settings, http_client=client)
+    try:
+        turn = provider.complete(instructions="", input_items=[], tools=[])
+    finally:
+        client.close()
+
+    assert turn.final_text is None
+    assert turn.incomplete_reason == "max_output_tokens"
+
+
 def test_responses_adapter_does_not_surface_provider_error_body() -> None:
     def unauthorized(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text="secret api-secret leaked in provider body")
@@ -1148,5 +1298,142 @@ def test_agent_rag_citation_contains_license_attribution_and_verified_chunk() ->
         assert "traceable citations" in citation.evidence[0].excerpt
         assert "excerpts from the licensed evidence tool" in model.instructions[0]
         assert "traceable citations" in model.inputs[1][-1]["output"]
+    finally:
+        temporary.cleanup()
+
+
+def test_agent_can_collect_and_cite_evidence_scoped_to_each_paper() -> None:
+    temporary, store = _store_in_tempdir()
+    try:
+        for source_id, title, passage in (
+            (
+                "W100",
+                "Retrieval systems for research assistants",
+                "TEST evidence: method alpha uses lexical retrieval.",
+            ),
+            (
+                "W200",
+                "Graph retrieval methods for language models",
+                "TEST evidence: method beta uses graph traversal.",
+            ),
+        ):
+            store.ingest_licensed_fulltext(
+                source_type="openalex",
+                source_id=source_id,
+                text=passage,
+                text_source_url=f"https://repository.example.org/{source_id}.txt",
+                license_id="CC-BY-4.0",
+                license_url="https://creativecommons.org/licenses/by/4.0/",
+                license_evidence_url=f"https://repository.example.org/{source_id}/license",
+                reviewer="local-project-owner",
+                attribution=f"TEST author, {title}, CC BY 4.0",
+                confirm_license_reviewed=True,
+            )
+
+        model = FakeModel(
+            [
+                _call_turn(
+                    ModelToolCall(
+                        "evidence-w100",
+                        "retrieve_paper_evidence",
+                        '{"query":"lexical retrieval method","limit":3,'
+                        '"source_type":"openalex","source_id":"W100"}',
+                    ),
+                    ModelToolCall(
+                        "evidence-w200",
+                        "retrieve_paper_evidence",
+                        '{"query":"graph traversal method","limit":3,'
+                        '"source_type":"openalex","source_id":"W200"}',
+                    ),
+                ),
+                _final_turn(
+                    "W100 uses lexical retrieval; W200 uses graph traversal.",
+                    ["W100", "W200"],
+                ),
+            ]
+        )
+        response = AgentHarness(model, PaperToolRegistry(store)).run(
+            "Compare the methods in W100 and W200"
+        )
+
+        assert response.status == "completed"
+        assert {citation.openalex_id for citation in response.citations} == {"W100", "W200"}
+        assert {
+            citation.openalex_id: citation.evidence[0].excerpt for citation in response.citations
+        } == {
+            "W100": "TEST evidence: method alpha uses lexical retrieval.",
+            "W200": "TEST evidence: method beta uses graph traversal.",
+        }
+        outputs = [
+            item["output"] for item in model.inputs[1] if item.get("type") == "function_call_output"
+        ]
+        assert len(outputs) == 2
+        assert "method alpha uses lexical retrieval" in outputs[0]
+        assert "method beta uses graph traversal" not in outputs[0]
+        assert "method beta uses graph traversal" in outputs[1]
+        assert "method alpha uses lexical retrieval" not in outputs[1]
+    finally:
+        temporary.cleanup()
+
+
+def test_agent_can_give_a_cited_partial_answer_when_one_paper_has_no_evidence() -> None:
+    temporary, store = _store_in_tempdir()
+    try:
+        store.ingest_licensed_fulltext(
+            source_type="openalex",
+            source_id="W100",
+            text="TEST evidence: method alpha uses lexical retrieval.",
+            text_source_url="https://repository.example.org/W100.txt",
+            license_id="CC-BY-4.0",
+            license_url="https://creativecommons.org/licenses/by/4.0/",
+            license_evidence_url="https://repository.example.org/W100/license",
+            reviewer="local-project-owner",
+            attribution="TEST author, W100, CC BY 4.0",
+            confirm_license_reviewed=True,
+        )
+        model = FakeModel(
+            [
+                _call_turn(
+                    ModelToolCall(
+                        "evidence-w100",
+                        "retrieve_paper_evidence",
+                        '{"query":"lexical retrieval method","limit":3,'
+                        '"source_type":"openalex","source_id":"W100"}',
+                    ),
+                    ModelToolCall(
+                        "evidence-w200",
+                        "retrieve_paper_evidence",
+                        '{"query":"graph traversal method","limit":3,'
+                        '"source_type":"openalex","source_id":"W200"}',
+                    ),
+                    ModelToolCall(
+                        "metadata-w200",
+                        "get_paper_details",
+                        '{"openalex_id":"W200"}',
+                    ),
+                ),
+                _final_turn(
+                    "Only W100 is supported: it uses lexical retrieval. W200 has no "
+                    "citable full-text evidence, so this comparison is incomplete.",
+                    ["W100", "W200"],
+                ),
+            ]
+        )
+        response = AgentHarness(model, PaperToolRegistry(store)).run(
+            "Compare the methods in W100 and W200"
+        )
+
+        assert response.status == "completed"
+        assert "comparison is incomplete" in response.answer
+        assert {citation.openalex_id for citation in response.citations} == {"W100", "W200"}
+        citation_by_id = {citation.openalex_id: citation for citation in response.citations}
+        assert citation_by_id["W100"].evidence
+        assert citation_by_id["W200"].evidence == []
+        outputs = [
+            item["output"] for item in model.inputs[1] if item.get("type") == "function_call_output"
+        ]
+        assert len(outputs) == 3
+        assert '"status": "ok"' in outputs[0]
+        assert '"status": "no_results"' in outputs[1]
     finally:
         temporary.cleanup()

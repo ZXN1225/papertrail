@@ -28,3 +28,7 @@
 arXiv 的 legacy API 要求所有受控机器合计每三秒最多一次请求、同时仅一个连接。测试失败后不要连续点击重试。
 
 用户随后确认 arXiv 搜索成功，P29 live 验收通过。
+
+## 2026-09-26 精确 ID 查询补充诊断
+
+用户针对已知 ID `2604.14572` 的对照测试发现：Python 对 `id_list` 单参数请求为 HTTP 200；添加 `start=0&max_results=1` 后，httpx 与 urllib 均为 HTTP 406。因此该复现场景不是请求头差异。`ArxivClient.get_work_page()` 现对 `id_list` 查单篇记录时省略分页参数。常规关键词搜索的分页行为不变。修复后的在线导入仍需用户本机验收。

@@ -661,8 +661,10 @@ class PaperStore:
         normalized_query = " ".join(query.split())
         if not normalized_query or len(normalized_query) > 256:
             raise ValueError("query must contain 1 to 256 non-whitespace characters")
-        if not 1 <= limit <= 8:
-            raise ValueError("limit must be 1-8")
+        # Keep the public API and Agent at <=8; offline benchmark runners may
+        # request top-10 to build a fully judged candidate pool.
+        if not 1 <= limit <= 10:
+            raise ValueError("limit must be 1-10")
         if retrieval_method not in {"bm25", "dense", "hybrid"}:
             raise ValueError("retrieval_method must be bm25, dense or hybrid")
         if retrieval_method != "bm25" and (query_embedding is None or not embedding_model):

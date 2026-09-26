@@ -34,7 +34,7 @@ const papers = [
 const agentAnswer = {
   status: "completed",
   answer:
-    "TEST answer: **evidence-first**.\n\n- Source: [OpenAlex](https://openalex.org/WTEST001).\n- Unsafe: [blocked](javascript:alert(1))",
+    "TEST answer: **evidence-first**.\n\n| Method | Evidence |\n| --- | --- |\n| TEST Dense | [OpenAlex](https://openalex.org/WTEST001) |\n\n- Unsafe: [blocked](javascript:alert(1))",
   citations: [
     {
       source: "arxiv",
@@ -234,6 +234,15 @@ test("shows agent answer with trace, license, and cited evidence", async ({
   await expect(page.locator(".answer-text strong")).toHaveText(
     "evidence-first",
   );
+  await expect(page.locator(".answer-text table th")).toHaveText([
+    "Method",
+    "Evidence",
+  ]);
+  await expect(page.locator(".answer-text table td")).toContainText([
+    "TEST Dense",
+    "OpenAlex",
+  ]);
+  await expect(page.locator(".answer-text")).not.toContainText("| --- | --- |");
   await expect(page.locator(".answer-text a")).toHaveAttribute(
     "href",
     "https://openalex.org/WTEST001",
