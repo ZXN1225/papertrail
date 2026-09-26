@@ -27,6 +27,8 @@ P50 根据用户对 Embedding 选型表的疑问，在 README 并列展示 P14 S
 
 P51 扩展 P48 的 Skill 现场验收。`citation_analysis` 对 W7118085507 执行 references 方向一跳扩展，trace 中 `activate_skill`、`get_openalex_work`、`expand_openalex_citations` 均为 `ok`；共 3 次工具调用（含激活）、4 个模型轮次、11,445 tokens，答案列出 3 篇参考文献并指出引用边不代表结论互相支持。`literature_discovery` 的一次主题检索探索未完成：8 次工具调用/模型轮次后 `max_steps_exceeded`，135,992 tokens，出现重复搜索和一次 `search_papers` 参数错误。未重跑。随后为 Skills 增加 3/4/3 次数据工具调用硬预算，耗尽后隐藏工具并要求总结已有证据，Harness 对后续工具请求拒绝执行；新增回归覆盖。详见 [`research/P48-agent-runtime-skills.md`](research/P48-agent-runtime-skills.md)。
 
+P52 根据用户反馈调整 README 文风与结构：压缩重复的解释性句子，删去 Agent/Web 验收数据和本机 smoke 记录；保留产品功能、研究结果表、评测范围与必要的数据许可说明，并同步精简项目文档链接。
+
 ## P40 本地试点语料准备（文件已就绪；导入待逐篇复核）
 
 - 检测到用户提供的 `backend/paper_doc/01`–`10`；保留 `01` 原有 PDF/TXT/manifest 和既有批准记录，对 `02`–`10` 的 PDF 文字层提取 UTF-8 TXT 与对应 manifest 草稿，共 9 组。第 `10` 篇后来由用户替换为 arXiv `2310.11511v1`（Self-RAG），已重新生成 `10.txt`（30 页）和 manifest；首面标题与正文已抽查。该本机目录被 `.gitignore` 忽略，原文不会进入提交。

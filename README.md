@@ -1,24 +1,24 @@
 # PaperTrail · 论文检索与研究助理 Agent
 
-**从研究问题出发发现论文，让 Agent 逐步检查知识库，并用可追溯的证据回答。**
+**论文检索、全文证据查找与文献比较。**
 
 [![PaperTrail CI](https://github.com/ZXN1225/papertrail/actions/workflows/ci.yml/badge.svg)](https://github.com/ZXN1225/papertrail/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![Agent](https://img.shields.io/badge/Agent-bounded%20tools-176B55)
 
-PaperTrail 是一个用于学习研究与简历展示的全栈 Agent 项目。它连接 OpenAlex 和 arXiv 元数据，提供论文检索、比较、许可全文 RAG 与研究助理工作区。项目聚焦 Agent Harness、证据溯源和可重复评测；它不是生产级文献服务，也不代替系统综述或研究者判断。
+PaperTrail 是一个全栈论文检索与研究助理项目，整合 OpenAlex、arXiv 和经许可导入的本地全文，支持论文比较与证据检索。
 
 ## 项目能做什么
 
 - **发现与管理论文**：从 OpenAlex、arXiv 搜索元数据，或使用已导入的本地目录；保存查询快照、来源、版本和内容哈希，支持重复导入与历史快照查看。
-- **扩展文献集合**：Agent 可从研究问题检索种子论文，再按需沿 OpenAlex 的参考文献或被引关系拓展一跳，去重并比较候选。引用关系是发现线索，不代表论文结论一致或互相支持。
+- **扩展文献集合**：从种子论文沿 OpenAlex 参考文献或被引关系拓展一跳，并比较候选。
 - **许可全文问答**：逐篇登记并确认 CC0 或 CC BY 许可后，才可将本地 UTF-8 文本导入；全文按可追踪位置分块，支持 BM25、Dense 和 Hybrid 检索。
-- **可核验回答**：论文引用必须来自本轮工具结果；获准全文证据额外保留片段、来源、许可和位置。引用无效或证据不足时，Harness 会拒绝完成为可信答案。
+- **可核验回答**：引用关联到本轮检索结果；全文证据保留片段、来源、许可和位置。
 - **运行时 Agent Skills**：内置文献发现、全文证据综合和引用脉络三种任务工作流；激活后，模型只能使用该 Skill 的固定工具子集。
-- **连续研究上下文**：Agent 请求会携带最近 4 轮对话，以及左侧最近一次检索的来源、关键词、年份范围和已载入页数。后端会从固定来源重新读取最多 30 篇书目元数据供后续问题引用；浏览器传来的论文正文不会直接作为可信证据。历史回答只帮助理解“刚才的结果”等指代，不会成为事实证据。
+- **连续研究上下文**：后续提问可引用最近的检索条件、书目结果和对话内容；论文正文仍以工具返回的全文证据为准。
 - **检索实验**：在相同语料和查询上比较 BM25、Dense cosine 与 RRF Hybrid，输出指标、配置、数据哈希和成本估算。
-- **中文研究工作区**：浏览论文、查看详情、并列比较元数据、向研究助理提问，并查看引用、证据片段和运行 trace。
+- **研究工作区**：浏览论文、查看详情、比较元数据，并检索引用和全文证据。
 
 ## 工作流
 
@@ -42,7 +42,7 @@ flowchart LR
     A --> UI
 ```
 
-Agent 使用服务端固定工具，不允许模型执行任意 SQL、shell 或 URL 抓取。论文标题、摘要、全文片段和工具输出都按不可信数据处理。
+Agent 通过服务端固定工具读取论文资料，不开放任意 URL、shell、SQL 或写入操作。
 
 ## Agent 与 RAG 设计
 
@@ -62,7 +62,7 @@ Agent 使用服务端固定工具，不允许模型执行任意 SQL、shell 或 
 - Harness 校验模型给出的引用是否来自本轮工具观察，并验证证据片段和论文 ID 的对应关系。
 - 元数据只能支持元数据层面的说法；论文结论必须有全文证据。证据不足时明确拒答，不从模型记忆补写论文事实。
 - Trace 记录步骤、工具状态、耗时和 token 计数，不记录密钥或论文正文。
-- 工作流建议：先依据主题和约束检索；结果过窄或需要追溯研究脉络时，再选种子作品扩展一跳并去重；比较候选时只陈述元数据能支持的内容；涉及研究发现时再调用批准全文证据。上游失败、无结果或证据不足会保留为明确状态。
+- 回答论文方法或发现时使用获准全文证据；只有书目数据时，回答限于书目信息。
 
 ### Runtime Skills
 
@@ -72,35 +72,27 @@ Agent 使用服务端固定工具，不允许模型执行任意 SQL、shell 或 
 | `evidence_synthesis`   | 总结、比较论文方法或发现         | 获准全文证据检索，以及可用的精确元数据读取 |
 | `citation_analysis`    | 沿 OpenAlex 引用关系扩展研究脉络 | Works 搜索/读取与有界一跳引用扩展          |
 
-Skill 定义保存在 `backend/app/agent/skills.json`，只包含说明文字和工具名称；Harness 校验目录后，将 Skill 工具范围收窄到当前已启用的固定白名单。一次运行只能激活一个 Skill，工具次数与运行时限仍由 Harness 统一限制。Skill 不加载脚本，不授予任意 URL、文件、shell、SQL 或写库能力。根目录 [`skills/`](skills/README.md) 是供贡献者和 Codex 使用的开发工作流文档；PaperTrail Agent 不会读取该目录。两类 Skills 使用不同目录和加载路径。
+Skill 定义保存在 `backend/app/agent/skills.json`。Harness 按目录限制可用工具和调用次数；每次运行最多激活一个 Skill。
 
 ### 检索策略选型及原因
 
-策略按研究任务分层组合，而不是把某个排序模型用于所有场景。决策优先考虑证据类型、数据许可、可复现性和运行成本；质量数字见下方同集对照。
-
 | 研究需求               | 选用策略                                     | 选型原因                                                                    | 实测依据与边界                                                                                          |
 | ---------------------- | -------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| 发现论文、浏览书目     | OpenAlex / arXiv 元数据检索；本地目录用 BM25 | 公开来源提供结构化书目字段；本地 BM25 无 Embedding 费用，结果容易复现和解释 | P05 小样本人工复核集用于验证基线流程；OpenAlex 与 arXiv 的年份定义不同，页面会分别标明出版年和提交日期  |
+| 发现论文、浏览书目     | OpenAlex / arXiv 元数据检索；本地目录用 BM25 | 公开来源提供结构化书目字段；本地 BM25 无 Embedding 费用，结果容易复现和解释 | P05 小样本人工复核；OpenAlex 按出版年筛选，arXiv 按提交日期筛选                                         |
 | 根据获准全文查找证据   | 全文 BM25 默认；Dense 或 RRF Hybrid 显式启用 | 全文需逐篇通过许可登记；BM25 保持本地可用，语义检索作为可选对照             | P14/P17 在冻结元数据集上做过排序诊断，但并非全文 RAG 质量评测；当前真实许可全文规模也不足以支持统计结论 |
 | 从种子论文拓展研究脉络 | OpenAlex 一跳参考文献 / 被引关系             | 引用邻居能补充关键词检索未命中的候选，且保留来源和关系便于复核              | 仅作发现线索；不是论文结论的证据，也不假设新候选比原搜索结果更相关                                      |
-| 合并多个公开来源结果   | OpenAlex + arXiv，按完全匹配 DOI 去重        | 兼顾综合书目与预印本发现；严格 DOI 匹配避免仅凭标题误合并                   | 跨源用例已纳入离线 Agent 工作流评测；没有把离线通过率解释为线上召回率                                   |
+| 合并多个公开来源结果   | OpenAlex + arXiv，按完全匹配 DOI 去重        | 兼顾综合书目与预印本发现；严格 DOI 匹配避免仅凭标题误合并                   | 按完全匹配 DOI 去重，不依据标题猜测相同作品                                                             |
 
-当前默认仍是元数据检索与全文 BM25。Dense/Hybrid 要显式配置 Embeddings provider，选择 Large 是可选实验路径，不会因模型通用基准较高就自动替换默认排序。Small 与 Large 的运行对照及成本列于下方；OpenAI 的 MTEB 数字是供应方模型基准，不代表 PaperTrail 检索表现。
+BM25 为默认全文检索。Dense 可选使用 OpenAI `text-embedding-3-large`（3072 维）与 cosine 相似度；Hybrid 使用 BM25 与 Dense 排名进行 RRF（`k=60`）。Large 与 Small 的官方 MTEB 分数分别为 64.6% 和 62.3%，输入价格分别为每百万 tokens $0.13 和 $0.02。[Large 模型说明](https://developers.openai.com/api/docs/models/text-embedding-3-large) · [Embeddings 指南](https://developers.openai.com/api/docs/guides/embeddings)。Embedding provider 默认关闭；启用后，问题和获准全文片段会发送到配置的 API。
 
-一次研究任务可由 Agent 依问题走过这些步骤，而不强制执行全部检索：先搜索主题与限制；查看少量候选；需要扩展时读取种子论文的参考文献或被引作品；合并重复 ID 并比较元数据；只有要回答论文方法/结论时才检索获准全文。来源或证据不足时如实停下。
-
-在 Web 工作区中，Agent 的连续提问会附带最近 4 轮对话与左侧最近一次成功搜索的结构化范围。每次提问时后端按固定 API/本地目录重新读取最多 3 页（每页 10 篇）的书目元数据，所以“根据刚才的检索结果列出标题、年份和链接”可以引用检索记录；这不是全文证据，不能据此总结论文发现。若来源在后续重读时不可用，运行记录会显示 `current_search_context` 错误，Agent 应说明无法核验，而不沿用历史回答冒充证据。用户可在面板中清空对话历史。
-
-BM25 为默认全文检索，不调用外部 Embeddings 服务。Dense/Hybrid 可选使用 OpenAI `text-embedding-3-large`（3072 维）与 cosine 相似度；Hybrid 用 BM25 与 Dense 排名进行 RRF（`k=60`）。选择 Large 是为了提高中英文混合检索的语义匹配能力：OpenAI 官方列出的 MTEB 为 64.6%，Small 为 62.3%；代价是输入价格约为 Small 的 6.5 倍（每百万 tokens $0.13 对 $0.02）。[Large 模型说明](https://developers.openai.com/api/docs/models/text-embedding-3-large) · [Embeddings 指南](https://developers.openai.com/api/docs/guides/embeddings)。Embedding provider 默认关闭；启用后，获准全文片段和搜索问题会发送到配置的 Embeddings API。模型基准不等于 PaperTrail 实测结果。
-
-下面是 P14 与 P17 的**历史元数据排序实验**，不是当前许可全文 RAG 评测。P14 使用 Small；P17 随后在同一冻结的 100 篇论文、30 个查询上改用 Large 复评。两次都使用未经人工核验的助手相关性标签，指标只供探索诊断。BM25 对两次实验相同：Hit@1 `0.5333`、MRR@10 `0.6444`、NDCG@10 `0.5222`。
+下面是 P14 与 P17 的**历史元数据排序实验**。P14 使用 Small；P17 随后在同一冻结的 100 篇论文、30 个查询上改用 Large 复评。两次都使用未经人工核验的助手相关性标签，指标只供探索诊断。BM25 对两次实验相同：Hit@1 `0.5333`、MRR@10 `0.6444`、NDCG@10 `0.5222`。
 
 | Embedding 配置 | Dense：Hit@1 / MRR@10 / NDCG@10 | Hybrid：Hit@1 / MRR@10 / NDCG@10 |                  估算 Embedding 费用 |
 | -------------- | ------------------------------: | -------------------------------: | -----------------------------------: |
 | P14 Small      |        0.8333 / 0.8562 / 0.6464 |         0.7000 / 0.8208 / 0.6321 | $0.0004792/次；两次合计约 $0.0009584 |
 | P17 Large      |        0.8000 / 0.8493 / 0.6952 |         0.7667 / 0.8478 / 0.6466 |                           $0.0031148 |
 
-Large 的 Dense NDCG@10 和 Hybrid 的 MRR/NDCG 在这组标签下较高，但 Dense 的 Hit@1/MRR 略低；Large 单次费用约为 Small 的 6.5 倍。由于标签未经人工核验，这些差异不能证明 Large 或 Small 的实际检索质量更好，也不应与后续 P39/P46 全文人工盲审结果混为一谈。完整设置和边界见 [P14](docs/research/P14-acceptance.md) 与 [P17](docs/research/P17-embedding-model-upgrade-acceptance.md)。
+这组标签下，Large 的 Dense NDCG@10 和 Hybrid 的 MRR/NDCG 较高，Dense 的 Hit@1/MRR 略低；Large 单次费用约为 Small 的 6.5 倍。标签未经人工核验，结果仅作探索对照。
 
 ## 技术栈
 
@@ -116,7 +108,7 @@ Large 的 Dense NDCG@10 和 Hybrid 的 MRR/NDCG 在这组标签下较高，但 D
 
 ## 检索策略与评测证据
 
-PaperTrail 按研究任务组合工具：公开元数据检索用于发现论文，本地 BM25 提供不依赖外部模型的基线，Dense/Hybrid 是需显式启用的全文实验选项，引用拓展用于补充候选脉络。它们服务不同研究阶段，不以单一排序器覆盖全部任务。
+评测覆盖公开元数据检索、本地 BM25、可选 Dense/Hybrid 全文检索和引用拓展。
 
 | 评测阶段                                                   | 能说明什么                                                                | 不能说明什么                                                                               |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -133,7 +125,7 @@ P39/P46 扩展试点的宏平均结果如下（6 个可回答问题；相关阈�
 | Dense  |     0.667 |     1.000 |     0.833 | **0.733** |         **0.438** |  1.000 |     0.833 | **0.843** |          **0.789** |
 | Hybrid | **0.833** | **1.000** | **0.917** |     0.671 |             0.342 |  1.000 | **0.917** |     0.762 |              0.741 |
 
-| 问题桶   | 方法   | Hit@5 |     MRR@5 |    NDCG@5 | 池内 Recall@5 | Hit@10 |    MRR@10 |   NDCG@10 | 池内 Recall@10 |
+| 问题类型 | 方法   | Hit@5 |     MRR@5 |    NDCG@5 | 池内 Recall@5 | Hit@10 |    MRR@10 |   NDCG@10 | 池内 Recall@10 |
 | -------- | ------ | ----: | --------: | --------: | ------------: | -----: | --------: | --------: | -------------: |
 | 精确术语 | BM25   | 1.000 |     0.417 |     0.283 |         0.286 |  1.000 |     0.417 |     0.429 |          0.500 |
 | 精确术语 | Dense  | 1.000 |     0.750 | **0.607** |     **0.571** |  1.000 |     0.750 | **0.812** |      **0.929** |
@@ -147,20 +139,11 @@ P39/P46 扩展试点的宏平均结果如下（6 个可回答问题；相关阈�
 
 Hybrid 的 Hit@1、MRR@5/10 在本次试点中较高，Dense 的 NDCG 与候选池内 Recall 较高；三种方法在六个可回答问题上的 Hit@10 均为 1.000。结果只支持“在这个小型试点的部分排序指标上观察到方法差异”，不能证明一般性质量提升、统计显著性或 Hybrid 全面胜出。评分来自单一评审；候选池内 Recall 的分母按问题计算，所有问题合计判断了 127 个候选，不包括未判断片段，也不等于全部 417 个全文片段。Q07/Q08 的三种方法 top-10 均未出现 grade≥2 片段，但每题只有一次语料内不可回答判断。完整输入哈希、延迟、成本和限制见 [P39/P46 全文 RAG 试点评测](docs/research/P39-rag-evaluation-protocol.md)。
 
-其他评测数据和复现边界见：[P05 人工复核](docs/research/P05-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md) · [P17 模型复评](docs/research/P17-embedding-model-upgrade-acceptance.md) · [P36 盲审池](docs/research/P36-blind-pool-review.md) · [P37 标签一致性](docs/research/P37-assistant-human-grade-agreement.md)。
+其他评测记录见：[P05 人工复核](docs/research/P05-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md) · [P17 模型复评](docs/research/P17-embedding-model-upgrade-acceptance.md) · [P36 盲审池](docs/research/P36-blind-pool-review.md) · [P37 标签一致性](docs/research/P37-assistant-human-grade-agreement.md)。
 
-多论文问题仍暴露出 top-2 的证据覆盖缺口：Hybrid 在 Q05 top-2 没有 grade≥2 片段，Q06 仅覆盖一篇的相关来源；两题到 top-5 才都覆盖两篇相关来源。来源轮转重排的离线反事实检查没有改善两题的 top-2 相关来源覆盖，因此未作为质量改进发布，也未改变默认排序。P43 的 Agent 指引要求按来源 ID 分别取证并披露缺口；一次 live 验收中两篇获准全文均分别返回证据，但这不是排序器改进证据。原文、片段和逐条标签保留在本机。
+多论文问题在 top-2 仍有证据覆盖缺口：Hybrid 未在 Q05 命中 grade≥2 片段，在 Q06 只覆盖一篇论文；两题到 top-5 才覆盖两篇论文。来源轮转重排没有改善 top-2 覆盖，因此没有改变默认排序。原文、片段和逐条标签保留在本机。
 
-尚无证据声称总体检索质量提升。更强结论需要多个主题的查询、更多相关文献和独立复评；全文问答还需单独测量证据准确性。未经人工校准的模型评分只作为候选建议，不记作人工标签。
-
-### Agent / Web 验证
-
-- 后端自动测试：**138 passed**；覆盖 Agent 工具循环、引用拓展和筛选、当前搜索上下文重读与引用、近期对话传递、OpenAlex/arXiv 跨源 DOI 归并、来源客户端、全文许可门禁、精确证据定位、逐篇来源限定的全文取证、缺少单篇证据时的部分回答与引用归属、盲审池导入及评分一致性指标。
-- 离线 Agent Harness 评测：**10/10 mock 场景通过**，覆盖安全/错误处理、主题检索与双向引用拓展，以及 OpenAlex + arXiv 补充发现与同 DOI 归并；检查年份/引用关系来源、保留备用 arXiv 链接及未观察引用拒绝。v5 报告逐场景列出状态/指标断言和失败原因；未授权工具执行为 0。它验证安全契约和工作流，不代表真实模型质量。
-- Web Playwright：**21/21 E2E 通过**，覆盖搜索、详情、比较、Agent 当前检索与多轮历史传递、证据展示、错误重试和键盘操作。测试复用已运行的开发服务，避免 Next.js 在同一 `.next` 目录启动第二个服务；详见 [P33 验收记录](docs/research/P33-agent-context-acceptance.md)。
-- GitHub Actions：后端与 Web jobs 均通过，包含 Ruff、pytest、OpenAPI 契约、前端类型检查、生产构建及浏览器 E2E。
-
-一篇经许可确认的 arXiv 全文完成了本机导入、检索、Agent 引用和删除/恢复 smoke。这只验证单篇闭环，不代表全文检索的统计质量。Agent 当前搜索上下文和多轮对话验收见 [P33 记录](docs/research/P33-agent-context-acceptance.md)。更多阶段记录见 [`docs/research/`](docs/research/)。
+当前全文评测覆盖 10 篇论文、8 个问题，由一位评审完成。未经人工核验的模型评分不计作人工标签。阶段记录见 [`docs/research/`](docs/research/)。
 
 ## 本地运行
 
@@ -271,8 +254,6 @@ cd backend
 uv run --locked python -m app.cli.evaluate_p14 --allow-provider-call
 ```
 
-Windows 本机 E2E 若在所有断言结束后未正常退出，可先在独立终端启动 `node ./node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3001`，再运行 Playwright。GitHub Actions 在 Linux 上会自动管理该服务。
-
 ## 项目结构
 
 ```text
@@ -292,8 +273,8 @@ Windows 本机 E2E 若在所有断言结束后未正常退出，可先在独立�
 │   ├── components/      # 搜索、论文详情、比较和 Agent UI
 │   └── tests/e2e/       # 浏览器端端到端用例
 ├── docs/
-│   ├── research/        # 各阶段验收与研究记录
-│   ├── development.md   # 本机运行、数据导入与验收说明
+│   ├── research/        # 评测与研究记录
+│   ├── development.md   # 本机运行与数据导入
 │   └── openapi.json     # API 契约
 └── .github/workflows/  # 后端与 Web 持续集成
 ```
@@ -310,4 +291,4 @@ Windows 本机 E2E 若在所有断言结束后未正常退出，可先在独立�
 
 - [项目规格](docs/PROJECT_SPEC.md) · [任务台账](docs/TASKS.md) · [阶段进度](docs/PROGRESS.md) · [执行计划](docs/EXECUTION_PLAN.md)
 - [开发与验收指南](docs/development.md) · [OpenAPI 契约](docs/openapi.json)
-- [P05 人工复核评测](docs/research/P05-acceptance.md) · [P12 Agent 离线评测](docs/research/P12-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md)
+- [P05 人工复核评测](docs/research/P05-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md)
