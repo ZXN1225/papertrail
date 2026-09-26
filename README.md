@@ -93,6 +93,15 @@ Skill 定义保存在 `backend/app/agent/skills.json`，只包含说明文字和
 
 BM25 为默认全文检索，不调用外部 Embeddings 服务。Dense/Hybrid 可选使用 OpenAI `text-embedding-3-large`（3072 维）与 cosine 相似度；Hybrid 用 BM25 与 Dense 排名进行 RRF（`k=60`）。选择 Large 是为了提高中英文混合检索的语义匹配能力：OpenAI 官方列出的 MTEB 为 64.6%，Small 为 62.3%；代价是输入价格约为 Small 的 6.5 倍（每百万 tokens $0.13 对 $0.02）。[Large 模型说明](https://developers.openai.com/api/docs/models/text-embedding-3-large) · [Embeddings 指南](https://developers.openai.com/api/docs/guides/embeddings)。Embedding provider 默认关闭；启用后，获准全文片段和搜索问题会发送到配置的 Embeddings API。模型基准不等于 PaperTrail 实测结果。
 
+下面是 P14 与 P17 的**历史元数据排序实验**，不是当前许可全文 RAG 评测。P14 使用 Small；P17 随后在同一冻结的 100 篇论文、30 个查询上改用 Large 复评。两次都使用未经人工核验的助手相关性标签，指标只供探索诊断。BM25 对两次实验相同：Hit@1 `0.5333`、MRR@10 `0.6444`、NDCG@10 `0.5222`。
+
+| Embedding 配置 | Dense：Hit@1 / MRR@10 / NDCG@10 | Hybrid：Hit@1 / MRR@10 / NDCG@10 |                  估算 Embedding 费用 |
+| -------------- | ------------------------------: | -------------------------------: | -----------------------------------: |
+| P14 Small      |        0.8333 / 0.8562 / 0.6464 |         0.7000 / 0.8208 / 0.6321 | $0.0004792/次；两次合计约 $0.0009584 |
+| P17 Large      |        0.8000 / 0.8493 / 0.6952 |         0.7667 / 0.8478 / 0.6466 |                           $0.0031148 |
+
+Large 的 Dense NDCG@10 和 Hybrid 的 MRR/NDCG 在这组标签下较高，但 Dense 的 Hit@1/MRR 略低；Large 单次费用约为 Small 的 6.5 倍。由于标签未经人工核验，这些差异不能证明 Large 或 Small 的实际检索质量更好，也不应与后续 P39/P46 全文人工盲审结果混为一谈。完整设置和边界见 [P14](docs/research/P14-acceptance.md) 与 [P17](docs/research/P17-embedding-model-upgrade-acceptance.md)。
+
 ## 技术栈
 
 | 层     | 技术                                                                      |

@@ -23,6 +23,8 @@ P48 第一版运行时 Skills 已实现并通过现场验收：`backend/app/agen
 
 P49 最终审查与交付完成：README 中保留 BM25/Dense/Hybrid 总体及分桶对照表、指标定义和小样本限制；P39/P47/P48 阶段记录与源代码、测试一并推送到当前 GitHub 工作分支。验证结果：后端 Ruff、格式检查、144 项 pytest 和 OpenAPI 导出通过；Web Prettier、TypeScript、生产构建及单 worker E2E（21/21）通过；根 `git diff --check` 通过。E2E 使用 3001 端口的独立生产预览复用，未停止用户在 3000 端口运行的开发服务。Web `pnpm audit --audit-level moderate` 和后端 pip-audit（扫描锁定 venv）均报告无已知漏洞。GitHub 只包含源代码、文档和汇总结果；本机 `.env`、数据库、全文、PDF 和逐条评分文件未纳入提交。
 
+P50 根据用户对 Embedding 选型表的疑问，在 README 并列展示 P14 Small 与 P17 Large 的 Dense/Hybrid 指标和估算费用，并说明二者是同一冻结元数据评测集上的先后实验；P14 表保留 Small 历史结果，Large 已在 P17 单独复评。再次强调 qrels 未经人工核验，这些结果不支持模型质量优劣结论，也与 P39/P46 全文盲审评测分开解释。
+
 ## P40 本地试点语料准备（文件已就绪；导入待逐篇复核）
 
 - 检测到用户提供的 `backend/paper_doc/01`–`10`；保留 `01` 原有 PDF/TXT/manifest 和既有批准记录，对 `02`–`10` 的 PDF 文字层提取 UTF-8 TXT 与对应 manifest 草稿，共 9 组。第 `10` 篇后来由用户替换为 arXiv `2310.11511v1`（Self-RAG），已重新生成 `10.txt`（30 页）和 manifest；首面标题与正文已抽查。该本机目录被 `.gitignore` 忽略，原文不会进入提交。
