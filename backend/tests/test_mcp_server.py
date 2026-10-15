@@ -195,6 +195,7 @@ def test_mcp_uses_configured_database_path_without_provider_settings(
 def test_mcp_resolves_relative_database_path_from_backend_root(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("DATA_STORAGE_PATH", "data\\papertrail.sqlite3")
+    data_path = Path("data") / "papertrail.sqlite3"
+    monkeypatch.setenv("DATA_STORAGE_PATH", str(data_path))
 
     assert _configured_database_path() == Path(__file__).parents[1] / "data" / "papertrail.sqlite3"
