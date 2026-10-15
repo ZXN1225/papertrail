@@ -1,25 +1,25 @@
 # PaperTrail · 论文检索与研究助理 Agent
 
-**从研究问题出发发现论文，让 Agent 逐步检查知识库，并用可追溯的证据回答。**
+**论文检索、全文证据查找与文献比较。**
 
 [![PaperTrail CI](https://github.com/ZXN1225/papertrail/actions/workflows/ci.yml/badge.svg)](https://github.com/ZXN1225/papertrail/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![Agent](https://img.shields.io/badge/Agent-bounded%20tools-176B55)
 
-PaperTrail 是一个用于学习研究与简历展示的全栈 Agent 项目。它连接 OpenAlex 和 arXiv 元数据，提供论文检索、比较、许可全文 RAG 与研究助理工作区。项目聚焦 Agent Harness、证据溯源和可重复评测；它不是生产级文献服务，也不代替系统综述或研究者判断。
+PaperTrail 是一个全栈论文检索与研究助理项目，整合 OpenAlex、arXiv 和经许可导入的本地全文，支持论文比较与证据检索。
 
-## 主要功能
+## 项目能做什么
 
 - **发现与管理论文**：从 OpenAlex、arXiv 搜索元数据，或使用已导入的本地目录；保存查询快照、来源、版本和内容哈希，支持重复导入与历史快照查看。
-- **逐步研究**：Agent 可搜索目录、查看单篇论文、查找词法相似论文、比较元数据，并根据问题决定是否继续调用工具。
-- **许可全文问答**：逐篇登记并确认 CC0 或 CC BY 许可后，才可将本地 UTF-8 文本导入；全文按结构与保守 UTF-8 token 上界分块，支持 BM25、Dense 和 Hybrid 检索。该上界不等于某个模型 tokenizer 的精确计数。
-- **可核验回答**：引用绑定本轮工具返回的论文 ID、证据片段、来源和位置；引用无效或证据不足时，Harness 会拒绝完成为可信答案。
-- **运行时 Harness**：集成有界 token/context/tool/deadline 预算、协作取消、运行状态查询、幂等 run ID、脱敏追踪与 Skills 版本记录；运行记录不保存原始问题、回答或论文摘录。
-- **Skills 与 MCP**：按研究任务选择三个只读产品 Skills，并用注册表哈希与工具白名单约束；MCP 提供固定只读 stdio 工具集，以 SQLite `mode=ro` 打开已迁移目录库，当前仅公布实际可用的 BM25 全文检索。
-- **Multi-agent 实验框架**：提供默认不接入生产问答路径的 worker/supervisor 对照骨架，共享预算、显式冲突处理；当前只有合成契约测试，真实任务收益仍待许可数据与预算评测。
+- **扩展文献集合**：从种子论文沿 OpenAlex 参考文献或被引关系拓展一跳，并比较候选。
+- **许可全文问答**：逐篇登记并确认 CC0 或 CC BY 许可后，才可将本地 PDF 或 UTF-8 文本导入；全文做结构化解析后按可追踪位置分块，支持 BM25、Dense 和 Hybrid 检索。
+- **可核验回答**：引用关联到本轮检索结果；全文证据保留片段、来源、许可和位置。
+- **运行时 Agent Skills**：内置三种任务工作流；激活后，模型只能使用该 Skill 的固定工具子集。
+- **连续研究上下文**：后续提问可引用最近的检索条件、书目结果和对话内容；论文正文仍以工具返回的全文证据为准。
+- **只读 MCP 集成**：以 stdio MCP Server 暴露固定的只读论文工具，外部 Host 无法借此写库或访问任意 URL。
 - **检索实验**：在相同语料和查询上比较 BM25、Dense cosine 与 RRF Hybrid，输出指标、配置、数据哈希和成本估算。
-- **中文研究工作区**：浏览论文、查看详情、并列比较元数据、向研究助理提问，并查看引用、证据片段和运行 trace。
+- **研究工作区**：浏览论文、查看详情、比较元数据，并检索引用和全文证据。
 
 ## 工作流
 
@@ -31,6 +31,9 @@ flowchart LR
     D -->|发现论文| O[OpenAlex / arXiv 元数据 API]
     D -->|读取本地资料| C[SQLite 论文目录]
     D -->|核对论文内容| F[已批准全文证据]
+    O --> X[按需扩展一跳引用关系]
+    X --> S[候选去重 / 比较]
+    S --> H
     O --> C
     C --> H
     F --> R[BM25 / Dense / Hybrid]
@@ -40,84 +43,157 @@ flowchart LR
     A --> UI
 ```
 
-Agent 使用服务端固定工具，不允许模型执行任意 SQL、shell 或 URL 抓取。论文标题、摘要、全文片段和工具输出都按不可信数据处理。
+Agent 通过服务端固定工具读取论文资料，不开放任意 URL、shell、SQL 或写入操作。外部 MCP Host 走同一个只读工具注册表。
 
 ## Agent 与 RAG 设计
 
 ### 固定工具集
 
-| 工具类型 | 能力                                                    | 边界                                                              |
-| -------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
-| 本地目录 | 搜索论文、读取详情、查找词法相似论文、比较 2–5 篇论文   | 只读已导入的元数据；“相似”不是引用关系                            |
-| OpenAlex | 搜索 Works、读取 Work、搜索/读取 Author、列出作者 Works | 固定官方 API 主机；请求字段、页大小、超时均受限                   |
-| arXiv    | 搜索和读取论文元数据                                    | 固定官方 API；限速；不会通过该工具下载 PDF                        |
-| 许可全文 | 检索批准全文的片段并返回定位与署名信息                  | 仅使用当前批准版本；BM25 默认，Dense/Hybrid 需显式启用 Embeddings |
+| 工具类型 | 能力                                                                       | 边界                                                                                                                                                                              |
+| -------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 本地目录 | 搜索论文、读取详情、查找词法相似论文、比较 2–5 篇论文                      | 只读已导入的元数据；“相似”不是引用关系                                                                                                                                            |
+| OpenAlex | 搜索/读取 Works、Authors、作者 Works；按需扩展种子论文的参考文献或被引作品 | 固定官方 API 主机；年份/OA 条件为结构化白名单；最多一跳、每方向最多 10 条；关系只作发现线索。调用依据：[OpenAlex 引用 API recipes](https://help.openalex.org/how-to/api-recipes/) |
+| arXiv    | 搜索和读取论文元数据；支持提交年份范围                                     | 固定官方 API；限速；年份按提交日期筛选；不会通过该工具下载 PDF                                                                                                                    |
+| 许可全文 | 检索批准全文的片段并返回定位与署名信息                                     | 仅使用当前批准版本；BM25 默认，Dense/Hybrid 需显式启用 Embeddings                                                                                                                 |
 
 ### Agent Harness 的运行约束
 
-- 工具参数经 Pydantic schema 验证，未知工具和多余参数会被拒绝。
+- 工具参数经 Pydantic schema 验证，未知工具和多余参数会被拒绝；Trace 只记录已注册工具名，未知名称统一记为 `unknown_tool`。
 - 每次运行限制决策步数、工具调用次数、总时限和观察内容大小。
-- 模型只可使用当前 Skill 允许的工具；`SKILL.md` 不得扩大工具权限，工具执行边界再次检查。
-- Harness 要求答案文本与结构化主张规范拼接一致，引用必须绑定当前运行观察到的来源 ID、原文 quote、证据类型和 chunk/字段位置。
-- 受控书目字段只能支持书目信息；论文方法、结果和发现要求许可全文证据。系统只校验来源/摘录绑定，不声称已证明语义蕴含。
-- SQLite run ledger 保存任务状态、问题哈希、token/工具计数和脱敏 trace，不持久化问答正文或全文摘录；重复 run ID 不会重复触发模型调用。中断任务可识别但不会自动重放。
-- MCP 通过真实 SDK Client 与 stdio 子进程契约测试；服务端工具面固定只读。
+- **每次模型请求前先按输入上界预留额度**：以指令、完整输入、工具 schema 与响应格式的 UTF-8 字节上界（加固定余量）从共享预算中先行扣留，再把输出上限收紧为 `min(配置上限, 剩余额度 − 输入预留)`；预留后没有输出空间就在调用前以 `token_budget_exceeded` 结束。provider 回报的实际输入超过上界时立即停止后续步骤。
+- embedding 查询同样在调用前按 query 字节数预检；额度不足时不发起请求，实际用量超过估算上界时计入并停止后续步骤。
+- Harness 校验模型给出的引用是否来自本轮工具观察，并验证证据片段和论文 ID 的对应关系。
+- 元数据只能支持元数据层面的说法；论文结论必须有全文证据。证据不足时明确拒答，不从模型记忆补写论文事实。
+- 运行账本只保存 run ID、问题哈希、状态、时间、用量计数与脱敏 trace，**不保存问题正文、答案或论文摘录**；因此重启后不会自动重放模型调用。
+- 回答论文方法或发现时使用获准全文证据；只有书目数据时，回答限于书目信息。
 
-### 检索管线
+### Runtime Skills
 
-1. 解析查询并检查本地知识库中的论文对象。
-2. 按需搜索标题/摘要元数据，Agent 可根据结果决定继续查看哪些论文。
-3. 只有问题需要论文内容且本地存在获准全文时，才检索全文证据。
-4. 返回片段、来源、许可、署名和字符位置，再由 Harness 检查引用。
+| Skill            | 适用任务                      | 允许的工具范围                     |
+| ---------------- | ----------------------------- | ---------------------------------- |
+| `paper-qa`       | 单篇论文的证据问答            | 获准全文证据检索与精确元数据读取   |
+| `compare-papers` | 比较两篇及以上论文的方法/发现 | 本地目录比较与获准全文证据检索     |
+| `research-brief` | 汇总一个主题的研究脉络        | 元数据发现、引用扩展与全文证据检索 |
 
-BM25 为默认全文检索，不调用外部 Embeddings 服务。Dense 使用 OpenAI Embeddings 与 cosine 相似度；Hybrid 用 BM25 与 Dense 排名进行 RRF（`k=60`）。Embedding provider 默认关闭；启用后，获准全文片段和搜索问题会发送到配置的 Embeddings API。
+Skill 定义保存在 `backend/app/agent/skill_specs/*.SKILL.md`，注册表与指令正文都有 SHA-256 pin：正文漂移会被拒绝。Harness 取“Skill 推荐工具”与“本轮已注册工具”的交集，**Skill 不能扩大工具权限**；每次运行最多激活一个 Skill。
+
+### 检索策略选型及原因
+
+| 研究需求               | 选用策略                                     | 选型原因                                                                    | 实测依据与边界                                                                                      |
+| ---------------------- | -------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 发现论文、浏览书目     | OpenAlex / arXiv 元数据检索；本地目录用 BM25 | 公开来源提供结构化书目字段；本地 BM25 无 Embedding 费用，结果容易复现和解释 | P05 小样本人工复核；OpenAlex 按出版年筛选，arXiv 按提交日期筛选                                     |
+| 根据获准全文查找证据   | 全文 BM25 默认；Dense 或 RRF Hybrid 显式启用 | 全文需逐篇通过许可登记；BM25 保持本地可用，语义检索作为可选对照             | P14 在冻结元数据集上做过排序诊断，但并非全文 RAG 质量评测；当前真实许可全文规模也不足以支持统计结论 |
+| 从种子论文拓展研究脉络 | OpenAlex 一跳参考文献 / 被引关系             | 引用邻居能补充关键词检索未命中的候选，且保留来源和关系便于复核              | 仅作发现线索；不是论文结论的证据，也不假设新候选比原搜索结果更相关                                  |
+| 合并多个公开来源结果   | OpenAlex + arXiv，按完全匹配 DOI 去重        | 兼顾综合书目与预印本发现；严格 DOI 匹配避免仅凭标题误合并                   | 按完全匹配 DOI 去重，不依据标题猜测相同作品                                                         |
+
+BM25 为默认全文检索。Dense 可选使用 OpenAI embeddings 与 cosine 相似度；Hybrid 使用 BM25 与 Dense 排名进行 RRF（`k=60`）。Embedding provider 默认关闭；启用后，问题和获准全文片段会发送到配置的 API。
+
+下面是 P14 的**历史元数据排序实验**：冻结的 100 篇论文、30 个查询，使用未经人工核验的助手相关性标签，指标只供探索诊断。BM25 的 Hit@1 `0.5333`、MRR@10 `0.6444`、NDCG@10 `0.5222`。
+
+| Embedding 配置 | Dense：Hit@1 / MRR@10 / NDCG@10 | Hybrid：Hit@1 / MRR@10 / NDCG@10 |                  估算 Embedding 费用 |
+| -------------- | ------------------------------: | -------------------------------: | -----------------------------------: |
+| P14 Small      |        0.8333 / 0.8562 / 0.6464 |         0.7000 / 0.8208 / 0.6321 | $0.0004792/次；两次合计约 $0.0009584 |
+
+该组标签下 Dense 的 Hit@1/MRR 较高而 Hybrid 的 NDCG 略低；标签未经人工核验，结果仅作探索对照。
 
 ## 技术栈
 
-| 层     | 技术                                                                   |
-| ------ | ---------------------------------------------------------------------- |
-| Web    | Next.js 16、React 19、TypeScript                                       |
-| API    | FastAPI、Pydantic、Uvicorn                                             |
-| Agent  | OpenAI Responses API function calling、受限 Agent Harness、Skills、MCP |
-| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                 |
-| 数据源 | OpenAlex Works / Authors API、arXiv API                                |
-| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60               |
-| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions         |
+| 层     | 技术                                                                      |
+| ------ | ------------------------------------------------------------------------- |
+| Web    | Next.js 16、React 19、TypeScript                                          |
+| API    | FastAPI、Pydantic、Uvicorn                                                |
+| Agent  | OpenAI Responses API function calling、受限 Agent Harness、服务端引用校验 |
+| MCP    | 只读 stdio MCP Server、固定工具注册表                                     |
+| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                    |
+| 数据源 | OpenAlex Works / Authors API、arXiv API、逐篇许可的本机 PDF 全文          |
+| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60                  |
+| 解析   | pdfplumber 结构化解析（元素/章节/表格/图注 + 页级 bbox 与解析告警）       |
+| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions            |
 
-## 评测结果与可信边界
+## 检索策略与评测证据
 
-### P05：小规模人工复核 BM25 集
+评测覆盖公开元数据检索、本地 BM25、可选 Dense/Hybrid 全文检索和许可全文的证据命中。
 
-80 条论文-查询相关性判断由用户人工复核，数据集包含 8 个查询和 10 篇论文。重跑 BM25 的结果为：
+| 评测项目                                               | 结果用途                                                             | 结论边界                                                             |
+| ------------------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| P05 人工复核集：8 个查询、10 篇论文、80 个判断         | BM25 指标和相关性评测流程可在冻结数据上复现                          | 样本太小，不能代表一般检索表现                                       |
+| P13/P14：30 个查询、100 篇元数据、助手生成的候选标签   | 可重复对照 BM25、Dense、Hybrid 的实现、配置和运行成本                | 标签未人工核验，不能证明哪种方法质量更好                             |
+| R02：9 篇许可全文、217 页、3,294 个 chunk 的解析与索引 | 冻结每篇的 PDF SHA、许可、parser 版本与逐 chunk 内容哈希，升级可审计 | lineage 只证明来源与索引可追溯，**不证明解析内容正确**               |
+| R01/R03：9 篇许可全文上的 53 题 AI 标注检索评测        | 在同一活动索引上度量“证据是否进了 top-k”，并按题型定位短板           | 标签由 AI Agent 标注、非人工金标；题目写自被评测索引本身，分数偏乐观 |
 
-| 指标    |   结果 |
-| ------- | -----: |
-| Hit@1   |   0.75 |
-| MRR@10  |  0.875 |
-| NDCG@10 | 0.8849 |
+### 许可全文上的证据命中（活动索引 v27，全库 3,294 chunks/查询）
 
-这是小样本流程验收与探索性结果，不能推断大规模检索质量。
+| 指标             | 结果                  |
+| ---------------- | --------------------- |
+| 证据命中 @1      | 26 / 44 = 59.1%       |
+| 证据命中 @8      | 39 / 44 = 88.6%       |
+| `figure_caption` | 5 / 5                 |
+| `single_fact`    | 22 / 24               |
+| `multi_hop`      | 11 / 12               |
+| `table_lookup`   | **1 / 3**（明确短板） |
 
-### P14：BM25、Dense、Hybrid 对照
+不可答题的可分性（诊断）：BM25 top-1 分数上可答题均值 **32.5**、不可答题均值 **18.3**，本样本中不可答题的最高分低于可答题的均值。该观察只有 9 道负例，不足以声称存在普遍可用的阈值。
 
-在 100 篇 OpenAlex 元数据和 30 个查询上对比相同候选集：
+`table_lookup` 偏低与 [R02 v27 解析升级记录](docs/research/R02-v27-parse-upgrade.md) 中记录的表头切词/单元格归属缺陷方向一致：列标签不可复原时，按表头词语提问自然检索不到。该题型只有 3 道，只能作为线索。
 
-| 方法                             |  Hit@1 | MRR@10 | NDCG@10 |
-| -------------------------------- | -----: | -----: | ------: |
-| BM25                             | 0.5333 | 0.6444 |  0.5222 |
-| Dense (`text-embedding-3-small`) | 0.8333 | 0.8562 |  0.6464 |
-| Hybrid (RRF@60)                  | 0.7000 | 0.8208 |  0.6321 |
+其余评测记录见：[P05 人工复核](docs/research/P05-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md) · [R01/R03 AI 标注评测](docs/research/R01-R03-ai-labeled-evaluation.md) · [阶段记录](docs/research/)。
 
-**解读限制：** P14 使用的 3,000 个相关性分数未全部经过人工核验；语料也来自单一主题搜索。因此这些结果只用于工程诊断，不能证明 Dense 优于 BM25，也不能代表真实用户检索表现。该次 Dense 运行处理 23,960 个输入 tokens，估算费用约 USD 0.0004792；实际账单以账户记录为准。完整分桶、配置与限制见 [P14 记录](docs/research/P14-acceptance.md)。
+## 本轮升级（2026-10）
 
-### Agent / Web 验证
+升级的原因、改动与结果集中在这里；细节见对应验收记录。
 
-- 后端自动测试：**219 passed**，包含 Harness、Skills、MCP 只读边界、PDF 结构定位、迁移、request-scoped 多轮上下文、任务运行记录、预算、真实 PDF 引擎的合成文件集成、脱敏 Trace、API 级取消链路、claim 数值/单位/方向/实验组机械一致性门禁和合成 Multi-agent 协调/配对评测契约。机械门禁不能证明语义蕴含或真实 RAG 质量。
-- 离线 Agent 安全评测：**3/3 mock 场景通过**；越权工具尝试被拦截，未授权工具执行为 0。它验证安全和评测管线，不代表真实模型质量。
-- Web Playwright：**18/18 E2E 通过**，覆盖搜索、详情、比较、Agent 证据展示、错误重试、键盘操作及有界追问/清空。
-- GitHub Actions 历史运行通过了后端和 Web jobs；当前本地还增加了 Docker Compose 构建与 readiness smoke job，但修改尚未上传，所以该 job 尚无远程运行结果。
+### 1. 解析与索引：v21 → v27
 
-一篇经许可确认的 arXiv 全文完成了本机导入、检索、Agent 引用和删除/恢复 smoke。这只验证单篇闭环，不代表全文检索的统计质量。更多阶段记录见 [`docs/research/`](docs/research/)。
+**原因**：许可全文索引长期停在 `pdfplumber-layout-v21`，而后续版本已经修掉了真实版面下的解析缺陷。不升级活动索引，检索就一直在用已知有错的旧文本。
+
+**改了什么**
+
+- 修掉两个**静默缺陷**（输出看起来正常、实际是错的）：
+  1. `Table.extract()` 的推断列边界落在表头字形之外时**静默丢词**（实测丢掉 `UMA`、`max_k p_k`）——改为以整表文本为参照回挂缺失词，单字符按目标单元格字符预算判定，并强制“不重复”；
+  2. pdfplumber 行边界切在单元格两行之间时，续行被当成独立行、原行该列为空——改为受列宽与行距约束的续行合并。
+- 新增规则：**没有 `Table N:` 标题、且 bbox 完全落在图形区域内的表格候选一律拒绝**。此前图形自身的文字层（坐标轴标签、刻度数字）会被当成一张很可信的多列表格，还带上伪造的 `Table 1` 标题。
+- 新增 6 个合成回归用例，其中两个是防回归守卫：「已在他行出现的词不得重复」「单字符在他处出现也不得漏判」。
+
+**结果**
+
+| 指标                     | 升级前 (v21) | 升级后 (v27)                         |
+| ------------------------ | ------------ | ------------------------------------ |
+| 活动全文                 | 9 篇         | 9 篇 / 217 页                        |
+| chunks                   | 4,871        | **3,294**                            |
+| 正文体量（字符）         | 712,009      | **715,744**（比值 1.005）            |
+| 表格数（v26 → v27 对比） | 26           | 24（移除 2 张图形文字层假表）        |
+| 全语料丢词               | —            | **0 张表丢词**，回收 36 个被丢弃的词 |
+| lineage 审计             | —            | **9/9 verified**                     |
+
+chunks 下降 **不是文本丢失**：正文体量反而多了 0.5%，说明只是分块变粗（平均 chunk 从 144 字符增至 215 字符）。
+
+### 2. 复核方式：人工逐项 → 独立 AI Agent 对抗式复核
+
+**原因**：此前每个 parser 版本都要重新生成 16–17 项人工复核包，但连续七个版本都没有等到标签，版本在自转。
+
+**改了什么**：把复核交给**不知晓本机结论的独立 Agent**，并补上此前缺失的可复现工具（`backend/tools/`）：复核包生成器、诊断数据集重版本化、标注候选导出、AI 标签组装与机械校验。
+
+**结果**：两轮复核都确认上述修复有效，并**找出我自己漏掉的缺陷**（就是上面那张图形文字层假表）；同时纠正了我上一轮对 `2610.09789` p10 的误判（我原以为三列一致，实际被压成单列）。最终构建：**8 supported / 7 unsupported / 1 uncertain，全样本 0 重复**；唯一残留是 `2610.06874` p14 被列线切掉的 1 个 `s`，已如实记录未修。记录见 [v26 独立核验](docs/research/R02-v26-independent-review.md) 与 [v27 升级记录](docs/research/R02-v27-parse-upgrade.md)。
+
+### 3. 评测证据：从 6 题单人参考 → 53 题 AI 标注
+
+**原因**：此前只有 6 道单人选定参考题，无法支撑任何质量描述。
+
+**改了什么**：在活动索引上建 44 道可答题（每题绑定真实 `chunk_id` 与逐字原文片段）+ 9 道不可答题；构建器**机械校验**每条引用是否逐字存在于所指 chunk、负例事实是否在整个语料中都不出现，并拒绝任何声称人工复核或金标的数据集。本次校验**丢弃了 1 条不合格标签**（该 Agent 自称已自检通过，仍被拦下）。
+
+**结果**：见上表（@1 59.1%、@8 88.6%，表格类查询为短板）。未调用任何付费模型（`provider_calls = 0`）。
+
+### 4. Agent 运行时与工具链
+
+- 新增**只读 MCP stdio Server**，与内部工具注册表共用同一套只读边界。
+- 运行账本新增历史摘要字段与检索/证据 lineage 分离迁移（0009/0010），账本仍只存哈希。
+- 修复仓库自身的可复现性：历史遗留的受限临时目录会让规范命令直接失败（pytest 收集阶段报 57 个 `PermissionError`、`ruff format` 崩溃）；修复后 **336 项测试可正常收集、291 passed / 0 failed**，OpenAPI 契约未变。
+
+### 仍然没做到（不据此宣称质量）
+
+- 表头切词/错列、`section_path` 元数据错误、OCR 与图像像素语义均未解决。
+- 全文评测是 **9 篇语料 + AI 标注**，不是独立人工金标，也不能外推为通用检索质量。
+- Multi-agent 对照只有 1/6 达成并获支持的 consensus、成本比约 2.20（高于 1.5 的启用门槛），因此**默认不接入生产路径**。
 
 ## 本地运行
 
@@ -157,18 +233,6 @@ pnpm dev
 
 打开 <http://127.0.0.1:3000>。API 文档位于 <http://127.0.0.1:8001/docs>；存活与就绪检查分别是 `/api/health/live` 和 `/api/health/ready`。首次 Web 安装后如果没有 Playwright 浏览器，执行 `pnpm exec playwright install chromium`。
 
-### Docker Compose
-
-仓库也提供容器化本机部署配置。需要 Docker Engine 和 Compose 插件；首次 build 会获取锁定依赖及基础镜像。后端 API 不直接发布到宿主机，Web 默认仅绑定 `127.0.0.1:3000`，SQLite 放在持久卷中。详细配置、密钥设置和数据保留说明见 [`docs/development.md`](docs/development.md#docker-compose-本地部署)。
-
-```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-docker compose up --build -d
-docker compose ps
-```
-
-当前开发主机没有 Docker/Podman，仓库内的镜像与 Compose 配置尚未在此环境实际构建或启动验收；Next standalone 产物已通过本机 `node server.js` 首页 smoke，但这不等于容器部署通过。请勿将容器配置描述为已验证部署。
-
 ### 导入论文数据
 
 导入少量 OpenAlex 元数据到本地 SQLite：
@@ -190,7 +254,7 @@ uv run --locked python -m app.cli.import_arxiv --query 'all:"retrieval augmented
 
 全文导入前，需从原始来源核对具体论文的许可、来源链接和署名要求。当前仅允许明确确认的 `CC0-1.0` 与 `CC-BY-4.0`；“可免费阅读”、`is_oa=true` 或元数据许可均不能代替全文许可。项目不会自动抓取全文，全文和 PDF 不随仓库分发。
 
-准备好本地 UTF-8 `.txt` 或经许可审核的 PDF 和 manifest 后，按[全文导入说明](docs/development.md#许可全文导入与检索-p09--p17)运行导入命令。PDF 在本地提取版面文本和表格，引用保留页码与页面区域；图表使用论文原文图注辅助检索，不声称能理解图片语义。之后可调用：
+准备好本机 PDF 与 manifest 后，按[全文导入说明](docs/development.md#许可全文导入与检索-p09)运行导入命令。之后可调用：
 
 ```text
 GET /api/v1/evidence/search?q=knowledge%20base&limit=5&retrieval_method=bm25
@@ -208,7 +272,7 @@ GET /api/v1/evidence/search?q=knowledge%20base&limit=5&retrieval_method=bm25
 }
 ```
 
-响应包含 `status`、答案、逐条主张、引用、警告、工具调用数、模型步骤、模型与 embedding 总 token 计数、`run_id` 和脱敏 trace。可以用 `GET /api/v1/agent/runs/{run_id}` 查询脱敏运行状态，用 `POST /api/v1/agent/runs/{run_id}/cancel` 请求协作取消。任务表不保存问题或回答正文；重启后的 orphaned run 会显示 `interrupted`，需要用户重新提交，系统不会回放模型调用。若没有启用 LLM，接口会返回 `model_disabled`；它不会生成伪造的回答。API 的完整 schema 见 [`docs/openapi.json`](docs/openapi.json)。
+响应包含 `status`、答案、引用、警告、工具调用数、模型步骤、token 计数、`run_id` 和 trace。若没有启用 LLM，接口会返回 `model_disabled`；它不会生成伪造的回答。API 的完整 schema 见 [`docs/openapi.json`](docs/openapi.json)。
 
 ## 评测与测试命令
 
@@ -221,6 +285,15 @@ uv run --locked ruff format --check .
 uv run --locked pytest -q
 uv run --locked python -m tools.export_openapi
 uv run --locked python -m app.cli.evaluate_p12
+
+# 只读核对本机许可 PDF 与活动索引的 lineage（不打印论文摘录、不写库）
+uv run --locked python -m app.cli.audit_fulltext_lineage `
+  --pdf "2607.24663=../A corrective agentic hybrid RAG.pdf"
+
+# AI 标注的证据命中评测（只读、0 次 provider 调用）
+uv run --locked python -m app.cli.evaluate_ai_labeled_tasks `
+  --dataset data/evaluation/ai-labeled-licensed-v1.json `
+  --output ../data/storage/ai-labeled-v1-report.json
 ```
 
 Web：
@@ -240,43 +313,48 @@ cd backend
 uv run --locked python -m app.cli.evaluate_p14 --allow-provider-call
 ```
 
-Windows 本机 E2E 若在所有断言结束后未正常退出，可先在独立终端启动 `node ./node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3001`，再运行 Playwright。GitHub Actions 在 Linux 上会自动管理该服务。
-
 ## 项目结构
 
 ```text
 .
 ├── backend/
-│   ├── app/agent/       # Harness、Responses 模型客户端、固定工具集
-│   ├── app/embeddings/  # 可选 Embeddings Provider
-│   ├── app/evaluation/  # BM25、P12/P14 与评测指标
-│   ├── app/retrieval/   # BM25、全文切块、向量与融合检索
-│   ├── app/sources/     # OpenAlex 和 arXiv 客户端
-│   ├── app/storage/     # SQLite repository 与版本化迁移
-│   ├── app/cli/         # 导入、评测、向量索引与全文撤销 CLI
-│   ├── data/evaluation/ # 可复现评测集
-│   └── tests/           # API、存储、Agent、RAG 与评测测试
+│   ├── app/agent/        # Harness、Responses 模型客户端、固定工具集、Skills 与多 Agent 实验
+│   ├── app/embeddings/   # 可选 Embeddings Provider
+│   ├── app/evaluation/   # BM25/P12/P14、全文检索诊断与 AI 标注评测
+│   ├── app/retrieval/    # BM25、PDF 结构解析、全文切块、向量与融合检索
+│   ├── app/sources/      # OpenAlex 和 arXiv 客户端
+│   ├── app/storage/      # SQLite repository 与版本化迁移
+│   ├── app/cli/          # 导入、评测、lineage 审计与全文撤销 CLI
+│   ├── app/mcp_server.py # 只读 stdio MCP Server
+│   ├── tools/            # 复核包生成、数据集重版本化、标注导出与组装
+│   ├── data/evaluation/  # 可复现评测集（含 AI 标注集）
+│   └── tests/            # API、存储、Agent、RAG、MCP 与评测测试
 ├── web/
 │   ├── app/             # 研究工作区与同源 API 代理
 │   ├── components/      # 搜索、论文详情、比较和 Agent UI
 │   └── tests/e2e/       # 浏览器端端到端用例
 ├── docs/
-│   ├── research/        # 各阶段验收与研究记录
-│   ├── development.md   # 本机运行、数据导入与验收说明
+│   ├── research/        # 评测、复核与验收记录
+│   ├── development.md   # 本机运行与数据导入
 │   └── openapi.json     # API 契约
-└── .github/workflows/  # 后端与 Web 持续集成
+└── .github/workflows/   # 后端与 Web 持续集成
 ```
 
 ## 已知限制
 
-- 这是学习与简历项目，不提供生产 SLA、线上可用率或大规模服务承诺。
+- 该项目仅供学习和研究使用，不提供生产 SLA、线上可用率或大规模服务承诺。
 - P05 人工复核集仅 8 个查询、10 篇论文，仍是探索性小样本。
 - P13/P14 相关性标签未经人工全审，相关检索指标不能作为质量声明。
+- 许可全文评测（53 题）的标签由 **AI Agent 标注**，不是人工金标；题目写自被评测索引本身，分数偏乐观。
+- 解析层面仍有已披露缺陷：多行表头被列线切穿导致列标签不可复原（`2609.39773` p39、`2610.12662` p17 等）、个别单字符在表头被切掉（`2610.06874` p14 的 1 个 `s`）、部分 table 元素的 `section_path` 不正确。
 - 尚未系统评估真实用户任务成功率、LLM 回答质量和多用户压力表现。
+- Multi-agent 对照未显示收益且成本更高，默认关闭；本机没有容器运行时，Docker/Compose 配置未在本机 build 验证。
 - 全文许可逐篇人工核对；项目源码目前未选择再发布许可证。公开仓库不自动授予代码复用许可。
 
 ## 项目文档
 
 - [项目规格](docs/PROJECT_SPEC.md) · [任务台账](docs/TASKS.md) · [阶段进度](docs/PROGRESS.md) · [执行计划](docs/EXECUTION_PLAN.md)
-- [开发与验收指南](docs/development.md) · [OpenAPI 契约](docs/openapi.json)
-- [P05 人工复核评测](docs/research/P05-acceptance.md) · [P12 Agent 离线评测](docs/research/P12-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md)
+- [开发与验收指南](docs/development.md) · [OpenAPI 契约](docs/openapi.json) · [项目约定](AGENTS.md)
+- [R02 v27 解析升级记录](docs/research/R02-v27-parse-upgrade.md) · [R01/R03 AI 标注评测](docs/research/R01-R03-ai-labeled-evaluation.md)
+- [R04 Agent 运行状态与预算](docs/research/R04-agent-runs-acceptance.md) · [R05 只读 MCP](docs/research/R05-mcp-acceptance.md) · [R06 Skills](docs/research/R06-skills-acceptance.md) · [R07 多 Agent 对照](docs/research/R07-multi-agent-experiment.md)
+- [P05 人工复核评测](docs/research/P05-acceptance.md) · [P14 检索对照](docs/research/P14-acceptance.md)
