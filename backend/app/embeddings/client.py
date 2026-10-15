@@ -112,9 +112,11 @@ class OpenAIEmbeddingClient:
                 for value in vector
             ):
                 raise ValueError("non-finite embedding value")
-            usage = body.get("usage", {})
-            tokens = usage.get("prompt_tokens", usage.get("total_tokens", 0))
-            if not isinstance(tokens, int) or tokens < 0:
+            usage = body.get("usage")
+            if not isinstance(usage, dict):
+                raise ValueError("missing usage")
+            tokens = usage.get("prompt_tokens", usage.get("total_tokens"))
+            if not isinstance(tokens, int) or isinstance(tokens, bool) or tokens < 0:
                 raise ValueError("invalid usage")
         except (AttributeError, KeyError, TypeError, ValueError) as error:
             raise EmbeddingError("invalid_provider_response") from error

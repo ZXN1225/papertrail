@@ -11,7 +11,12 @@ import pytest
 
 from app.sources.arxiv import ArxivPage, ArxivWork
 from app.sources.openalex import OpenAlexMeta, OpenAlexPage, OpenAlexWork
-from app.storage.repository import PaperStore, UnsupportedSchemaVersion, _reconstruct_abstract
+from app.storage.repository import (
+    PaperStore,
+    StoreError,
+    UnsupportedSchemaVersion,
+    _reconstruct_abstract,
+)
 
 
 def _page(title: str = "Research on retrieval", *, with_abstract: bool = True) -> OpenAlexPage:
@@ -76,10 +81,46 @@ def test_migrations_are_repeatable_and_record_schema_version() -> None:
         store.migrate()
         store.migrate()
         with closing(sqlite3.connect(store.database_path)) as connection:
-            assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
-            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 5
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
+            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 10
     finally:
         temporary.cleanup()
+
+
+def test_readonly_store_does_not_create_or_upgrade_database(tmp_path: Path) -> None:
+    missing_path = tmp_path / "missing" / "papertrail.sqlite3"
+    readonly_missing = PaperStore(missing_path, readonly=True)
+
+    with pytest.raises(StoreError, match="does not exist"):
+        readonly_missing.list_papers(query=None, limit=5, offset=0)
+    assert not missing_path.parent.exists()
+
+    legacy_path = tmp_path / "legacy.sqlite3"
+    with closing(sqlite3.connect(legacy_path)):
+        pass
+    readonly_legacy = PaperStore(legacy_path, readonly=True)
+    with pytest.raises(UnsupportedSchemaVersion, match="not current"):
+        readonly_legacy.list_papers(query=None, limit=5, offset=0)
+
+    with closing(sqlite3.connect(legacy_path)) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 0
+        assert (
+            connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() == []
+        )
+
+
+def test_readonly_store_opens_sqlite_in_read_only_mode(tmp_path: Path) -> None:
+    path = tmp_path / "papertrail.sqlite3"
+    writable = PaperStore(path)
+    writable.migrate()
+
+    readonly = PaperStore(path, readonly=True)
+    with readonly._connection() as connection:
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            connection.execute("CREATE TABLE forbidden_write (id INTEGER PRIMARY KEY)")
+
+    with readonly._connection() as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
 
 
 def test_existing_v1_database_upgrades_without_losing_openalex_rows() -> None:
@@ -109,12 +150,99 @@ def test_existing_v1_database_upgrades_without_losing_openalex_rows() -> None:
 
         store.migrate()
         with closing(sqlite3.connect(store.database_path)) as connection:
-            assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
             assert (
                 connection.execute("SELECT title FROM works WHERE openalex_id='W44'").fetchone()[0]
                 == "Legacy row"
             )
-            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 5
+            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 10
+    finally:
+        temporary.cleanup()
+
+
+def test_v6_fulltext_upgrade_marks_legacy_offsets_unknown_and_cascades_elements() -> None:
+    temporary, store = _store_in_tempdir()
+    source_sha = "legacy-test-sha"
+    try:
+        with closing(sqlite3.connect(store.database_path)) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            migrations = sorted(
+                (Path(__file__).parents[1] / "app/storage/migrations").glob("000[1-6]_*.sql")
+            )
+            for version, migration_path in enumerate(migrations, start=1):
+                migration_sql = migration_path.read_text(encoding="utf-8")
+                connection.executescript("BEGIN IMMEDIATE;\n" + migration_sql)
+                connection.execute(
+                    "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at) "
+                    "VALUES (?, ?, ?, ?)",
+                    (
+                        version,
+                        migration_path.stem,
+                        hashlib.sha256(migration_sql.encode("utf-8")).hexdigest(),
+                        "2026-10-11T00:00:00+00:00",
+                    ),
+                )
+                connection.execute(f"PRAGMA user_version = {version}")
+                connection.commit()
+            connection.execute(
+                """INSERT INTO fulltext_documents (
+                    source_type, source_id, title, source_url, current_sha256, status, updated_at
+                ) VALUES ('openalex', 'W123', 'TEST legacy document',
+                    'https://example.org/TEST', ?, 'approved', 'now')""",
+                (source_sha,),
+            )
+            connection.execute(
+                """INSERT INTO fulltext_versions (
+                    source_type, source_id, content_sha256, source_text_sha256, text_content,
+                    license_id, license_url, license_evidence_url, text_source_url,
+                    license_reviewed_at, reviewer, attribution, chunker_version, imported_at,
+                    parser_version, source_document_sha256
+                ) VALUES ('openalex', 'W123', ?, 'text-sha', 'TEST legacy passage',
+                    'CC-BY-4.0', 'https://creativecommons.org/licenses/by/4.0/',
+                    'https://example.org/license-evidence', 'https://example.org/TEST',
+                    'now', 'TEST reviewer', 'TEST attribution', 'paragraph-char-v1', 'now',
+                    'pdfplumber-layout-v1', 'document-sha')""",
+                (source_sha,),
+            )
+            connection.execute(
+                """INSERT INTO fulltext_chunks (
+                    chunk_id, source_type, source_id, content_sha256, ordinal, title,
+                    locator, char_start, char_end, text
+                ) VALUES ('TEST-legacy-chunk', 'openalex', 'W123', ?, 0,
+                    'TEST legacy document', 'TEST page 1', 0, 20, 'TEST legacy passage')""",
+                (source_sha,),
+            )
+            connection.commit()
+
+        store.migrate()
+        with closing(sqlite3.connect(store.database_path)) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            legacy = connection.execute(
+                """SELECT element_id, char_offset_scope, retrieval_text, evidence_text
+                FROM fulltext_chunks WHERE chunk_id=?""",
+                ("TEST-legacy-chunk",),
+            ).fetchone()
+            assert legacy["element_id"] is None
+            assert legacy["char_offset_scope"] == "unknown_legacy"
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 10
+            assert legacy["retrieval_text"] == "TEST legacy passage"
+            assert legacy["evidence_text"] == "TEST legacy passage"
+            connection.execute(
+                """INSERT INTO fulltext_elements (
+                    source_type, source_id, content_sha256, element_id, order_index,
+                    page_number, element_type, element_json
+                ) VALUES ('openalex', 'W123', ?, 'pdfel_TEST_cascade', 0, 1,
+                    'paragraph', '{"synthetic":true}')""",
+                (source_sha,),
+            )
+            connection.commit()
+            connection.execute(
+                "DELETE FROM fulltext_versions WHERE source_type='openalex' AND source_id='W123'"
+            )
+            connection.commit()
+            assert connection.execute("SELECT COUNT(*) FROM fulltext_chunks").fetchone()[0] == 0
+            assert connection.execute("SELECT COUNT(*) FROM fulltext_elements").fetchone()[0] == 0
     finally:
         temporary.cleanup()
 

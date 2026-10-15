@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-13",
+  "provenance": {
+    "frozen_candidate_dataset_sha256": "9ceb30530faff7fae5a6ea085479b6755d6277077211c306e6758cd52e2ae0e3",
+    "gold_standard": false,
+    "limitation": "Same six selected questions and source PDFs as the earlier v1/v2 diagnostics; not an independent holdout or general retrieval recall benchmark.",
+    "parser_content_labels_migrated": false,
+    "quality_claim_allowed": false,
+    "review_is_single_reviewer": true,
+    "v1_baseline_json_sha256": "102fd55df4a5bdbe257d8c39222411c8512554567824eb52eaf73083214b55f3",
+    "v2_comparison_json_sha256": "20260901215b9e1dceca22b39746719895d0dd230031258ad2eeecb9be1db1dd"
+  },
+  "purpose": "Read-only verification that v3 singular/plural exception rules preserve the exact v2 six-question top-8 results; diagnostic only.",
+  "retrieval": {
+    "bm25_version": "okapi-bm25-v3",
+    "database_access": "read-only",
+    "limit": 8,
+    "method": "bm25_fulltext_v3",
+    "provider_calls": false,
+    "scope": "exact_arxiv_source_per_question",
+    "tokenizer_version": "unicode-latin-cjk-bigram-plural-v3"
+  },
+  "schema": "papertrail-current-index-retrieval-smoke-v3",
+  "summary": {
+    "active_content_hashes_unchanged": true,
+    "reference_evidence_hits_at_8": 6,
+    "reference_ranks_v3": {
+      "R1": 5,
+      "R2": 1,
+      "R3": 1,
+      "R4": 1,
+      "R5": 2,
+      "R6": 3
+    },
+    "task_count": 6,
+    "top8_chunk_id_sets_unchanged_from_v2": true
+  },
+  "tasks": [
+    {
+      "active_content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+      "content_sha256_unchanged": true,
+      "question": "Which four layers make up the proposed ELBE RAG framework?",
+      "reference_chunk_id": "arxiv:2609.27579:775eedc9d38d2854:36",
+      "reference_rank_v2": 5,
+      "reference_rank_v3": 5,
+      "source_chunk_count": 48,
+      "source_id": "2609.27579",
+      "task_id": "R1",
+      "top8_chunk_ids_unchanged": true
+    },
+    {
+      "active_content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+      "content_sha256_unchanged": true,
+      "question": "Does the proposed ELBE assistant directly perform accelerator control actions?",
+      "reference_chunk_id": "arxiv:2609.27579:775eedc9d38d2854:13",
+      "reference_rank_v2": 1,
+      "reference_rank_v3": 1,
+      "source_chunk_count": 48,
+      "source_id": "2609.27579",
+      "task_id": "R2",
+      "top8_chunk_ids_unchanged": true
+    },
+    {
+      "active_content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+      "content_sha256_unchanged": true,
+      "question": "In Figure 5(a), what wavelength and SiN thickness were measured?",
+      "reference_chunk_id": "arxiv:2608.02037:2813019827144122:243",
+      "reference_rank_v2": 1,
+      "reference_rank_v3": 1,
+      "source_chunk_count": 315,
+      "source_id": "2608.02037",
+      "task_id": "R3",
+      "top8_chunk_ids_unchanged": true
+    },
+    {
+      "active_content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+      "content_sha256_unchanged": true,
+      "question": "Which a-Si:H thickness belongs to panels d and e of Figure 5?",
+      "reference_chunk_id": "arxiv:2608.02037:2813019827144122:243",
+      "reference_rank_v2": 1,
+      "reference_rank_v3": 1,
+      "source_chunk_count": 315,
+      "source_id": "2608.02037",
+      "task_id": "R4",
+      "top8_chunk_ids_unchanged": true
+    },
+    {
+      "active_content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+      "content_sha256_unchanged": true,
+      "question": "What were the strict vital recall and hallucination rate for Agentic GraphRAG in Table II?",
+      "reference_chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:339",
+      "reference_rank_v2": 2,
+      "reference_rank_v3": 2,
+      "source_chunk_count": 743,
+      "source_id": "2607.24663",
+      "task_id": "R5",
+      "top8_chunk_ids_unchanged": true
+    },
+    {
+      "active_content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+      "content_sha256_unchanged": true,
+      "question": "Which system has the highest NDCG at 10 in Table III?",
+      "reference_chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:341",
+      "reference_rank_v2": 3,
+      "reference_rank_v3": 3,
+      "source_chunk_count": 743,
+      "source_id": "2607.24663",
+      "task_id": "R6",
+      "top8_chunk_ids_unchanged": true
+    }
+  ]
+}

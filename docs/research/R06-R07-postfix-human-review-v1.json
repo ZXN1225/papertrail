@@ -1,0 +1,68 @@
+{
+  "schema": "papertrail-postfix-human-review-v1",
+  "synthetic": false,
+  "gold_standard": false,
+  "quality_claim_allowed": false,
+  "review_source": "user PDF review in conversation on 2026-10-13",
+  "original_report_sha256": "3e60cdfdcda8068348f04eb2c4a95d53226a68818484fb23302fad822042d5f2",
+  "original_review_pack_sha256": "c05ed5a3ea5b8301d0ec3f09a3db442f99a35458ddf6e6bb255a99e637f1f8b2",
+  "reviewed_local_pack_sha256": "a100664a64698c260461713b50b2ffa4fc3cb3810aefdcdacdbbf486b8a78a49",
+  "reviewed_answer_count": 8,
+  "unreviewed_arm_count": 10,
+  "parser_offset_check": "For all eight selected answers, read-only SQLite audit found the cited chunk, matched the source element's half-open character span to evidence_text, found the claim quote within that text, and matched the citation locator to the stored locator. This checks the frozen parser snapshot, not pixel-level PDF coordinates.",
+  "groups": [
+    {
+      "group": "A",
+      "task_id": "R1",
+      "arms": ["skills_on"],
+      "source_id": "2609.27579",
+      "pdf_page": 3,
+      "answer_support": "supported",
+      "frozen_locator_valid": true
+    },
+    {
+      "group": "B",
+      "task_id": "R2",
+      "arms": ["skills_off", "skills_on"],
+      "source_id": "2609.27579",
+      "pdf_page": 2,
+      "answer_support": "supported",
+      "frozen_locator_valid": true
+    },
+    {
+      "group": "C",
+      "task_id": "R3",
+      "arms": ["skills_off", "skills_on", "multi_agent"],
+      "source_id": "2608.02037",
+      "pdf_page": 9,
+      "answer_support": "supported",
+      "frozen_locator_valid": true
+    },
+    {
+      "group": "D",
+      "task_id": "R4",
+      "arms": ["skills_off"],
+      "source_id": "2608.02037",
+      "pdf_page": 9,
+      "answer_support": "supported",
+      "frozen_locator_valid": false,
+      "locator_issue": "Frozen parser split a continuing Figure 5 caption into paragraph elements; the selected quote omits the preceding (d) Transition label. Parser v14 repairs future imports, but the original run and citation remain unchanged."
+    },
+    {
+      "group": "E",
+      "task_id": "R6",
+      "arms": ["skills_on"],
+      "source_id": "2607.24663",
+      "pdf_pages": [10, 11],
+      "answer_support": "supported",
+      "frozen_locator_valid": true,
+      "format_caveat": "The page 11 quote is byte-exact within the parser transcript; strict identity with visual PDF whitespace and line breaks was not independently established. The full page 10 table supports the maximum claim."
+    }
+  ],
+  "limits": [
+    "Human labels cover only the eight machine-selected answers in five groups; other arms were not semantically scored.",
+    "The six-question, one-repeat sample is exploratory and does not establish general Skills or multi-agent benefit.",
+    "R1 and R4 frozen designated direct-evidence BM25 top-eight misses remain misses.",
+    "No new provider requests were made for this review."
+  ]
+}

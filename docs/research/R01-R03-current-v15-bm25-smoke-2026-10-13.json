@@ -1,0 +1,595 @@
+{
+  "schema": "papertrail-current-index-retrieval-smoke-v1",
+  "date": "2026-10-13",
+  "purpose": "Repeat the six frozen questions against current active full-text indexes after parser reindexing; diagnostic smoke only.",
+  "retrieval": {
+    "method": "bm25_fulltext_v1",
+    "scope": "exact_arxiv_source_per_question",
+    "limit": 8,
+    "provider_calls": false,
+    "database_access": "read-only",
+    "full_source_rank_method": "Same BM25Index implementation and title/retrieval_text fields as repository search, ranked across all current chunks for the exact source; used to diagnose rank beyond API top-8."
+  },
+  "provenance": {
+    "frozen_candidate_dataset_sha256": "9ceb30530faff7fae5a6ea085479b6755d6277077211c306e6758cd52e2ae0e3",
+    "human_review_sha256": "4b9ff6eef31968df19343c06407a01be4c5b17826b1c9dde3999696d58fd8f5d",
+    "taskset_sha256": "9122147fa003be028a74c210e36e7df23d7bf49cd02e7e98f9ae4d480e658a0b",
+    "review_is_single_reviewer": true,
+    "gold_standard": false,
+    "quality_claim_allowed": false,
+    "parser_content_labels_migrated": false,
+    "limitation": "The old human labels judge assistant-authored answers against original PDFs. This smoke only tests current-index retrieval for the same six questions; it is not an independent holdout or a new gold-evidence benchmark."
+  },
+  "summary": {
+    "task_count": 6,
+    "current_reference_evidence_hits_at_8": 5,
+    "current_reference_evidence_misses_at_8": [
+      "R1"
+    ],
+    "per_task_ranks": {
+      "R1": null,
+      "R2": 1,
+      "R3": 1,
+      "R4": 1,
+      "R5": 2,
+      "R6": 3
+    },
+    "interpretation": "Descriptive six-question smoke only. R1 reference passage ranks 47/48, outside top 8; do not generalize as retrieval recall or claim parser-wide accuracy.",
+    "full_source_reference_ranks": {
+      "R1": 47,
+      "R2": 1,
+      "R3": 1,
+      "R4": 1,
+      "R5": 2,
+      "R6": 3
+    }
+  },
+  "tasks": [
+    {
+      "task_id": "R1",
+      "question": "Which four layers make up the proposed ELBE RAG framework?",
+      "source_id": "2609.27579",
+      "source_pdf_sha256": "f944b10d58484c1d57c5dba23a1e4c18fcc1a07a18606e0c2b728d9cb46ba20d",
+      "frozen_parser_version": "pdfplumber-layout-v13",
+      "frozen_content_sha256": "8806728fcc1d5c30ef0a74eef04ac1a42922b5e0978aa0191bc04ce1a2d2966b",
+      "active_content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+      "reviewed_answerability": "answerable",
+      "reviewed_candidate_support": "supported",
+      "reviewed_reference_locator": "PDF page 3, right-column four-layer description",
+      "reference_evidence_rank_in_current_top8": null,
+      "reference_evidence_retrieved_in_current_top8": false,
+      "top8": [
+        {
+          "rank": 1,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:29",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 3,
+          "element_type": "paragraph",
+          "locator": "第 3 页 · 未标注章节 · paragraph · 字符 0-424",
+          "score": 13.048973
+        },
+        {
+          "rank": 2,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:10",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 2,
+          "element_type": "paragraph",
+          "locator": "第 2 页 · 未标注章节 · paragraph · 字符 0-497",
+          "score": 6.210854
+        },
+        {
+          "rank": 3,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:9",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 2,
+          "element_type": "paragraph",
+          "locator": "第 2 页 · 未标注章节 · paragraph · 字符 0-1214",
+          "score": 2.439689
+        },
+        {
+          "rank": 4,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:28",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 3,
+          "element_type": "paragraph",
+          "locator": "第 3 页 · 未标注章节 · paragraph · 字符 0-1621",
+          "score": 2.179758
+        },
+        {
+          "rank": 5,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:35",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 3,
+          "element_type": "figure_caption",
+          "locator": "第 3 页 · 未标注章节 · figure_caption · 字符 0-275",
+          "score": 2.148059
+        },
+        {
+          "rank": 6,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:8",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 1,
+          "element_type": "paragraph",
+          "locator": "第 1 页 · 未标注章节 · paragraph · 字符 1793-2580",
+          "score": 2.041509
+        },
+        {
+          "rank": 7,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:7",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 1,
+          "element_type": "paragraph",
+          "locator": "第 1 页 · 未标注章节 · paragraph · 字符 0-1792",
+          "score": 1.831446
+        },
+        {
+          "rank": 8,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:1",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 1,
+          "element_type": "paragraph",
+          "locator": "第 1 页 · Abstract · paragraph · 字符 0-949",
+          "score": 1.439295
+        }
+      ],
+      "reference_evidence_chunk_id_current": "arxiv:2609.27579:775eedc9d38d2854:36",
+      "reference_evidence_rank_in_full_source": 47,
+      "active_source_chunk_count": 48
+    },
+    {
+      "task_id": "R2",
+      "question": "Does the proposed ELBE assistant directly perform accelerator control actions?",
+      "source_id": "2609.27579",
+      "source_pdf_sha256": "f944b10d58484c1d57c5dba23a1e4c18fcc1a07a18606e0c2b728d9cb46ba20d",
+      "frozen_parser_version": "pdfplumber-layout-v13",
+      "frozen_content_sha256": "8806728fcc1d5c30ef0a74eef04ac1a42922b5e0978aa0191bc04ce1a2d2966b",
+      "active_content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+      "reviewed_answerability": "answerable",
+      "reviewed_candidate_support": "unsupported",
+      "reviewed_reference_locator": "PDF page 2, decision-support paragraph",
+      "reference_evidence_rank_in_current_top8": 1,
+      "reference_evidence_retrieved_in_current_top8": true,
+      "top8": [
+        {
+          "rank": 1,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:13",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 2,
+          "element_type": "paragraph",
+          "locator": "第 2 页 · 未标注章节 · paragraph · 字符 0-1555",
+          "score": 5.747937
+        },
+        {
+          "rank": 2,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:29",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 3,
+          "element_type": "paragraph",
+          "locator": "第 3 页 · 未标注章节 · paragraph · 字符 0-424",
+          "score": 2.460432
+        },
+        {
+          "rank": 3,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:10",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 2,
+          "element_type": "paragraph",
+          "locator": "第 2 页 · 未标注章节 · paragraph · 字符 0-497",
+          "score": 2.43965
+        },
+        {
+          "rank": 4,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:47",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 4,
+          "element_type": "paragraph",
+          "locator": "第 4 页 · REFERENCES · paragraph · 字符 0-1197",
+          "score": 1.971061
+        },
+        {
+          "rank": 5,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:9",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 2,
+          "element_type": "paragraph",
+          "locator": "第 2 页 · 未标注章节 · paragraph · 字符 0-1214",
+          "score": 1.752985
+        },
+        {
+          "rank": 6,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:28",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 3,
+          "element_type": "paragraph",
+          "locator": "第 3 页 · 未标注章节 · paragraph · 字符 0-1621",
+          "score": 1.261882
+        },
+        {
+          "rank": 7,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:4",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 1,
+          "element_type": "paragraph",
+          "locator": "第 1 页 · 未标注章节 · paragraph · 字符 0-98",
+          "score": 0.076816
+        },
+        {
+          "rank": 8,
+          "chunk_id": "arxiv:2609.27579:775eedc9d38d2854:11",
+          "content_sha256": "775eedc9d38d28541b1e316466108061aec49fdf2b7837f423d8951e9595c260",
+          "page_number": 2,
+          "element_type": "figure_caption",
+          "locator": "第 2 页 · 未标注章节 · figure_caption · 字符 0-149",
+          "score": 0.073537
+        }
+      ],
+      "reference_evidence_chunk_id_current": "arxiv:2609.27579:775eedc9d38d2854:13",
+      "reference_evidence_rank_in_full_source": 1,
+      "active_source_chunk_count": 48
+    },
+    {
+      "task_id": "R3",
+      "question": "In Figure 5(a), what wavelength and SiN thickness were measured?",
+      "source_id": "2608.02037",
+      "source_pdf_sha256": "e3b9029a72c6466c837e8c1b320dbddca1800d353d0e667b383adfd552e04d51",
+      "frozen_parser_version": "pdfplumber-layout-v13",
+      "frozen_content_sha256": "f7e369019af0246a8ac5a2b2513f2d711a43f6493b996d085118d5c7f43e78fe",
+      "active_content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+      "reviewed_answerability": "answerable",
+      "reviewed_candidate_support": "supported",
+      "reviewed_reference_locator": "PDF page 9, Figure 5(a) caption",
+      "reference_evidence_rank_in_current_top8": 1,
+      "reference_evidence_retrieved_in_current_top8": true,
+      "top8": [
+        {
+          "rank": 1,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:243",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 9,
+          "element_type": "figure_caption",
+          "locator": "第 9 页 · Results · figure_caption · 字符 0-767",
+          "score": 15.065209
+        },
+        {
+          "rank": 2,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:192",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 8,
+          "element_type": "paragraph",
+          "locator": "第 8 页 · Results · paragraph · 字符 0-860",
+          "score": 13.267151
+        },
+        {
+          "rank": 3,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:188",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 8,
+          "element_type": "figure_caption",
+          "locator": "第 8 页 · Introduction · figure_caption · 字符 0-446",
+          "score": 11.455205
+        },
+        {
+          "rank": 4,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:208",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 9,
+          "element_type": "paragraph",
+          "locator": "第 9 页 · Results · paragraph · 字符 0-1444",
+          "score": 10.792202
+        },
+        {
+          "rank": 5,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:105",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 5,
+          "element_type": "paragraph",
+          "locator": "第 5 页 · Introduction · paragraph · 字符 0-1642",
+          "score": 10.790969
+        },
+        {
+          "rank": 6,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:245",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 10,
+          "element_type": "paragraph",
+          "locator": "第 10 页 · Results · paragraph · 字符 0-1791",
+          "score": 10.1087
+        },
+        {
+          "rank": 7,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:210",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 9,
+          "element_type": "paragraph",
+          "locator": "第 9 页 · Results · paragraph · 字符 0-749",
+          "score": 9.890719
+        },
+        {
+          "rank": 8,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:45",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 4,
+          "element_type": "paragraph",
+          "locator": "第 4 页 · Introduction · paragraph · 字符 0-728",
+          "score": 9.463035
+        }
+      ],
+      "reference_evidence_chunk_id_current": "arxiv:2608.02037:2813019827144122:243",
+      "reference_evidence_rank_in_full_source": 1,
+      "active_source_chunk_count": 315
+    },
+    {
+      "task_id": "R4",
+      "question": "Which a-Si:H thickness belongs to panels d and e of Figure 5?",
+      "source_id": "2608.02037",
+      "source_pdf_sha256": "e3b9029a72c6466c837e8c1b320dbddca1800d353d0e667b383adfd552e04d51",
+      "frozen_parser_version": "pdfplumber-layout-v13",
+      "frozen_content_sha256": "f7e369019af0246a8ac5a2b2513f2d711a43f6493b996d085118d5c7f43e78fe",
+      "active_content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+      "reviewed_answerability": "answerable",
+      "reviewed_candidate_support": "unsupported",
+      "reviewed_reference_locator": "PDF page 9, Figure 5(d)/(e) caption",
+      "reference_evidence_rank_in_current_top8": 1,
+      "reference_evidence_retrieved_in_current_top8": true,
+      "top8": [
+        {
+          "rank": 1,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:243",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 9,
+          "element_type": "figure_caption",
+          "locator": "第 9 页 · Results · figure_caption · 字符 0-767",
+          "score": 20.6853
+        },
+        {
+          "rank": 2,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:188",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 8,
+          "element_type": "figure_caption",
+          "locator": "第 8 页 · Introduction · figure_caption · 字符 0-446",
+          "score": 18.778379
+        },
+        {
+          "rank": 3,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:111",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 5,
+          "element_type": "paragraph",
+          "locator": "第 5 页 · Introduction · paragraph · 字符 0-1789",
+          "score": 16.695221
+        },
+        {
+          "rank": 4,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:144",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 7,
+          "element_type": "figure_caption",
+          "locator": "第 7 页 · Introduction · figure_caption · 字符 0-795",
+          "score": 16.464597
+        },
+        {
+          "rank": 5,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:246",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 10,
+          "element_type": "paragraph",
+          "locator": "第 10 页 · Results · paragraph · 字符 1792-2916",
+          "score": 15.440506
+        },
+        {
+          "rank": 6,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:109",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 5,
+          "element_type": "paragraph",
+          "locator": "第 5 页 · Introduction · paragraph · 字符 0-988",
+          "score": 15.133438
+        },
+        {
+          "rank": 7,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:245",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 10,
+          "element_type": "paragraph",
+          "locator": "第 10 页 · Results · paragraph · 字符 0-1791",
+          "score": 15.026459
+        },
+        {
+          "rank": 8,
+          "chunk_id": "arxiv:2608.02037:2813019827144122:103",
+          "content_sha256": "281301982714412296c864605bf5c8ba5e468721328297fd480a538cdb3716d8",
+          "page_number": 4,
+          "element_type": "paragraph",
+          "locator": "第 4 页 · Introduction · paragraph · 字符 0-354",
+          "score": 14.926873
+        }
+      ],
+      "reference_evidence_chunk_id_current": "arxiv:2608.02037:2813019827144122:243",
+      "reference_evidence_rank_in_full_source": 1,
+      "active_source_chunk_count": 315
+    },
+    {
+      "task_id": "R5",
+      "question": "What were the strict vital recall and hallucination rate for Agentic GraphRAG in Table II?",
+      "source_id": "2607.24663",
+      "source_pdf_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c",
+      "frozen_parser_version": "pdfplumber-layout-v13",
+      "frozen_content_sha256": "24d68b981e8d126093e77c0b064d46b1395b780adc3ff8998d6d6a3ab27f63b4",
+      "active_content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+      "reviewed_answerability": "answerable",
+      "reviewed_candidate_support": "supported",
+      "reviewed_reference_locator": "PDF page 10, Table II, Agentic GraphRAG row",
+      "reference_evidence_rank_in_current_top8": 2,
+      "reference_evidence_retrieved_in_current_top8": true,
+      "top8": [
+        {
+          "rank": 1,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:336",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 10,
+          "element_type": "paragraph",
+          "locator": "第 10 页 · 未标注章节 · paragraph · 字符 0-126",
+          "score": 26.083264
+        },
+        {
+          "rank": 2,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:339",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 10,
+          "element_type": "table",
+          "locator": "第 10 页 · table · 解析器物理行 5-9",
+          "score": 20.366963
+        },
+        {
+          "rank": 3,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:356",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 11,
+          "element_type": "paragraph",
+          "locator": "第 11 页 · 未标注章节 · paragraph · 字符 0-955",
+          "score": 20.299546
+        },
+        {
+          "rank": 4,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:269",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 9,
+          "element_type": "paragraph",
+          "locator": "第 9 页 · 未标注章节 · paragraph · 字符 0-234",
+          "score": 19.446673
+        },
+        {
+          "rank": 5,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:368",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 12,
+          "element_type": "paragraph",
+          "locator": "第 12 页 · 19. The ∆-recall-versus-∆-hallucination scatter, provided · paragraph · 字符 0-1794",
+          "score": 18.556368
+        },
+        {
+          "rank": 6,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:383",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 13,
+          "element_type": "paragraph",
+          "locator": "第 13 页 · 未标注章节 · paragraph · 字符 0-1270",
+          "score": 18.290495
+        },
+        {
+          "rank": 7,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:228",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 8,
+          "element_type": "paragraph",
+          "locator": "第 8 页 · 未标注章节 · paragraph · 字符 0-403",
+          "score": 17.881157
+        },
+        {
+          "rank": 8,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:650",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 26,
+          "element_type": "paragraph",
+          "locator": "第 26 页 · ACKNOWLEDGMENTS / 0.2 BM25 (date/shift tokens) · paragraph · 字符 0-1788",
+          "score": 16.548155
+        }
+      ],
+      "reference_evidence_chunk_id_current": "arxiv:2607.24663:699f09c0f4d1a224:339",
+      "reference_evidence_rank_in_full_source": 2,
+      "active_source_chunk_count": 743
+    },
+    {
+      "task_id": "R6",
+      "question": "Which system has the highest NDCG at 10 in Table III?",
+      "source_id": "2607.24663",
+      "source_pdf_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c",
+      "frozen_parser_version": "pdfplumber-layout-v13",
+      "frozen_content_sha256": "24d68b981e8d126093e77c0b064d46b1395b780adc3ff8998d6d6a3ab27f63b4",
+      "active_content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+      "reviewed_answerability": "answerable",
+      "reviewed_candidate_support": "unsupported",
+      "reviewed_reference_locator": "PDF page 10, Table III, complete NDCG@10 comparison",
+      "reference_evidence_rank_in_current_top8": 3,
+      "reference_evidence_retrieved_in_current_top8": true,
+      "top8": [
+        {
+          "rank": 1,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:348",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 11,
+          "element_type": "paragraph",
+          "locator": "第 11 页 · 未标注章节 · paragraph · 字符 0-807",
+          "score": 20.336318
+        },
+        {
+          "rank": 2,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:368",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 12,
+          "element_type": "paragraph",
+          "locator": "第 12 页 · 19. The ∆-recall-versus-∆-hallucination scatter, provided · paragraph · 字符 0-1794",
+          "score": 15.992754
+        },
+        {
+          "rank": 3,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:341",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 10,
+          "element_type": "table",
+          "locator": "第 10 页 · table · 解析器物理行 2-6",
+          "score": 15.933221
+        },
+        {
+          "rank": 4,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:340",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 10,
+          "element_type": "paragraph",
+          "locator": "第 10 页 · 未标注章节 · paragraph · 字符 0-532",
+          "score": 15.246846
+        },
+        {
+          "rank": 5,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:498",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 18,
+          "element_type": "paragraph",
+          "locator": "第 18 页 · ACKNOWLEDGMENTS · paragraph · 字符 0-1554",
+          "score": 13.637535
+        },
+        {
+          "rank": 6,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:363",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 12,
+          "element_type": "paragraph",
+          "locator": "第 12 页 · 未标注章节 · paragraph · 字符 0-1787",
+          "score": 13.001684
+        },
+        {
+          "rank": 7,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:269",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 9,
+          "element_type": "paragraph",
+          "locator": "第 9 页 · 未标注章节 · paragraph · 字符 0-234",
+          "score": 12.98517
+        },
+        {
+          "rank": 8,
+          "chunk_id": "arxiv:2607.24663:699f09c0f4d1a224:228",
+          "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+          "page_number": 8,
+          "element_type": "paragraph",
+          "locator": "第 8 页 · 未标注章节 · paragraph · 字符 0-403",
+          "score": 12.756554
+        }
+      ],
+      "reference_evidence_chunk_id_current": "arxiv:2607.24663:699f09c0f4d1a224:341",
+      "reference_evidence_rank_in_full_source": 3,
+      "active_source_chunk_count": 743
+    }
+  ]
+}

@@ -15,7 +15,7 @@ from app.cli import index_fulltext_embeddings
 from app.config import Settings
 from app.embeddings.client import EmbeddingBatch
 from app.main import create_app
-from app.retrieval.fulltext import MAX_CHUNK_CHARS, chunk_plain_text
+from app.retrieval.fulltext import MAX_CHUNK_CHARS, MAX_CHUNK_TOKEN_UPPER_BOUND, chunk_plain_text
 from app.sources.arxiv import ArxivPage, ArxivWork
 from app.sources.openalex import OpenAlexMeta, OpenAlexPage, OpenAlexWork
 from app.storage.repository import PaperStore
@@ -81,7 +81,7 @@ def test_license_gate_rejects_unknown_restricted_and_unconfirmed_content() -> No
             "items": [],
             "scanned_chunks": 0,
             "truncated": False,
-            "retrieval_method": "bm25_fulltext_v1",
+            "retrieval_method": "bm25_fulltext_v3",
         }
     finally:
         temporary.cleanup()
@@ -97,11 +97,17 @@ def test_ingest_is_idempotent_and_returns_license_and_exact_evidence_locator() -
         )
         first = _ingest(store, text)
         repeat = _ingest(store, text)
+        lineage = store.get_current_fulltext_metadata(source_type="openalex", source_id="W900")
         result = store.search_fulltext_evidence("evidence passages support answers")
 
         assert first["status"] == "approved"
         assert repeat["status"] == "unchanged"
         assert first["content_sha256"] == repeat["content_sha256"]
+        assert lineage is not None
+        assert lineage["current_sha256"] == first["content_sha256"]
+        assert lineage["license_id"] == "CC-BY-4.0"
+        assert lineage["parser_version"] == "plain-text-v1"
+        assert lineage["chunk_count"] == 2
         assert first["chunk_count"] == 2
         assert result["status"] == "ok"
         hit = result["items"][0]
@@ -125,6 +131,32 @@ def test_ingest_is_idempotent_and_returns_license_and_exact_evidence_locator() -
         temporary.cleanup()
 
 
+def test_reparse_with_same_license_metadata_preserves_review_timestamp() -> None:
+    temporary, store = _seed_store()
+    try:
+        first = _ingest(store, "First TEST version of licensed research text.")
+        reparsed = _ingest(
+            store,
+            "Second TEST parser output for the same licensed research text.",
+            parser_version="plain-text-v2",
+        )
+        current = store.get_current_fulltext_metadata(source_type="openalex", source_id="W900")
+
+        assert current is not None
+        assert reparsed["status"] == "approved"
+        assert reparsed["content_sha256"] != first["content_sha256"]
+        assert reparsed["license_reviewed_at"] == first["license_reviewed_at"]
+        with closing(sqlite3.connect(store.database_path)) as connection:
+            reviewed_at = connection.execute(
+                """SELECT license_reviewed_at FROM fulltext_versions
+                WHERE source_type='openalex' AND source_id='W900' AND content_sha256=?""",
+                (current["current_sha256"],),
+            ).fetchone()[0]
+        assert reviewed_at == first["license_reviewed_at"]
+    finally:
+        temporary.cleanup()
+
+
 def test_changed_content_replaces_active_version_without_exposing_old_text() -> None:
     temporary, store = _seed_store()
     try:
@@ -142,6 +174,47 @@ def test_changed_content_replaces_active_version_without_exposing_old_text() -> 
         assert old_result["status"] == "no_results"
         assert new_result["items"][0]["content_sha256"] == active_hash
         assert versions == 2
+    finally:
+        temporary.cleanup()
+
+
+def test_fulltext_index_scans_all_chunks_and_refuses_truncated_corpus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    temporary, store = _seed_store()
+    try:
+        _ingest(
+            store,
+            "\n\n".join(
+                f"# TEST synthetic section {index}\n\n"
+                + ("zebrafinale evidence." if index == 2000 else "TEST synthetic=true filler.")
+                for index in range(2001)
+            ),
+        )
+        chunks = store.list_current_fulltext_chunks()
+        result = store.search_fulltext_evidence("zebrafinale")
+
+        assert len(chunks) == 2001
+        assert result["status"] == "ok"
+        assert result["scanned_chunks"] == 2001
+        assert result["truncated"] is False
+        assert result["items"][0]["chunk_id"] == chunks[-1]["chunk_id"]
+        assert (
+            store.search_fulltext_evidence("zebrafinale", source_type="arxiv")["status"]
+            == "no_results"
+        )
+        with pytest.raises(ValueError, match="requires a source_type"):
+            store.search_fulltext_evidence("zebrafinale", source_id="W900")
+
+        monkeypatch.setattr("app.storage.repository.MAX_ACTIVE_FULLTEXT_CHUNKS", 2001)
+        assert store.search_fulltext_evidence("zebrafinale")["truncated"] is False
+        monkeypatch.setattr("app.storage.repository.MAX_ACTIVE_FULLTEXT_CHUNKS", 2000)
+        bounded = store.search_fulltext_evidence("zebrafinale")
+        assert bounded["status"] == "corpus_limit_exceeded"
+        assert bounded["items"] == []
+        assert bounded["truncated"] is True
+        with pytest.raises(ValueError, match="exceeds the configured chunk limit"):
+            store.list_current_fulltext_chunks()
     finally:
         temporary.cleanup()
 
@@ -209,8 +282,188 @@ def test_chunker_bounds_chunks_and_preserves_offsets() -> None:
     assert all(
         source.strip()[chunk.char_start : chunk.char_end].strip() == chunk.text for chunk in chunks
     )
+    assert all(len(chunk.text.encode("utf-8")) <= MAX_CHUNK_TOKEN_UPPER_BOUND for chunk in chunks)
     with pytest.raises(ValueError, match="2,000,000"):
         chunk_plain_text("x" * 2_000_001)
+
+
+def test_chunker_uses_utf8_token_upper_bound_for_cjk_and_preserves_character_offsets() -> None:
+    source = "论文检索增强生成系统应保留证据位置。" * 500
+
+    chunks = chunk_plain_text(source)
+
+    assert len(chunks) > 1
+    assert all(len(chunk.text.encode("utf-8")) <= MAX_CHUNK_TOKEN_UPPER_BOUND for chunk in chunks)
+    assert all(source[chunk.char_start : chunk.char_end].strip() == chunk.text for chunk in chunks)
+    assert max(len(chunk.text) for chunk in chunks) < MAX_CHUNK_CHARS
+
+
+def test_pdf_ingest_keeps_parser_metadata_and_page_region_in_retrieved_evidence() -> None:
+    temporary, store = _seed_store()
+    source_element_text = "Table 1 (page 4)\nMethod | Recall\nHybrid RAG | 0.91"
+    try:
+        _ingest(
+            store,
+            source_element_text,
+            parsed_elements=[
+                {
+                    "element_id": "pdfel_TESTTABLE01",
+                    "order_index": 0,
+                    "page_number": 4,
+                    "page_width": 612.0,
+                    "page_height": 792.0,
+                    "element_type": "table",
+                    "section_path": ["Experiments"],
+                    "text": source_element_text,
+                    "bbox": [45.0, 90.0, 540.0, 310.0],
+                    "structured": {
+                        "rows": [
+                            {
+                                "row_index": 0,
+                                "cells": [
+                                    {"text": "Method", "bbox": [50, 100, 200, 120]},
+                                    {"text": "Recall", "bbox": [210, 100, 300, 120]},
+                                ],
+                            },
+                            {
+                                "row_index": 1,
+                                "cells": [
+                                    {"text": "Hybrid RAG", "bbox": [50, 130, 200, 150]},
+                                    {"text": "0.91", "bbox": [210, 130, 300, 150]},
+                                ],
+                            },
+                        ]
+                    },
+                    "warnings": [],
+                }
+            ],
+            parser_warnings=[{"page_number": 4, "code": "test_partial_warning"}],
+            parser_version="pdfplumber-layout-v1",
+            source_document_sha256="a" * 64,
+        )
+        found = store.search_fulltext_evidence("Hybrid RAG Recall")
+        item = found["items"][0]
+        assert item["page_number"] == 4
+        assert item["element_type"] == "table"
+        assert item["section_path"] == ["Experiments"]
+        assert item["bbox"] == [45.0, 90.0, 540.0, 310.0]
+        assert item["element_id"] == "pdfel_TESTTABLE01"
+        assert item["parent_element_id"] == "pdfel_TESTTABLE01"
+        assert item["char_offset_scope"] == "element_text"
+        assert item["element"]["structured"]["rows"][1]["cells"][1] == {
+            "text": "0.91",
+            "bbox": [210, 130, 300, 150],
+        }
+        assert source_element_text[item["char_start"] : item["char_end"]] == "Hybrid RAG | 0.91"
+        assert "解析器物理行 2" in item["locator"]
+        assert item["excerpt"] == "Hybrid RAG | 0.91"
+        assert "Method | Recall" in item["retrieval_context"]
+        assert "Experiments" in item["retrieval_context"]
+        assert "Hybrid RAG | 0.91" in item["retrieval_context"]
+        assert item["parser_warnings"] == [{"page_number": 4, "code": "test_partial_warning"}]
+        with store._connection() as connection:
+            version = connection.execute(
+                "SELECT parser_version, source_document_sha256, chunker_version "
+                "FROM fulltext_versions"
+            ).fetchone()
+        assert version["parser_version"] == "pdfplumber-layout-v1"
+        assert version["source_document_sha256"] == "a" * 64
+        assert version["chunker_version"] == "pdf-element-structure-token-upper-bound-v4"
+        with store._connection() as connection:
+            assert connection.execute("SELECT COUNT(*) FROM fulltext_elements").fetchone()[0] == 1
+    finally:
+        temporary.cleanup()
+
+
+def test_pdf_parent_expansion_returns_neighbor_child_evidence_with_exact_offsets() -> None:
+    temporary, store = _seed_store()
+    try:
+        source_text = (
+            "TargetFeature alpha. " + "filler " * 300 + "AdjacentClaim=42. " + "tail " * 150
+        )
+        _ingest(
+            store,
+            source_text,
+            parsed_elements=[
+                {
+                    "element_id": "pdfel_TEST_PARENT_EXPANSION",
+                    "order_index": 0,
+                    "page_number": 7,
+                    "element_type": "paragraph",
+                    "section_path": ["TEST Methods", "TEST Retrieval"],
+                    "text": source_text,
+                    "bbox": [10, 20, 300, 400],
+                    "warnings": [],
+                }
+            ],
+            parser_version="TEST-parent-expansion-v1",
+            source_document_sha256="b" * 64,
+        )
+
+        result = store.search_fulltext_evidence("TargetFeature alpha", limit=1)
+        item = result["items"][0]
+
+        assert item["parent_element_id"] == "pdfel_TEST_PARENT_EXPANSION"
+        assert "TEST Methods / TEST Retrieval" in item["retrieval_context"]
+        assert "AdjacentClaim=42." in item["retrieval_context"]
+        sibling = next(
+            (
+                child
+                for child in item["expanded_evidence"]
+                if "AdjacentClaim=42." in child["excerpt"]
+            ),
+            None,
+        )
+        assert sibling is not None, (item["excerpt"], item["expanded_evidence"])
+        assert sibling["chunk_id"] != item["chunk_id"]
+        assert source_text[sibling["char_start"] : sibling["char_end"]] == sibling["excerpt"]
+        assert len(item["retrieval_context"].encode("utf-8")) <= 5_600
+    finally:
+        temporary.cleanup()
+
+
+def test_pdf_parent_expansion_crosses_adjacent_elements_on_same_section_path() -> None:
+    temporary, store = _seed_store()
+    try:
+        _ingest(
+            store,
+            "TargetFeature alpha.\nAdjacentClaim=42.",
+            parsed_elements=[
+                {
+                    "element_id": "pdfel_TEST_SECTION_A",
+                    "order_index": 0,
+                    "page_number": 3,
+                    "element_type": "paragraph",
+                    "section_path": ["TEST Results"],
+                    "text": "TargetFeature alpha.",
+                    "bbox": [10, 20, 300, 40],
+                    "warnings": [],
+                },
+                {
+                    "element_id": "pdfel_TEST_SECTION_B",
+                    "order_index": 1,
+                    "page_number": 4,
+                    "element_type": "paragraph",
+                    "section_path": ["TEST Results"],
+                    "text": "AdjacentClaim=42.",
+                    "bbox": [10, 20, 300, 40],
+                    "warnings": [],
+                },
+            ],
+            parser_version="TEST-section-expansion-v1",
+            source_document_sha256="c" * 64,
+        )
+
+        item = store.search_fulltext_evidence("TargetFeature alpha", limit=1)["items"][0]
+        sibling = item["expanded_evidence"][0]
+
+        assert item["parent_element_id"] == "pdfel_TEST_SECTION_A"
+        assert sibling["parent_element_id"] == "pdfel_TEST_SECTION_B"
+        assert sibling["page_number"] == 4
+        assert sibling["excerpt"] == "AdjacentClaim=42."
+        assert "AdjacentClaim=42." in item["retrieval_context"]
+    finally:
+        temporary.cleanup()
 
 
 def test_evidence_api_only_returns_approved_fulltext_and_rejects_partial_filter() -> None:
@@ -280,7 +533,7 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         assert dense["retrieval_method"] == "dense_cosine_v1"
         assert dense["items"][0]["chunk_id"] == chunks[1]["chunk_id"]
         assert dense["items"][0]["license_id"] == "CC-BY-4.0"
-        assert hybrid["retrieval_method"] == "hybrid_rrf_v1"
+        assert hybrid["retrieval_method"] == "hybrid_rrf_v3"
         assert hybrid["items"]
         assert all(
             item["content_sha256"] == chunks[0]["content_sha256"] for item in hybrid["items"]
@@ -440,7 +693,7 @@ def test_agent_evidence_tool_uses_hybrid_provider_and_fails_closed_when_disabled
         )
         disabled = PaperToolRegistry(store).execute("retrieve_paper_evidence", request)
         assert result["status"] == "ok"
-        assert result["retrieval_method"] == "hybrid_rrf_v1"
+        assert result["retrieval_method"] == "hybrid_rrf_v3"
         assert result["items"][0]["chunk_id"] == chunk["chunk_id"]
         assert disabled == {"status": "embedding_unavailable"}
     finally:

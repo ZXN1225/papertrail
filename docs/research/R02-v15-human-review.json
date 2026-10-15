@@ -1,0 +1,34 @@
+{
+  "schema_version": "papertrail-r02-parser-review-v1",
+  "review_scope": "parser-v15 correction samples A1 and B2",
+  "reviewed_at": "2026-10-13",
+  "reviewer": "user",
+  "labels_are_independent_gold": false,
+  "items": [
+    {
+      "item_id": "A1",
+      "source_id": "2607.24663",
+      "source_pdf_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c",
+      "content_sha256": "699f09c0f4d1a224592a39fb348ffa2c61635ecfe0a26041c747428620ff843c",
+      "parser_version": "pdfplumber-layout-v15",
+      "page_number": 10,
+      "element_type": "table",
+      "bbox": [55.99, 110.63, 568.63, 182.96],
+      "status": "supported",
+      "notes": "User confirms ∆V_strict vs. Naive and V_strict (%) are correct and the isolated V is gone. In the follow-up review, user again marked the v15 table content supported and flagged the displayed 8 nonempty logical rows/3 header rows versus metadata 9/4 as inconsistent unless an empty internal row is explicitly explained. This historical v15 content label remains bound to its original content SHA; the metadata discrepancy was fixed in v18 rather than treated as human approval of the v18/v19 output.",
+      "metadata_follow_up": "v18 removes rows emptied by header normalization from logical row/header counts while preserving physical row_index values. The current v19 Table II reports row_count=8, header_row_count=3, and physical indexes 1-8; this implementation result is regression-tested, and the user has not separately reviewed the v19 structured output."
+    },
+    {
+      "item_id": "B2",
+      "source_id": "2608.20519",
+      "source_pdf_sha256": "7d664debd8dc5c83119c0b1b64a9d8ef2a277eca54cea402dd786fd9d311ce31",
+      "content_sha256": "6597dad8dc12f1364bc9882e7bd732528116d6e6f6665e34bf0ef3b789f2ab58",
+      "parser_version": "pdfplumber-layout-v15",
+      "page_number": 14,
+      "element_type": "table",
+      "bbox": [128.04, 517.61, 483.97, 656.45],
+      "status": "supported",
+      "notes": "User confirms three-column structure; brain metastases, head and neck, and MR-guided radiotherapy remain in the correct cells; IVIM parameters f_p, D_t, D_p have the correct subscripts; no remaining misalignment was reported."
+    }
+  ]
+}

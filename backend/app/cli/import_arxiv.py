@@ -26,7 +26,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with ArxivClient(timeout_seconds=20) as client:
             page = client.search(args.query, start=args.start, max_results=args.max_results)
-    except (ArxivError, ValueError) as error:
+    except ArxivError as error:
+        print(f"arXiv import failed: {error.code}: {error.safe_message}", file=sys.stderr)
+        return 2
+    except ValueError as error:
         print(f"arXiv import failed: {type(error).__name__}: {error}", file=sys.stderr)
         return 2
     try:

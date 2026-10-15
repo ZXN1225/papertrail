@@ -1,0 +1,423 @@
+{
+  "schema_version": "papertrail.refinement-plan.v1",
+  "created_at": "2026-10-11",
+  "language": "zh-CN",
+  "status": "implementation_in_progress_local_delivery_accepted",
+  "implementation_started": true,
+  "publication_authorized": false,
+  "local_delivery_acceptance": {
+    "status": "accepted_by_user",
+    "date": "2026-10-13",
+    "scope": "reviewed local build, six-question exploratory report, Figure 5 correction and engineering check record",
+    "does_not_prove": [
+      "general PDF or RAG accuracy targets",
+      "R01-R03 independent held-out quality thresholds",
+      "multi-agent benefit or production enablement",
+      "remote GitHub Actions"
+    ],
+    "publication_authorized": false
+  },
+  "review_document": "docs/reviews/2026-10-11-agent-hiring-review.md",
+  "workflow_document": "docs/reviews/2026-10-11-refinement-roadmap.md",
+  "reference_repository": {
+    "url": "https://github.com/CN-Discretemathematics/car-selection-assistant",
+    "commit_sha": "621833da1a009d8571ddac7bb65aa78f8f4d33b4",
+    "review_mode": "selected_source_static_review",
+    "tests_run": false,
+    "deployment_verified": false
+  },
+  "boundaries": {
+    "agent_tools": "fixed_allowlist_read_only",
+    "fulltext_requires_per_document_license_review": true,
+    "no_arbitrary_url_shell_sql_or_free_database_writes": true,
+    "restricted_artifacts_remain_local_and_excluded_from_git": true,
+    "ai_labels_are_not_human_gold": true,
+    "implementation_resume_requires_user_instruction": false,
+    "push_requires_user_acceptance_and_explicit_authorization": true,
+    "multi_agent_default_enabled": false,
+    "multi_agent_effect_claim_allowed_without_real_evaluation": false
+  },
+  "evaluation_proposal": {
+    "status": "not_executed",
+    "thresholds_are_industry_standards": false,
+    "initial_documents": [
+      10,
+      12
+    ],
+    "initial_questions": 40,
+    "expanded_documents": [
+      20,
+      30
+    ],
+    "expanded_questions": 100,
+    "expanded_split": {
+      "development": 60,
+      "held_out_test": 40
+    },
+    "split_unit": "document_or_topic_group",
+    "live_trials_per_question": 3,
+    "trial_aggregation_unit": "question",
+    "label_anchor": "original_document_version_element_cell_or_span",
+    "freeze_thresholds_before_held_out_evaluation": true,
+    "targets": {
+      "critical_invariant_test_pass_fraction": 1.0,
+      "human_verified_evidence_locator_accuracy": 0.95,
+      "gold_evidence_recall_at_10": 0.85,
+      "human_graded_claim_support_fraction": 0.95,
+      "task_success_fraction": 0.8,
+      "unanswerable_correct_refusal_fraction": 0.9,
+      "answerable_false_refusal_fraction_max": 0.1,
+      "latency_and_cost_limits": "to_be_frozen_after_baseline_and_user_budget"
+    },
+    "all_refusal_is_not_success": true,
+    "synthetic_data": {
+      "id_prefix": "TEST-",
+      "synthetic": true
+    },
+    "licensed_real_data": {
+      "synthetic": false,
+      "isolated_evaluation_namespace": true
+    }
+  },
+  "tasks": [
+    {
+      "id": "R00",
+      "priority": "P0",
+      "status": "done",
+      "optional": false,
+      "title": "可复现基线与验收口径",
+      "depends_on": [],
+      "deliverables": [
+        "源码与锁文件基线",
+        "实现/测试/质量/用户验收状态表",
+        "安全与E2E复核记录"
+      ],
+      "acceptance": [
+        "Git或备份状态明确",
+        "完整命令正常退出或明确失败",
+        "历史公告重新审计"
+      ],
+      "effort_days_estimate": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "R01",
+      "priority": "P0",
+      "status": "in_progress",
+      "optional": false,
+      "title": "研究任务与人审许可评测集",
+      "depends_on": [
+        "R00"
+      ],
+      "deliverables": [
+        "任务规格",
+        "逐篇许可核验",
+        "题目与原始证据标签",
+        "dev/test拆分"
+      ],
+      "acceptance": [
+        "实际人工审核记录",
+        "可答性与证据位置可追溯",
+        "评测与用户库隔离"
+      ],
+      "effort_days_estimate": [
+        2,
+        4
+      ],
+      "automated_scope": "Synthetic v2 has 12 document-disjoint TEST sources and 40 tasks; CLI evaluates all/dev/test with split-only candidate documents and per-split denominators. Current local real corpus has 9 licensed full-text PDFs (217 pages). Ten earlier candidate questions (four single-paper plus six across three papers) received single-user PDF evidence review; a six-question live comparison had selected answers reviewed in five groups. These are exploratory and not an independent holdout.",
+      "known_gaps": [
+        "The active licensed full-text corpus has 9 papers; user-provided arXiv:2610.13595 is CC BY-NC-SA 4.0 and remains excluded by the current CC0/CC BY allowlist.",
+        "The roadmap target of 10-12 licensed documents and about 40 independently authored real tasks, including unanswerable tasks and document/topic-disjoint real holdout, remains unmet; earlier candidate papers have since been supplied and reviewed rather than remaining unapproved.",
+        "Ten prior candidate questions and selected outputs have single-user review only; no independent double annotation, broad answer-quality estimate, or three-trial stability evaluation.",
+        "Synthetic split is not a real-paper gold standard; v26 PDF parser review labels are separate from R01 task-answer labels."
+      ]
+    },
+    {
+      "id": "R02",
+      "priority": "P0",
+      "status": "in_progress",
+      "optional": false,
+      "title": "结构文档与PDF解析修正",
+      "depends_on": [
+        "R01"
+      ],
+      "deliverables": [
+        "parser adapter与schema",
+        "章节/元素/坐标",
+        "表格cells与图注关系",
+        "数据库迁移"
+      ],
+      "acceptance": [
+        "真实版面核验",
+        "异常显式报告",
+        "删除级联与版本隔离"
+      ],
+      "effort_estimate_group": "R02_R03_combined_7_to_12_days",
+      "automated_scope": "Parser v26 retains the v25 out-of-page text filter and conservative grid checks. If a captioned table body grid cuts positioned words, a header-anchor fallback may recover visual-line columns only when distinct heading starts recur in most body rows and no positioned token crosses an inferred boundary; otherwise it remains visual-lines-only. Nine licensed PDFs (217 pages) were parsed offline. A 3,254-element mechanical audit found zero duplicate IDs/invalid bboxes; all 16 review item mappings and page images are present. The v26 review packet SHA-256 is f8bd20fac4b478ee6bc626d5dcaaf2a5a2c9739c4fdd3f5961be504dd59a98d5. Parser/table tests 57 passed; full backend 330 passed with one existing Starlette/AnyIO deprecation warning. This does not establish general extraction accuracy.",
+      "current_local_index": "Active local SQLite remains pdfplumber-layout-v21; v26 drafts and review artifacts are isolated under the Git-ignored live_eval reports directory and are not indexed.",
+      "known_gaps": [
+        "The v26 packet's 16 sampled PDF elements still require user review; earlier v21/v25 labels do not transfer. The active index must not be rebuilt until v26 review and follow-up repairs are complete.",
+        "General PDF layout accuracy, OCR, image semantics, and cross-layout accuracy have not been measured.",
+        "The header-anchor fallback has only synthetic coverage plus one licensed-paper spot check; semantic cell interpretation and broader layout behavior remain unverified."
+      ]
+    },
+    {
+      "id": "R03",
+      "priority": "P0",
+      "status": "in_progress",
+      "optional": false,
+      "title": "结构分块与逐主张证据契约",
+      "depends_on": [
+        "R02"
+      ],
+      "deliverables": [
+        "retrieval/evidence文本分离",
+        "token与表格分块",
+        "claim-span验证",
+        "同题baseline"
+      ],
+      "acceptance": [
+        "每条事实引用本轮合法证据",
+        "正文中的 OpenAlex/arXiv ID 均出现在对应已核验引用列表",
+        "数值/单位与实验条件核验",
+        "质量分桶与原始分母公开"
+      ],
+      "effort_estimate_group": "R02_R03_combined_7_to_12_days",
+      "automated_scope": "Exact claim-to-answer and typed source-field binding; chunks use a 1800 UTF-8 byte conservative upper bound for byte-level BPE token count; retrieval_text/evidence_text are separated, and a PDF hit expands to bounded adjacent child evidence under the same element or section path (including cross-page neighbors); semantic entailment remains unverified. A read-only v21-to-v25 (historical; v26 mapping awaits user review) BM25 parser-version diagnostic mapped 5/6 selected references by exact evidence text, source, page, and element type; source-scoped top-8 was 5/6 and all-nine-corpus top-8 was 4/6. Unmapped references count as misses; the six-task report is not gold recall.",
+      "known_gaps": [
+        "no whole-section expansion or semantic association across different section paths",
+        "UTF-8 byte upper bound is not exact provider tokenizer accounting",
+        "four prior and six additional real-PDF candidate questions have single-user support review; the six-question post-fix live trial has five PDF-reviewed answer groups, but independent held-out evidence recall and general claim support remain unmeasured",
+        "The v21-to-v25 diagnostic is not a v26 result; remap and rerun only after v26 source spans are human-checked."
+      ]
+    },
+    {
+      "id": "R04",
+      "priority": "P1",
+      "status": "in_progress",
+      "optional": false,
+      "title": "研究会话与Harness",
+      "depends_on": [
+        "R01",
+        "R03"
+      ],
+      "deliverables": [
+        "task状态机",
+        "上下文与预算",
+        "取消/恢复",
+        "脱敏事件与回放"
+      ],
+      "acceptance": [
+        "多轮约束修正",
+        "超时重启与重复请求有明确结果",
+        "总预算不可绕过"
+      ],
+      "effort_days_estimate": [
+        4,
+        7
+      ],
+      "implemented_scope": [
+        "redacted persistent run state and trace metadata",
+        "question and prior-history SHA-256 only; no prompt, answer or evidence excerpt persistence",
+        "bounded request-scoped prior turns with history digest only and current-run evidence isolation",
+        "duplicate run ID rejection, status lookup, cooperative cancel and interrupted-state recognition",
+        "aggregate model and embedding observed-token accounting",
+        "per-request model output cap is clamped to remaining observed run tokens; provider-reported overrun stops subsequent steps",
+        "model input UTF-8 byte upper bound is reserved before provider calls; output is clamped to the remainder and reported input above the bound stops the run",
+        "dense/hybrid embedding query bytes plus a 1024-byte envelope reserve are preflighted against remaining run tokens; provider usage above the estimate halts the run",
+        "missing or malformed model and embedding usage is never silently recorded as zero",
+        "embedding usage errors produce usage_unavailable, stop the current run before another model request, return HTTP 503, and persist failed run status"
+      ],
+      "known_limits": [
+        "no automatic model-call replay after process restart",
+        "conversation history is not persisted and clears on page reload",
+        "model and embedding preflight are UTF-8 byte upper bounds rather than exact provider tokenization; one in-flight call can still overshoot if the bound or provider usage is inaccurate",
+        "provider-reported usage may be inaccurate; there is no provider-side monetary hard cap",
+        "context limit uses characters rather than exact provider tokenization",
+        "no persistent multi-turn conversation body"
+      ]
+    },
+    {
+      "id": "R05",
+      "priority": "P2",
+      "status": "done",
+      "optional": true,
+      "title": "只读MCP集成",
+      "depends_on": [
+        "R03",
+        "R04"
+      ],
+      "deliverables": [
+        "stdio adapter",
+        "固定协议与SDK版本",
+        "SDK Client与stdio子进程契约测试",
+        "外部Host配置及人工smoke指引"
+      ],
+      "acceptance": [
+        "许可权限与直接调用一致",
+        "坏参数/超时/未知工具明确失败",
+        "不自动扩大白名单",
+        "至少一个外部Host人工连接并完成只读调用"
+      ],
+      "effort_days_estimate": [
+        2,
+        4
+      ],
+      "implemented_scope": [
+        "locked MCP Python SDK stdio server exposes five fixed read-only PaperTrail tools",
+        "MCP contract tests compare protocol results with the direct fixed registry path",
+        "SQLite mode=ro prevents MCP writes; missing or stale databases fail closed without creation or migration",
+        "MCP process resolves DATA_STORAGE_PATH without loading unrelated provider settings",
+        "Cursor Windows host configuration and manual smoke checklist documented",
+        "one external Cursor host connected and returned licensed read-only evidence with source and table locator"
+      ],
+      "known_gaps": [
+        "external smoke covered one Cursor host only; other hosts remain untested",
+        "the host must point to an existing database already migrated by PaperTrail",
+        "MCP full-text search currently exposes BM25 only"
+      ]
+    },
+    {
+      "id": "R06",
+      "priority": "P2",
+      "status": "in_progress",
+      "optional": true,
+      "title": "运行时Skills",
+      "depends_on": [
+        "R03",
+        "R04"
+      ],
+      "deliverables": [
+        "paper-qa",
+        "compare-papers",
+        "research-brief",
+        "选择/按需加载/版本日志"
+      ],
+      "acceptance": [
+        "触发与误触发可测",
+        "说明不能提升工具权限",
+        "开关同题对照完整"
+      ],
+      "effort_days_estimate": [
+        2,
+        4
+      ],
+      "implemented_scope": [
+        "three product task skills: paper-qa, compare-papers and research-brief",
+        "registry version and instruction SHA-256 are verified before use",
+        "selected skill tool recommendations intersect the fixed registry for both model-visible and execute paths",
+        "default-on Harness runtime plus same-question skills-on/off mock contract switch",
+        "synthetic/mock contract and one six-question same-model skills-on/off live comparison; selected answers received user PDF support review, but no general benefit claim"
+      ],
+      "known_gaps": [
+        "one same-model six-question comparison ran; selected answers have single-user PDF support labels, with one skills-off citation defect and no generalizable benefit conclusion",
+        "skill-off comparison switch is not exposed in production API"
+      ]
+    },
+    {
+      "id": "R07",
+      "priority": "P3",
+      "status": "in_progress",
+      "optional": true,
+      "title": "多Agent收益实验",
+      "depends_on": [
+        "R03",
+        "R04"
+      ],
+      "deliverables": [
+        "worker/supervisor契约",
+        "共享预算",
+        "固定流程/单Agent/多Agent对照"
+      ],
+      "acceptance": [
+        "部分失败与冲突处理",
+        "无安全和证据退化",
+        "未达启用门槛保留单Agent默认"
+      ],
+      "enablement_target": {
+        "task_success_absolute_gain": 0.05,
+        "cost_ratio_max": 1.5,
+        "requires_sample_uncertainty_review": true
+      },
+      "effort_days_estimate": [
+        3,
+        5
+      ],
+      "user_scope_decision": "framework_first; disabled_by_default; licensed_local_corpus_and_budgeted_six_question_trial_completed; enablement_threshold_not_met",
+      "implemented_scope": [
+        "sequential worker/supervisor coordinator",
+        "shared observed token/tool/deadline/cancellation budget",
+        "exact structured claim and citation consensus or explicit conflict",
+        "worker exception isolation and component-aware observed-token accounting",
+        "paired-task single-agent versus multi-agent evaluator with repeated-trial aggregation and bootstrap interval",
+        "CLI verifies the frozen task manifest byte digest and exact observed task IDs; every evaluation report keeps quality claims disabled because licenses and human review are not authenticated",
+        "synthetic contract tests and one six-question two-worker live comparison; only R3 reached exact consensus, estimated cost ratio versus skills-off was 2.20"
+      ]
+    },
+    {
+      "id": "R08",
+      "priority": "P1",
+      "status": "in_progress",
+      "optional": false,
+      "local_user_acceptance": "accepted_2026-10-13",
+      "title": "工程验收与作品集",
+      "depends_on": [
+        "R03",
+        "R04"
+      ],
+      "selected_optional_dependencies": [
+        "R05",
+        "R06",
+        "R07"
+      ],
+      "deliverables": [
+        "完整回归和质量摘要",
+        "复现/启动说明",
+        "失败复盘",
+        "演示和简历事实表"
+      ],
+      "acceptance": [
+        "所有必选及已选任务完成",
+        "新环境复现",
+        "用户检查接受",
+        "无受限数据进入公开材料"
+      ],
+      "effort_days_estimate": [
+        2,
+        4
+      ],
+      "implemented_scope": [
+        "native locked-environment backend and Web reproduction documentation",
+        "backend and Next.js multi-stage Dockerfiles plus Compose service wiring and persistent SQLite volume",
+        "Next standalone production build and native node server.js smoke through the Web-to-API readiness proxy with a temporary SQLite database",
+        "GitHub Actions container job prepared to validate Compose config, build/up the stack, smoke readiness/home, and remove its test volume",
+        "current 281-test backend regression with one existing Starlette/AnyIO deprecation warning; Ruff and format checks pass, OpenAPI hash is unchanged, and current four-paper v15 PDF/index lineage is reproducibly audited; Web format/type/build and Playwright 18/18 previously exited successfully; backend and Web dependency audits found no known vulnerabilities",
+        "v20 parser change: 35 targeted parser tests and 25 retrieval/lineage tests pass; Ruff, format, OpenAPI and repeated v20 read-only six-task BM25 diagnostics pass. A v20 full backend suite did not finish in this restricted environment, so no full-suite claim is made for v20."
+      ],
+      "known_gaps": [
+        "user-host Docker Compose build/up and health/readiness passed; remote GitHub Actions container smoke remains unrun",
+        "licensed PDF excerpts, Table III crop and selected live answers have single-user review; general evidence/semantic quality and Skills/Multi-agent benefit remain unproven; current local delivery was user-accepted on 2026-10-13, while full roadmap gates remain open",
+        "current parser v25 packet review and R01-R03 real-corpus quality gates remain open; prior local delivery acceptance does not close them"
+      ]
+    },
+    {
+      "id": "R09",
+      "priority": "release",
+      "status": "requires_future_authorization",
+      "optional": true,
+      "title": "用户授权后发布",
+      "depends_on": [
+        "R08"
+      ],
+      "deliverables": [
+        "发布差异与清单"
+      ],
+      "acceptance": [
+        "用户验收完成",
+        "用户另行明确授权推送"
+      ]
+    }
+  ]
+}

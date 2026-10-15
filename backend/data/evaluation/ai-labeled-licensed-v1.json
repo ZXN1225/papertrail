@@ -1,0 +1,827 @@
+{
+  "schema": "papertrail.ai-labeled-tasks.v1",
+  "dataset_id": "ai-labeled-licensed-v1",
+  "created_by": "tools.build_ai_labeled_dataset",
+  "synthetic": false,
+  "gold_standard": false,
+  "quality_claim_allowed": false,
+  "human_reviewed": false,
+  "label_source": "ai_agent_review",
+  "label_method": "AI agents authored each question from an indexed chunk of the licensed corpus; quote-to-chunk verbatim containment and corpus-wide absence of negative facts are verified mechanically by the build tool",
+  "retrieval_method": "bm25",
+  "top_k": 8,
+  "source_scope": "all_approved_arxiv",
+  "sources": {
+    "2607.24663": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "0da037fba9f20122cb7bd1f23b40619e24cf44dc2d424179de26768ba0d079b5",
+      "source_document_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2608.02037": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "c60ff124687c0c5b9a875d0445dd0994059b2410ddc4baa64770e738bcab4526",
+      "source_document_sha256": "e3b9029a72c6466c837e8c1b320dbddca1800d353d0e667b383adfd552e04d51",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2608.20519": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "ab689e887328f2e61aa976c39526b0e0680d6b52ba41cc982c3d7f8f653f83e6",
+      "source_document_sha256": "7d664debd8dc5c83119c0b1b64a9d8ef2a277eca54cea402dd786fd9d311ce31",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2609.27579": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "198ed0f205db6f60a1221fdd7fa71229f9770fd0997704d694259cf5e07d7f2b",
+      "source_document_sha256": "f944b10d58484c1d57c5dba23a1e4c18fcc1a07a18606e0c2b728d9cb46ba20d",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2609.39773": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "09b6db19f542cd81cce9d7258cdd4a2ed04724bcf5071716c00bba24c4801f79",
+      "source_document_sha256": "1f3bf6c3e4d019160bc53bc0c0aef4ecc9954a96cda5fecdaa790581ae27b5fe",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2610.06874": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "f63eb37a210ec35b5743c935561bffeba5dc10411746f9594d4ce889a2a48aca",
+      "source_document_sha256": "2ee6b350ef50cbd39b8fc90381853ef4a18bd1def4dbaf3550097a95e1202d74",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2610.09789": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "85149afe3e89a885422b6e9041aec982bd91fe24817e6720843db820be6e1771",
+      "source_document_sha256": "8eb016db8598bd2834654a013fa6fd817a49a869e52218c8d6b823265e37f501",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2610.10204": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "589a74aee6326710ace5f58f9fb0bd5d9702a4f8a136db6131f551cccb89935e",
+      "source_document_sha256": "8185fb09c8b7c63c131bceea90ef9462dd00a0382665f531ae95931c21252e59",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "2610.12662": {
+      "parser_version": "pdfplumber-layout-v27",
+      "content_sha256": "35de68474a6b00965707b7b2719a23a19520a07e9dac8c10e3bd1c7f876cd78c",
+      "source_document_sha256": "3c79ea5ba95e2dcc9a0f758486a3f36c15a8cfd15a81216088a0738ffdc20b2e",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  },
+  "limitations": [
+    "labels are AI-authored, not human-reviewed and not a gold standard",
+    "questions were written from the same index that is being evaluated",
+    "single licensed corpus of nine papers; not a general retrieval-quality estimate"
+  ],
+  "tasks": [
+    {
+      "task_id": "AI-2607.24663-01",
+      "source_id": "2607.24663",
+      "challenge_type": "multi_hop",
+      "question": "Which tooling layer provides the facility's live process-variable data at query time, and what property of that data keeps it out of the pre-built index?",
+      "answer": "It is accessed at query time through the Model-Context-Protocol tooling layer, because its data are continuous and timestamped rather than document-based.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2607.24663",
+        "chunk_id": "arxiv:2607.24663:0da037fba9f20122:25",
+        "page_number": 3,
+        "element_type": "paragraph",
+        "quote": "This source is accessed at query time through the Model-\nContext-Protocol tooling layer, as its data are continuous and\ntimestamped rather than document-based, and thus are not\npre-indexed."
+      }
+    },
+    {
+      "task_id": "AI-2607.24663-02",
+      "source_id": "2607.24663",
+      "challenge_type": "single_fact",
+      "question": "How many atomic nuggets must each gold answer contain, which two labels can they carry, and what is the minimum number of the higher-priority ones?",
+      "answer": "3–10 atomic nuggets labeled vital or okay, with at least two vital.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2607.24663",
+        "chunk_id": "arxiv:2607.24663:0da037fba9f20122:187",
+        "page_number": 7,
+        "element_type": "paragraph",
+        "quote": "each an-\nswer is decomposed into 3–10 atomic nuggets labeled vital or\nokay (at least two vital)."
+      }
+    },
+    {
+      "task_id": "AI-2607.24663-03",
+      "source_id": "2607.24663",
+      "challenge_type": "multi_hop",
+      "question": "Where is the benefit of the corrective mechanism concentrated, and what happens to grounding if more rounds are allowed beyond that point?",
+      "answer": "In the first corrective round; additional rounds change answers without improving grounding.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2607.24663",
+        "chunk_id": "arxiv:2607.24663:0da037fba9f20122:509",
+        "page_number": 27,
+        "element_type": "paragraph",
+        "quote": "The effect of the loop is concentrated in the first corrective round, with additional rounds altering answers without\nimproving grounding."
+      }
+    },
+    {
+      "task_id": "AI-2607.24663-04",
+      "source_id": "2607.24663",
+      "challenge_type": "single_fact",
+      "question": "Which agent-facing capability exposes the facility's institutional knowledge to Claude Code and Codex, and what is its publication status?",
+      "answer": "The /aps-rag retrieval skill described in Sec. S4, which will be released publicly.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2607.24663",
+        "chunk_id": "arxiv:2607.24663:0da037fba9f20122:258",
+        "page_number": 14,
+        "element_type": "paragraph",
+        "quote": "the /aps-rag re-\ntrieval skill (see Sec. S4), which lets the platform’s institu-\ntional knowledge be queried from Claude Code and Codex,\nwill be released publicly"
+      }
+    },
+    {
+      "task_id": "AI-2607.24663-05",
+      "source_id": "2607.24663",
+      "challenge_type": "multi_hop",
+      "question": "When a subsystem problem is logged as an event, where might the underlying cause have been recorded beforehand, and where does the fix end up?",
+      "answer": "The fault may have been filed in a maintenance work request days earlier, and the resolution lives in an operator's wiki.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2607.24663",
+        "chunk_id": "arxiv:2607.24663:0da037fba9f20122:1",
+        "page_number": 1,
+        "element_type": "paragraph",
+        "quote": "the subsystem fault that caused it may have been\nfiled in a maintenance work request days earlier; the resolu-\ntion lives in an operator’s wiki"
+      }
+    },
+    {
+      "task_id": "AI-2608.02037-01",
+      "source_id": "2608.02037",
+      "challenge_type": "figure_caption",
+      "question": "What sidewall angle was measured for the recess formed in the upper cladding?",
+      "answer": "85.24°.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.02037",
+        "chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:174",
+        "page_number": 8,
+        "element_type": "figure_caption",
+        "quote": "SEM of the top oxide cladding recess with a\nmeasured sidewall angle of 85.24°."
+      }
+    },
+    {
+      "task_id": "AI-2608.02037-02",
+      "source_id": "2608.02037",
+      "challenge_type": "single_fact",
+      "question": "What mean on-chip optical power and what propagation loss were obtained with the butt-coupled scheme described?",
+      "answer": "19 mW mean on-chip optical power with 3 dB/cm propagation losses at 445 nm.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.02037",
+        "chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:12",
+        "page_number": 2,
+        "element_type": "paragraph",
+        "quote": "architecture utilized a butt-coupling scheme demonstrating 19 mW mean on-chip optical power\nwith 3 dB/cm propagation losses at 445 nm."
+      }
+    },
+    {
+      "task_id": "AI-2608.02037-03",
+      "source_id": "2608.02037",
+      "challenge_type": "single_fact",
+      "question": "Which transmission level and loss figure were selected for the printed amplifiers, and between which two structures does that mode transition take place?",
+      "answer": "About 70% transmission (1.6 dB loss), for the transition from the 220 nm thick a-Si:H waveguide to the III-V SOA.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.02037",
+        "chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:232",
+        "page_number": 10,
+        "element_type": "paragraph",
+        "quote": "amplifiers designed to\ntransmit approximately 70% (1.6 dB loss) from the 220 nm thick a-Si:H waveguide to the III-V\nSOA are chosen for the integration"
+      }
+    },
+    {
+      "task_id": "AI-2608.02037-04",
+      "source_id": "2608.02037",
+      "challenge_type": "multi_hop",
+      "question": "What emission wavelength, threshold current, and on-chip power characterize these devices at the stated driving current?",
+      "answer": "Emission near 970 nm, a threshold current of about 35 ± 5 mA, and 0 ± 1 dBm on-chip output power at 80 mA.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.02037",
+        "chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:273",
+        "page_number": 12,
+        "element_type": "paragraph",
+        "quote": "The lasers exhibit emission at around 970 nm with a threshold current\nof approximately 35 ± 5 mA and on-chip output powers of 0 ± 1 dBm at a driving current of\n80 mA."
+      }
+    },
+    {
+      "task_id": "AI-2608.02037-05",
+      "source_id": "2608.02037",
+      "challenge_type": "multi_hop",
+      "question": "Which film's fitted extinction coefficient vanishes only above a certain wavelength, and what does the other film's coefficient do over the whole measured range?",
+      "answer": "The a-Si:H coefficient drops to zero at about 790 nm, whereas the SiN coefficient remains zero across the entire wavelength range.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.02037",
+        "chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:97",
+        "page_number": 5,
+        "element_type": "paragraph",
+        "quote": "Notably, the fitted extinction coefficient of SiN remains zero\nacross the entire wavelength range, whereas for a-Si:H, it drops to zero at approximately 790\nnm."
+      }
+    },
+    {
+      "task_id": "AI-2608.20519-01",
+      "source_id": "2608.20519",
+      "challenge_type": "multi_hop",
+      "question": "What overall score did the expert reports receive, how many assessments contributed to it, and how often did the two reviewers land within a single point of each other?",
+      "answer": "A pooled mean of 4.65 ± 0.80 across 54 ratings, with the raters agreeing within one point on 85% of paired ratings.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.20519",
+        "chunk_id": "arxiv:2608.20519:ab689e887328f2e6:7",
+        "page_number": 1,
+        "element_type": "paragraph",
+        "quote": "Across 54 ratings, the pooled mean was 4.65 ± 0.80, with 93% of ratings ≥ 4;\nMetric means were 4.6 (reasoning), 4.5 (citation), and 4.8 (utility), and raters agreed within\none point on 85% of paired ratings."
+      }
+    },
+    {
+      "task_id": "AI-2608.20519-02",
+      "source_id": "2608.20519",
+      "challenge_type": "single_fact",
+      "question": "How many curated publications, and of what kind, made up the corpus at the time of the study?",
+      "answer": "28 peer-reviewed publications on DWI/IVIM and related quantitative MRI in oncology and MRgRT.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.20519",
+        "chunk_id": "arxiv:2608.20519:ab689e887328f2e6:70",
+        "page_number": 13,
+        "element_type": "paragraph",
+        "quote": "the evidence base comprised 28\npeer-reviewed publications on DWI/IVIM (and related quantitative MRI) in oncology and\nMRgRT, curated to span the tumor types and parameters relevant to the platform (Table 2)."
+      }
+    },
+    {
+      "task_id": "AI-2608.20519-03",
+      "source_id": "2608.20519",
+      "challenge_type": "figure_caption",
+      "question": "Which reviewer gave the top reasoning score to every case, and which outlier values did the other reviewer assign?",
+      "answer": "The physicist gave a reasoning score of 5 to all cases, while the physician gave reasoning scores of 2, 3 and 3 in three cases and one citation score of 1.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.20519",
+        "chunk_id": "arxiv:2608.20519:ab689e887328f2e6:173",
+        "page_number": 19,
+        "element_type": "figure_caption",
+        "quote": "The physician’s ratings showed greater\nvariability, driven by a few atypical cases (reasoning scores of 2, 3, and 3 in three cases and one\ncitation score of 1), whereas the physicist assigned a reasoning of 5 to all cases."
+      }
+    },
+    {
+      "task_id": "AI-2608.20519-04",
+      "source_id": "2608.20519",
+      "challenge_type": "single_fact",
+      "question": "Which review-board protocol governed the retrospectively collected data, and at which medical center were they gathered?",
+      "answer": "Umbrella IRB protocol 082013-008 at UT Southwestern Medical Center.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.20519",
+        "chunk_id": "arxiv:2608.20519:ab689e887328f2e6:194",
+        "page_number": 23,
+        "element_type": "paragraph",
+        "quote": "All datasets were retrospectively collected from an approved study at the UT Southwestern\nMedical Center, under an umbrella IRB protocol 082013-008"
+      }
+    },
+    {
+      "task_id": "AI-2608.20519-05",
+      "source_id": "2608.20519",
+      "challenge_type": "single_fact",
+      "question": "What average top-1 recall did the cited rare-disease agent achieve in phenotype-ontology diagnosis, and by what margin did it beat the runner-up?",
+      "answer": "An average Recall@1 of 57.18%, outperforming the next best method by 23.79%.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2608.20519",
+        "chunk_id": "arxiv:2608.20519:ab689e887328f2e6:16",
+        "page_number": 4,
+        "element_type": "paragraph",
+        "quote": "DeepRare, an agentic rare-disease system evaluated across nine datasets spanning\n2,919 diseases, achieved an average Recall@1 of 57.18% in human-phenotype-ontology-based\ndiagnostic tasks, outperforming the next best method by 23.79%"
+      }
+    },
+    {
+      "task_id": "AI-2609.27579-01",
+      "source_id": "2609.27579",
+      "challenge_type": "single_fact",
+      "question": "What kinds of operational material is the proposed AI support tool meant to integrate, and for which accelerator facility is it intended?",
+      "answer": "Heterogeneous operational knowledge such as logbooks, interlock reports, machine parameters, and historical archive data; it is intended for the ELBE facility.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.27579",
+        "chunk_id": "arxiv:2609.27579:198ed0f205db6f60:1",
+        "page_number": 1,
+        "element_type": "paragraph",
+        "quote": "The efficient operation of accelerator facilities increas-\ningly relies on rapid access to heterogeneous operational\nknowledge, including logbooks, interlock reports, machine\nparameters, and historical archive data."
+      }
+    },
+    {
+      "task_id": "AI-2609.27579-02",
+      "source_id": "2609.27579",
+      "challenge_type": "multi_hop",
+      "question": "What does the acronym of the Dresden-based electron linear accelerator stand for, and at which research centre is it located?",
+      "answer": "Electron Linac for beams with high Brilliance and low Emittance; it is located at the Helmholtz-Zentrum Dresden-Rossendorf (HZDR).",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.27579",
+        "chunk_id": "arxiv:2609.27579:198ed0f205db6f60:3",
+        "page_number": 1,
+        "element_type": "paragraph",
+        "quote": "At the electron linear accelerator ELBE (Electron Linac\nfor beams with high Brilliance and low Emittance) at the\nHelmholtz-Zentrum Dresden-Rossendorf (HZDR)"
+      }
+    },
+    {
+      "task_id": "AI-2609.27579-03",
+      "source_id": "2609.27579",
+      "challenge_type": "single_fact",
+      "question": "Which of the broad data classes used at the facility consists of archived machine parameters kept in historical databases, and what is said about how they are sampled?",
+      "answer": "Structured time-series data, stored in historical databases with subsystem-dependent sampling rates.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.27579",
+        "chunk_id": "arxiv:2609.27579:198ed0f205db6f60:9",
+        "page_number": 2,
+        "element_type": "paragraph",
+        "quote": "Operational data at ELBE can be broadly cat-\negorized into three classes: Structured time-series data,\nconsisting of archived machine parameters stored in histor-\nical databases with subsystem-dependent sampling rates;"
+      }
+    },
+    {
+      "task_id": "AI-2609.27579-04",
+      "source_id": "2609.27579",
+      "challenge_type": "figure_caption",
+      "question": "According to the architecture figure's caption, what processing do the heterogeneous facility data undergo, and what do user queries set off?",
+      "answer": "The data are normalized and embedded into a vector database, and user queries trigger semantic retrieval with metadata and time constraints.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.27579",
+        "chunk_id": "arxiv:2609.27579:198ed0f205db6f60:31",
+        "page_number": 3,
+        "element_type": "figure_caption",
+        "quote": "Heterogeneous accelerator data are\nnormalized and embedded into a vector database. User queries trigger semantic retrieval with metadata and time constraints"
+      }
+    },
+    {
+      "task_id": "AI-2609.27579-05",
+      "source_id": "2609.27579",
+      "challenge_type": "single_fact",
+      "question": "What practical obstacles does the paper list as the current limitations of its proposed operational-support approach?",
+      "answer": "Inconsistent naming conventions across subsystems, variability in logbook documentation quality, and imperfect time synchronization between data sources.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.27579",
+        "chunk_id": "arxiv:2609.27579:198ed0f205db6f60:24",
+        "page_number": 3,
+        "element_type": "paragraph",
+        "quote": "Current challenges include inconsistent naming conven-\ntions across subsystems, variability in logbook documenta-\ntion quality, and imperfect time synchronization between\ndata sources."
+      }
+    },
+    {
+      "task_id": "AI-2609.39773-01",
+      "source_id": "2609.39773",
+      "challenge_type": "multi_hop",
+      "question": "Under the coarse-graining step used to factor the joint distribution, what is discarded and what two quantities stand in for each molecule?",
+      "answer": "All intramolecular degrees of freedom are removed; each molecule is replaced by a centroid q^{(i)} ∈ R^{3} and an orientation Q^{(i)} ∈ SO(3).",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.39773",
+        "chunk_id": "arxiv:2609.39773:09b6db19f542cd81:34",
+        "page_number": 4,
+        "element_type": "paragraph",
+        "quote": "a coarse-graining\nmap (Definition A.1) that removes all intramolecular degrees of freedom, replacing each molecule i with a centroid\nq^{(i)} ∈ R^{3} and an orientation Q^{(i)} ∈ SO(3)"
+      }
+    },
+    {
+      "task_id": "AI-2609.39773-02",
+      "source_id": "2609.39773",
+      "challenge_type": "single_fact",
+      "question": "What numerical procedure does the implementation use to evaluate functions of a matrix such as its logarithm, exponential, and square root?",
+      "answer": "By diagonalizing the argument and applying the corresponding scalar function to the eigenvalues.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.39773",
+        "chunk_id": "arxiv:2609.39773:09b6db19f542cd81:105",
+        "page_number": 6,
+        "element_type": "paragraph",
+        "quote": "where the matrix logarithm, matrix exponential, and principal square root are each evaluated by diagonalizing the\nargument, applying the corresponding scalar function to the eigenvalues"
+      }
+    },
+    {
+      "task_id": "AI-2609.39773-03",
+      "source_id": "2609.39773",
+      "challenge_type": "multi_hop",
+      "question": "Which criteria must a predicted structure meet before the authors count it as solved?",
+      "answer": "It must be packing similar, possess RMSD_{N}_{Matches} ≤ 2.0 Å, and contain no collisions.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.39773",
+        "chunk_id": "arxiv:2609.39773:09b6db19f542cd81:162",
+        "page_number": 8,
+        "element_type": "paragraph",
+        "quote": "a target is considered solved when the structures are\npacking similar, possess RMSD_{N}_{Matches} ≤ 2.0 Å, and contain no collisions."
+      }
+    },
+    {
+      "task_id": "AI-2609.39773-04",
+      "source_id": "2609.39773",
+      "challenge_type": "single_fact",
+      "question": "What relation between the symmetry of the coarse-grained description and that of the full atomistic structure do the authors conjecture, and what geometric reason do they give?",
+      "answer": "That coarse-graining can only increase space group symmetry or leave it unchanged (G ≤ G_{CG}), because molecular centroids tend to occupy high-symmetry packing positions.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.39773",
+        "chunk_id": "arxiv:2609.39773:09b6db19f542cd81:661",
+        "page_number": 26,
+        "element_type": "paragraph",
+        "quote": "We suspect that coarse-graining can thus only “increase” the space group symmetry or leave it unchanged: G ≤ G_{CG} .\nThe mechanism is geometric: molecular centroids tend to occupy high-symmetry packing positions."
+      }
+    },
+    {
+      "task_id": "AI-2609.39773-05",
+      "source_id": "2609.39773",
+      "challenge_type": "single_fact",
+      "question": "Why do the authors say a true apples-to-apples comparison against the competing crystal-structure-prediction approach remains difficult?",
+      "answer": "Because of differing data splits and benchmarking pipelines.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2609.39773",
+        "chunk_id": "arxiv:2609.39773:09b6db19f542cd81:754",
+        "page_number": 35,
+        "element_type": "paragraph",
+        "quote": "This does not invalidate CG-OMatG: a true apples-to-apples comparison remains\ndifficult because of differing data splits and benchmarking pipelines."
+      }
+    },
+    {
+      "task_id": "AI-2610.06874-02",
+      "source_id": "2610.06874",
+      "challenge_type": "table_lookup",
+      "question": "At which probed height is the measured mean wind speed closest to the log-law value, and what deviation is reported there?",
+      "answer": "At z = 9.77 m, where the deviation is +0.1%.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.06874",
+        "chunk_id": "arxiv:2610.06874:f63eb37a210ec35b:186",
+        "page_number": 14,
+        "element_type": "table",
+        "quote": "5.08 | 6.97 | 6.89 | +1.2 | 0.91 / 0.48\n9.77 | 7.78 | 7.77 | +0.1 | 0.79 / 0.48"
+      }
+    },
+    {
+      "task_id": "AI-2610.06874-03",
+      "source_id": "2610.06874",
+      "challenge_type": "single_fact",
+      "question": "How many learned policies were trained across the disturbance fidelity levels, and what was kept identical between them?",
+      "answer": "One policy per fidelity level L0–L4 (five levels × five seeds); observation, action, and reward definitions were held constant and only the disturbance field changed.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.06874",
+        "chunk_id": "arxiv:2610.06874:f63eb37a210ec35b:220",
+        "page_number": 17,
+        "element_type": "paragraph",
+        "quote": "One policy is trained per fidelity level\nL0–L4 (five levels × five seeds), with observation, action, and reward definitions held constant across levels—only the\ndisturbance field changes."
+      }
+    },
+    {
+      "task_id": "AI-2610.06874-04",
+      "source_id": "2610.06874",
+      "challenge_type": "single_fact",
+      "question": "How many episodes, and how many distinct test conditions, make up the whole evaluation campaign?",
+      "answer": "7290 episodes over 27 test conditions.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.06874",
+        "chunk_id": "arxiv:2610.06874:f63eb37a210ec35b:289",
+        "page_number": 21,
+        "element_type": "paragraph",
+        "quote": "The total evaluation campaign comprises\n7290 episodes over 27 test conditions."
+      }
+    },
+    {
+      "task_id": "AI-2610.06874-05",
+      "source_id": "2610.06874",
+      "challenge_type": "single_fact",
+      "question": "What does the paper say about the status of its evidence and about real-world flight validation?",
+      "answer": "The study is simulation-only with no flight-test validation, so conclusions about sim-to-real deployment are inferential.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.06874",
+        "chunk_id": "arxiv:2610.06874:f63eb37a210ec35b:406",
+        "page_number": 29,
+        "element_type": "paragraph",
+        "quote": "We wish to emphasize that currently the study is simulation-only: no flight-test validation is performed, so conclusions\nabout sim-to-real deployment are inferential,"
+      }
+    },
+    {
+      "task_id": "AI-2610.09789-01",
+      "source_id": "2610.09789",
+      "challenge_type": "table_lookup",
+      "question": "According to the comparison table, which two features of the original agent-based simulation are marked as not reproduced by the reduced equations?",
+      "answer": "Cooperators persisting at about 40% (which would require mutation or a spatial refuge), and the shift of the peak time with the donation rate.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.09789",
+        "chunk_id": "arxiv:2610.09789:85149afe3e89a885:154",
+        "page_number": 10,
+        "element_type": "table",
+        "quote": "Cooperators persist at ∼ 40% no mutation, no spatial refuge no\nPeak time shifts with the donation rate threshold on R_{t} only no"
+      }
+    },
+    {
+      "task_id": "AI-2610.09789-02",
+      "source_id": "2610.09789",
+      "challenge_type": "single_fact",
+      "question": "How high does the simulated population peak when the public goods game is active compared with the run without it, and when is that gap statistically significant?",
+      "answer": "It peaks at around 3,200 agents with the PGG against 2,400 without it, and the difference is statistically significant during this early phase.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.09789",
+        "chunk_id": "arxiv:2610.09789:85149afe3e89a885:18",
+        "page_number": 3,
+        "element_type": "paragraph",
+        "quote": "With the PGG\nthe population grows faster and peaks higher, at around 3,200 agents against 2,400 without it;\nthe difference is statistically significant during this early phase."
+      }
+    },
+    {
+      "task_id": "AI-2610.09789-03",
+      "source_id": "2610.09789",
+      "challenge_type": "single_fact",
+      "question": "In the bifurcation analysis, at which defector growth-rate value does the long-run level first split in two, and beyond roughly what value does it become irregular?",
+      "answer": "It stays on a single level below r_B = 3, splits in two above 3, and becomes irregular beyond r_B ≃ 3.57.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.09789",
+        "chunk_id": "arxiv:2610.09789:85149afe3e89a885:97",
+        "page_number": 6,
+        "element_type": "paragraph",
+        "quote": "below r_{B} = 3 the system settles\non a single level, above it the level splits in two, and beyond r_{B} ≃ 3.57 the long-run behavior\nbecomes irregular."
+      }
+    },
+    {
+      "task_id": "AI-2610.09789-04",
+      "source_id": "2610.09789",
+      "challenge_type": "single_fact",
+      "question": "Which quantity in the difference equations stands for the subsistence capacity of the environment when there is no cooperative enhancement, and which symbol gives the per-step environmental decay?",
+      "answer": "K_min, the baseline carrying capacity defined as the subsistence level, and δ_K, the natural degradation rate of the environment per time step.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.09789",
+        "chunk_id": "arxiv:2610.09789:85149afe3e89a885:39",
+        "page_number": 4,
+        "element_type": "paragraph",
+        "quote": "is the baseline carrying capacity (subsistence level) in the absence of enhancement.\n• δ_{K} is the natural degradation rate of the environment per time step."
+      }
+    },
+    {
+      "task_id": "AI-2610.09789-05",
+      "source_id": "2610.09789",
+      "challenge_type": "multi_hop",
+      "question": "In the reduced equations, which parameter increase lifts the peak capacity while leaving the final population level unchanged, and which parameter decrease produces a comparable rise in the peak?",
+      "answer": "Raising ∆K lifts the peak capacity and leaves K_min untouched, while a smaller δ_K (slower degradation) does the same.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.09789",
+        "chunk_id": "arxiv:2610.09789:85149afe3e89a885:147",
+        "page_number": 9,
+        "element_type": "paragraph",
+        "quote": "A larger\ndonation rate raises the peak but not the equilibrium; in the equations, a larger ∆K raises the\npeak capacity and leaves K_{min} untouched."
+      }
+    },
+    {
+      "task_id": "AI-2610.10204-01",
+      "source_id": "2610.10204",
+      "challenge_type": "figure_caption",
+      "question": "In the illustration of the ellipsoidal water parcel, how does diffusion change the patch, and how do strain and divergence act on it?",
+      "answer": "Diffusion increases the patch volume by diluting its content in both directions, while strain and divergence stretch it across the horizontal and the vertical.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.10204",
+        "chunk_id": "arxiv:2610.10204:589a74aee6326710:41",
+        "page_number": 3,
+        "element_type": "figure_caption",
+        "quote": "Diffusion in both\ndirections increase the volume of the patch by diluting its content, while strain and divergence stretch the patch\nacross the horizontal and the vertical, respectively."
+      }
+    },
+    {
+      "task_id": "AI-2610.10204-02",
+      "source_id": "2610.10204",
+      "challenge_type": "single_fact",
+      "question": "How long was the fertilized patch followed directly at sea after the iron was released, and how much longer was it observed from space?",
+      "answer": "About two weeks in situ after the injection, and then 40 days by satellite.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.10204",
+        "chunk_id": "arxiv:2610.10204:589a74aee6326710:105",
+        "page_number": 4,
+        "element_type": "paragraph",
+        "quote": "SOIREE was the first iron fertilization experiment conducted in the polar Southern Ocean [7, 2]. The\nfertilized patch was tracked in situ for approximately two weeks after iron injection and by satellite over\nthe following 40 days."
+      }
+    },
+    {
+      "task_id": "AI-2610.10204-03",
+      "source_id": "2610.10204",
+      "challenge_type": "multi_hop",
+      "question": "How much primary production does the model attribute to the patch over the full 42-day run, and what share of that total had already been produced in the first fortnight?",
+      "answer": "About 1,640 tons after 42 days, of which roughly 25% was produced in the first two weeks.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.10204",
+        "chunk_id": "arxiv:2610.10204:589a74aee6326710:115",
+        "page_number": 6,
+        "element_type": "paragraph",
+        "quote": "Our model estimates 1640 tons of primary production inside the water patch after\n42 days. The total organic carbon produced in the first 2 weeks is about 25% of this final amount,"
+      }
+    },
+    {
+      "task_id": "AI-2610.10204-04",
+      "source_id": "2610.10204",
+      "challenge_type": "single_fact",
+      "question": "What mechanism does the study propose for the drop in the local carbon flux as vertical diffusivity changes?",
+      "answer": "Higher exchange of carbon between the patch and the deeper layer, which replaces part of the atmosphere-to-sea flux from above.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.10204",
+        "chunk_id": "arxiv:2610.10204:589a74aee6326710:163",
+        "page_number": 9,
+        "element_type": "paragraph",
+        "quote": "The decrease in LCF is\nprobably caused by higher exchange of carbon between the water patch and deeper layer, replacing\npart of the atmosphere-to-sea flux from above."
+      }
+    },
+    {
+      "task_id": "AI-2610.10204-05",
+      "source_id": "2610.10204",
+      "challenge_type": "single_fact",
+      "question": "Which three factors of injection geometry and mixing does the model find carbon uptake to be sensitive to, and what can dilution of the patch do to the ecosystem's response?",
+      "answer": "Sensitivity to initial injected area, horizontal divergence and vertical diffusivity; patch dilution can enhance the ecosystem response.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.10204",
+        "chunk_id": "arxiv:2610.10204:589a74aee6326710:9",
+        "page_number": 1,
+        "element_type": "paragraph",
+        "quote": "Our results show that patch\ndilution can enhance the ecosystem response, and how carbon uptake is sensitive to initial injected area,\nhorizontal divergence and vertical diffusivity."
+      }
+    },
+    {
+      "task_id": "AI-2610.12662-01",
+      "source_id": "2610.12662",
+      "challenge_type": "single_fact",
+      "question": "Which LLM produced the fastest translated kernel, and what speedup over the serial Fortran reference did it reach during cached execution on the GPU?",
+      "answer": "Gemini, with up to a 357× speedup at 10^6 atmospheric columns.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.12662",
+        "chunk_id": "arxiv:2610.12662:35de68474a6b0096:4",
+        "page_number": 1,
+        "element_type": "paragraph",
+        "quote": "fastest translated JAX implementation, generated using Gemini, achieves up to a 357× speedup over\nserial Fortran in cached GPU execution at 10^{6} atmospheric columns."
+      }
+    },
+    {
+      "task_id": "AI-2610.12662-02",
+      "source_id": "2610.12662",
+      "challenge_type": "multi_hop",
+      "question": "In what index order must callers pass arrays to the generated bridge, and does the bridge rearrange them on the host before the transfer to the device?",
+      "answer": "Callers pass ordinary NumPy arrays in the Fortran-facing index order, such as (ncol, nz), and the bridge transfers them in that same order with no host-side transposition.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.12662",
+        "chunk_id": "arxiv:2610.12662:35de68474a6b0096:54",
+        "page_number": 6,
+        "element_type": "paragraph",
+        "quote": "Callers pass ordinary NumPy arrays in the Fortran-facing index order,\nsuch as (ncol, nz) , and the bridge transfers them to the device in that same index order, with\nno host-side transposition."
+      }
+    },
+    {
+      "task_id": "AI-2610.12662-03",
+      "source_id": "2610.12662",
+      "challenge_type": "single_fact",
+      "question": "How many refinement passes does the assistant apply to array-based procedures, and what is the third pass responsible for?",
+      "answer": "Four passes; the third is a vectorization and control-flow pass.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.12662",
+        "chunk_id": "arxiv:2610.12662:35de68474a6b0096:61",
+        "page_number": 8,
+        "element_type": "paragraph",
+        "quote": "Array-based Fortran procedures are translated using four passes: an initial draft, a JIT-safety pass,\na vectorization and control-flow pass, and a finalization pass that enforces data-type consistency,"
+      }
+    },
+    {
+      "task_id": "AI-2610.12662-04",
+      "source_id": "2610.12662",
+      "challenge_type": "figure_caption",
+      "question": "Which three model families outperform the plain Fortran baseline in cached runtime scaling, and which one performs best among the validated translations?",
+      "answer": "Claude, GPT, and Gemini; Gemini achieves the best performance among the numerically validated translations.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.12662",
+        "chunk_id": "arxiv:2610.12662:35de68474a6b0096:133",
+        "page_number": 15,
+        "element_type": "figure_caption",
+        "quote": "Claude, GPT, and\nGemini scale substantially better than serial Fortran, with Gemini achieving the best performance\namong the numerically validated translations."
+      }
+    },
+    {
+      "task_id": "AI-2610.12662-05",
+      "source_id": "2610.12662",
+      "challenge_type": "table_lookup",
+      "question": "Between the two rows shown in the error table, which variable has the smaller value in the first error column, and what does its third column report?",
+      "answer": "Precipitation rate (1.4 × 10−19, versus 9.8 × 10−13 for relative humidity), with a third-column value of 0.79.",
+      "expected_answerable": true,
+      "evidence": {
+        "source_id": "2610.12662",
+        "chunk_id": "arxiv:2610.12662:35de68474a6b0096:139",
+        "page_number": 16,
+        "element_type": "table",
+        "quote": "Precipitation rate | 1.4 × 10−19 | 1.1 × 10−19 | 0.79\nRelative humidity | 9.8 × 10−13 | 4.1 × 10−13 | 0.42"
+      }
+    },
+    {
+      "task_id": "AI-UNANS-01",
+      "source_id": "2607.24663",
+      "challenge_type": "unanswerable",
+      "question": "What solar-flare forecasting skill score did the APS-RAG retrieval pipeline achieve when it was applied to satellite magnetogram data?",
+      "expected_answerable": false,
+      "absent_fact": "The APS-RAG retrieval pipeline was applied to solar-flare forecasting from satellite magnetogram data.",
+      "related_source_id": "2607.24663"
+    },
+    {
+      "task_id": "AI-UNANS-02",
+      "source_id": "2608.02037",
+      "challenge_type": "unanswerable",
+      "question": "At what millikelvin temperature were the micro-transfer-printed amplifiers on this silicon nitride platform operated as superconducting qubits?",
+      "expected_answerable": false,
+      "absent_fact": "Micro-transfer-printed amplifiers on the silicon nitride platform were operated as superconducting qubits at millikelvin temperatures.",
+      "related_source_id": "2608.02037"
+    },
+    {
+      "task_id": "AI-UNANS-03",
+      "source_id": "2608.20519",
+      "challenge_type": "unanswerable",
+      "question": "How much did the platform's band-limited implicit neural representation denoiser improve the signal-to-noise ratio of seismic reflection data used in petroleum exploration?",
+      "expected_answerable": false,
+      "absent_fact": "The platform's band-limited implicit neural representation denoiser was also applied to seismic reflection data for petroleum exploration.",
+      "related_source_id": "2608.20519"
+    },
+    {
+      "task_id": "AI-UNANS-04",
+      "source_id": "2609.27579",
+      "challenge_type": "unanswerable",
+      "question": "How many patient arrhythmia cases were used to clinically validate the accelerator facility's AI support tool in the hospital cardiology ward?",
+      "expected_answerable": false,
+      "absent_fact": "The accelerator operational-support framework was clinically validated on patient arrhythmia cases in a hospital cardiology ward.",
+      "related_source_id": "2609.27579"
+    },
+    {
+      "task_id": "AI-UNANS-05",
+      "source_id": "2609.39773",
+      "challenge_type": "unanswerable",
+      "question": "Which agricultural soil dataset was used to benchmark the crystal-packing flow model for crop-yield forecasting?",
+      "expected_answerable": false,
+      "absent_fact": "The molecular crystal structure prediction flow model was benchmarked on agricultural soil samples for crop-yield forecasting.",
+      "related_source_id": "2609.39773"
+    },
+    {
+      "task_id": "AI-UNANS-06",
+      "source_id": "2610.06874",
+      "challenge_type": "unanswerable",
+      "question": "What annualized return did the quadrotor PPO controllers achieve when evaluated on high-frequency equity trading data?",
+      "expected_answerable": false,
+      "absent_fact": "The quadrotor wind-fidelity study evaluated its PPO controllers on high-frequency equity trading data and reported an annualized return.",
+      "related_source_id": "2610.06874"
+    },
+    {
+      "task_id": "AI-UNANS-07",
+      "source_id": "2610.09789",
+      "challenge_type": "unanswerable",
+      "question": "What do the paper's brain-imaging results show about neural activity when human volunteers decide how much to contribute to a public good?",
+      "expected_answerable": false,
+      "absent_fact": "The paper reports functional MRI brain-imaging measurements from human volunteers who played a public goods game.",
+      "related_source_id": "2610.09789"
+    },
+    {
+      "task_id": "AI-UNANS-08",
+      "source_id": "2610.10204",
+      "challenge_type": "unanswerable",
+      "question": "What efficacy and adverse-event rates did the paper's randomized trial of an influenza vaccine in adults report?",
+      "expected_answerable": false,
+      "absent_fact": "The paper reports a randomized controlled clinical trial of an influenza vaccine in human adults, including efficacy and adverse-event rates.",
+      "related_source_id": "2610.10204"
+    },
+    {
+      "task_id": "AI-UNANS-09",
+      "source_id": "2610.12662",
+      "challenge_type": "unanswerable",
+      "question": "What tensile strength values did the paper measure for its carbon-fibre composite samples?",
+      "expected_answerable": false,
+      "absent_fact": "The paper reports laboratory tensile-strength measurements on carbon-fibre composite material samples.",
+      "related_source_id": "2610.12662"
+    }
+  ]
+}

@@ -11,6 +11,18 @@ import httpx
 from app.config import Settings
 
 API_URL = "https://api.openai.com/v1/responses"
+_INPUT_TOKEN_OVERHEAD_BYTES = 4_096
+METADATA_CITABLE_FIELDS = (
+    "title",
+    "publication_year",
+    "published_at",
+    "updated_at",
+    "doi",
+    "authors",
+    "categories",
+    "primary_category",
+    "cited_by_count",
+)
 FINAL_ANSWER_SCHEMA: dict[str, Any] = {
     "type": "json_schema",
     "name": "papertrail_research_answer",
@@ -18,7 +30,10 @@ FINAL_ANSWER_SCHEMA: dict[str, Any] = {
     "schema": {
         "type": "object",
         "properties": {
-            "answer": {"type": "string"},
+            "answer": {
+                "type": "string",
+                "description": "Exactly the claim texts joined by one newline, with no extras.",
+            },
             "cited_openalex_ids": {
                 "type": "array",
                 "items": {"type": "string", "pattern": "^W[0-9]+$"},
@@ -27,9 +42,72 @@ FINAL_ANSWER_SCHEMA: dict[str, Any] = {
                 "type": "array",
                 "items": {"type": "string", "minLength": 4, "maxLength": 64},
             },
+            "claims": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "minLength": 1, "maxLength": 1_000},
+                        "evidence": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "source_id": {
+                                        "type": "string",
+                                        "minLength": 4,
+                                        "maxLength": 64,
+                                    },
+                                    "quote": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 1_000,
+                                        "description": (
+                                            "An exact contiguous substring of the observed field. "
+                                            "Preserve whitespace, line breaks, hyphens "
+                                            "and symbols. Encode line breaks as JSON escapes."
+                                        ),
+                                    },
+                                    "evidence_type": {
+                                        "type": "string",
+                                        "enum": ["metadata", "fulltext"],
+                                    },
+                                    "source_field": {
+                                        "type": "string",
+                                        "enum": ["excerpt", *METADATA_CITABLE_FIELDS],
+                                        "description": (
+                                            "For fulltext always use excerpt. For metadata use "
+                                            "the exact observed bibliographic field name."
+                                        ),
+                                    },
+                                    "chunk_id": {"type": ["string", "null"], "maxLength": 180},
+                                },
+                                "required": [
+                                    "source_id",
+                                    "quote",
+                                    "evidence_type",
+                                    "source_field",
+                                    "chunk_id",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
+                    },
+                    "required": ["text", "evidence"],
+                    "additionalProperties": False,
+                },
+            },
             "insufficient_evidence": {"type": "boolean"},
         },
-        "required": ["answer", "cited_openalex_ids", "cited_arxiv_ids", "insufficient_evidence"],
+        "required": [
+            "answer",
+            "cited_openalex_ids",
+            "cited_arxiv_ids",
+            "claims",
+            "insufficient_evidence",
+        ],
         "additionalProperties": False,
     },
 }
@@ -59,7 +137,28 @@ class ModelClient(Protocol):
         instructions: str,
         input_items: list[dict[str, Any]],
         tools: list[dict[str, Any]],
+        max_output_tokens: int | None = None,
     ) -> ModelTurn: ...
+
+
+def estimate_input_tokens_upper_bound(
+    *,
+    instructions: str,
+    input_items: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    max_output_tokens: int,
+) -> int:
+    """Return a conservative UTF-8 byte bound plus provider-envelope reserve."""
+    request_shape = {
+        "instructions": instructions,
+        "input": input_items,
+        "tools": tools,
+        "text": {"format": FINAL_ANSWER_SCHEMA},
+        "max_output_tokens": max_output_tokens,
+    }
+    return len(json.dumps(request_shape, ensure_ascii=False).encode("utf-8")) + (
+        _INPUT_TOKEN_OVERHEAD_BYTES
+    )
 
 
 class ModelUnavailable(RuntimeError):
@@ -96,7 +195,13 @@ class OpenAIResponsesClient:
         instructions: str,
         input_items: list[dict[str, Any]],
         tools: list[dict[str, Any]],
+        max_output_tokens: int | None = None,
     ) -> ModelTurn:
+        output_limit = (
+            self.settings.llm_max_output_tokens if max_output_tokens is None else max_output_tokens
+        )
+        if output_limit < 1 or output_limit > self.settings.llm_max_output_tokens:
+            raise ValueError("max_output_tokens must be within the configured model limit")
         payload = {
             "model": self.settings.llm_model,
             "instructions": instructions,
@@ -105,7 +210,7 @@ class OpenAIResponsesClient:
             "tool_choice": "auto",
             "parallel_tool_calls": False,
             "text": {"format": FINAL_ANSWER_SCHEMA},
-            "max_output_tokens": self.settings.llm_max_output_tokens,
+            "max_output_tokens": output_limit,
             "store": False,
         }
         try:
@@ -151,13 +256,18 @@ class OpenAIResponsesClient:
                         final_fragments.append(content["text"])
                     elif content.get("type") == "refusal":
                         refusal = True
-        usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
-        input_tokens = _nonnegative_int(usage.get("input_tokens"))
-        output_tokens = _nonnegative_int(usage.get("output_tokens"))
+        usage = body.get("usage")
+        if not isinstance(usage, dict):
+            raise ModelUnavailable("OpenAI Responses API omitted token usage.")
+        input_tokens = usage.get("input_tokens")
+        output_tokens = usage.get("output_tokens")
+        if not _is_nonnegative_int(input_tokens) or not _is_nonnegative_int(output_tokens):
+            raise ModelUnavailable("OpenAI Responses API returned invalid token usage.")
+        final_text = _collapse_identical_complete_json("".join(final_fragments)) or None
         return ModelTurn(
             tool_calls=calls,
             continuation_items=[item for item in output_items if isinstance(item, dict)],
-            final_text="".join(final_fragments) or None,
+            final_text=final_text,
             refusal=refusal,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -172,5 +282,19 @@ def encode_tool_result(call_id: str, observation: dict[str, Any]) -> dict[str, s
     }
 
 
-def _nonnegative_int(value: Any) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+def _collapse_identical_complete_json(text: str) -> str:
+    """Collapse only exact repeats of one complete JSON object, not partial fragments."""
+    try:
+        parsed, end = json.JSONDecoder().raw_decode(text)
+    except ValueError:
+        return text
+    if not isinstance(parsed, dict) or end == len(text) or end == 0:
+        return text
+    first = text[:end]
+    if len(text) % end == 0 and text == first * (len(text) // end):
+        return first
+    return text
+
+
+def _is_nonnegative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0

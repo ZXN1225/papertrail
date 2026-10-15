@@ -7,7 +7,16 @@ __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
+backend/.pytest-tmp-*/
+backend/tests/.pytest-tmp-*/
+backend/tests/tmp*/
+# Scratch working area: rendered paper page images, one-off probe scripts and
+# throwaway manifests. Durable equivalents live in backend/tools/.
+tmp/
+# Any PDF anywhere, not just the repository root.
+*.pdf
 .ruff_cache/
+.ruff-cache/
 .mypy_cache/
 .coverage
 htmlcov/
@@ -15,6 +24,7 @@ htmlcov/
 *.sqlite*
 reports/
 backend/*.pdf
+/*.pdf
 node_modules/
 .pnpm-store/
 .next/
@@ -33,3 +43,6 @@ backups/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+# Local-only working notes kept out of the published tree.
+current_contexts.md

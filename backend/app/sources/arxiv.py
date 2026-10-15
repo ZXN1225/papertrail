@@ -9,6 +9,8 @@ import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from math import ceil, isfinite
 from urllib.parse import quote, urlencode, urlparse
 
 import httpx
@@ -34,7 +36,16 @@ class ArxivError(Exception):
 class ArxivRateLimitError(ArxivError):
     code = "arxiv_rate_limited"
     status_code = 503
-    safe_message = "arXiv API 暂时不可用，请稍后重试。"
+
+    def __init__(self, retry_after_seconds: int | None = None) -> None:
+        super().__init__()
+        self.retry_after_seconds = retry_after_seconds
+
+    @property
+    def safe_message(self) -> str:
+        if self.retry_after_seconds is not None:
+            return f"arXiv API 当前限流，请至少等待 {self.retry_after_seconds} 秒后再试。"
+        return "arXiv API 当前限流；为避免连续触发，请至少等待 5 分钟后再试。"
 
 
 class ArxivUnavailableError(ArxivError):
@@ -181,7 +192,7 @@ class ArxivClient:
             except httpx.TransportError:
                 raise ArxivUnavailableError from None
         if response.status_code == 429:
-            raise ArxivRateLimitError
+            raise ArxivRateLimitError(_parse_retry_after(response.headers.get("Retry-After")))
         if response.status_code < 200 or response.status_code >= 300:
             raise ArxivUnavailableError
         if len(response.content) > MAX_RESPONSE_BYTES:
@@ -189,6 +200,25 @@ class ArxivClient:
         if b"<!DOCTYPE" in response.content.upper() or b"<!ENTITY" in response.content.upper():
             raise ArxivProtocolError
         return _parse_atom(response.content, start=start)
+
+
+def _parse_retry_after(value: str | None) -> int | None:
+    """Parse a bounded Retry-After hint without exposing the response header."""
+    if not value:
+        return None
+    try:
+        seconds = float(value.strip())
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(value)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=UTC)
+            seconds = (retry_at - datetime.now(UTC)).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            return None
+    if not isfinite(seconds) or seconds <= 0 or seconds > 86_400:
+        return None
+    return ceil(seconds)
 
 
 def _parse_atom(content: bytes, *, start: int) -> ArxivPage:

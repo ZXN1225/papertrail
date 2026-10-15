@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -12,8 +13,27 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+class AgentTurn(StrictModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4_000)
+
+
 class AgentQuestion(StrictModel):
     question: str = Field(min_length=3, max_length=1_000)
+    run_id: UUID | None = None
+    history: list[AgentTurn] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_request_history(self) -> AgentQuestion:
+        if len(self.history) % 2 != 0:
+            raise ValueError("history must contain complete user/assistant turn pairs")
+        for index, turn in enumerate(self.history):
+            expected_role = "user" if index % 2 == 0 else "assistant"
+            if turn.role != expected_role:
+                raise ValueError("history roles must alternate user then assistant")
+        if sum(len(turn.content) for turn in self.history) > 8_000:
+            raise ValueError("history exceeds the 8,000 character request limit")
+        return self
 
 
 class SearchPapersArgs(StrictModel):
@@ -94,6 +114,7 @@ class FinalAnswer(StrictModel):
     answer: str = Field(max_length=4_000)
     cited_openalex_ids: list[str] = Field(max_length=10)
     cited_arxiv_ids: list[str] = Field(default_factory=list, max_length=10)
+    claims: list[Claim] = Field(default_factory=list, max_length=30)
     insufficient_evidence: bool
 
     @field_validator("cited_openalex_ids")
@@ -120,6 +141,19 @@ class EvidenceSpan(StrictModel):
     chunk_id: str = Field(max_length=180)
     locator: str = Field(max_length=240)
     excerpt: str = Field(max_length=1_800)
+
+
+class ClaimEvidence(StrictModel):
+    source_id: str = Field(min_length=4, max_length=64)
+    quote: str = Field(min_length=1, max_length=1_000)
+    evidence_type: Literal["metadata", "fulltext"]
+    source_field: str = Field(min_length=1, max_length=64)
+    chunk_id: str | None = Field(max_length=180)
+
+
+class Claim(StrictModel):
+    text: str = Field(min_length=1, max_length=1_000)
+    evidence: list[ClaimEvidence] = Field(min_length=1, max_length=8)
 
 
 class Citation(StrictModel):
@@ -154,26 +188,63 @@ class AgentTraceEvent(StrictModel):
     output_tokens: int = Field(default=0, ge=0)
 
 
+class AgentTaskStatus(StrictModel):
+    run_id: UUID
+    status: Literal["running", "completed", "failed", "cancelled", "interrupted"]
+    result_status: str | None = None
+    question_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    history_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    created_at: str
+    updated_at: str
+    model_input_tokens: int = Field(ge=0)
+    model_output_tokens: int = Field(ge=0)
+    total_observed_tokens: int = Field(ge=0)
+    tool_calls: int = Field(ge=0)
+    model_steps: int = Field(ge=0)
+    duration_ms: int = Field(ge=0)
+    trace: list[AgentTraceEvent] = Field(default_factory=list, max_length=32)
+
+
+class SkillUsage(StrictModel):
+    """Reproducibility metadata for task guidance loaded by this run."""
+
+    skill_id: str = Field(pattern=r"^[a-z0-9-]{1,64}$")
+    version: str = Field(max_length=32)
+    instructions_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    allowed_tools: list[str] = Field(default_factory=list, max_length=16)
+    registry_version: str = Field(max_length=32)
+    registry_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    selection_reason: str = Field(max_length=120)
+
+
 class AgentResponse(StrictModel):
     status: Literal[
         "completed",
         "insufficient_evidence",
         "unverified_citations",
+        "unverified_evidence",
         "max_steps_exceeded",
         "tool_budget_exceeded",
+        "token_budget_exceeded",
+        "context_budget_exceeded",
+        "cancelled",
         "deadline_exceeded",
         "model_disabled",
         "model_unavailable",
+        "usage_unavailable",
         "model_refusal",
         "invalid_model_output",
     ]
     answer: str
     citations: list[Citation] = Field(default_factory=list)
+    claims: list[Claim] = Field(default_factory=list, max_length=30)
     warnings: list[str] = Field(default_factory=list)
     tool_calls: int = 0
     model_steps: int = 0
     model_input_tokens: int = 0
     model_output_tokens: int = 0
+    total_observed_tokens: int = Field(default=0, ge=0)
     run_id: str | None = None
     duration_ms: int = Field(default=0, ge=0)
     trace: list[AgentTraceEvent] = Field(default_factory=list, max_length=32)
+    skill: SkillUsage | None = None

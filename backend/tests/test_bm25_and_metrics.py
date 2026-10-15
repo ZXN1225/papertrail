@@ -20,6 +20,46 @@ def test_tokenizer_handles_english_case_and_cjk_bigrams() -> None:
     assert tokenize("RAG检索系统") == ["rag", "检索", "索系", "系统"]
 
 
+def test_tokenizer_normalizes_regular_and_irregular_plurals() -> None:
+    assert tokenize("layers layer categories category processes process") == [
+        "layer",
+        "layer",
+        "category",
+        "category",
+        "process",
+        "process",
+    ]
+    assert tokenize("movies movie analyses analysis series physics") == [
+        "movie",
+        "movie",
+        "analysis",
+        "analysis",
+        "series",
+        "physics",
+    ]
+    assert tokenize("lenses lens aliases alias gases gas statuses status") == [
+        "lens",
+        "lens",
+        "alias",
+        "alias",
+        "gas",
+        "gas",
+        "status",
+        "status",
+    ]
+
+
+def test_bm25_matches_plural_query_to_singular_document() -> None:
+    index = BM25Index(
+        [
+            SimpleNamespace(openalex_id="W-layer", title="Layer architecture", abstract=None),
+            SimpleNamespace(openalex_id="W-other", title="Control systems", abstract=None),
+        ]
+    )
+
+    assert [hit.openalex_id for hit in index.search("Which layers?", limit=2)] == ["W-layer"]
+
+
 def test_bm25_ranks_matching_documents_and_breaks_ties_by_id() -> None:
     documents = [
         SimpleNamespace(openalex_id="W2", title="RAG retrieval", abstract=None),

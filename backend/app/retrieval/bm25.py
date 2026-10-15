@@ -9,7 +9,7 @@ from typing import Any, Protocol
 
 from app.retrieval.tokenizer import tokenize
 
-BM25_VERSION = "okapi-bm25-v1"
+BM25_VERSION = "okapi-bm25-v3"
 DEFAULT_K1 = 1.5
 DEFAULT_B = 0.75
 

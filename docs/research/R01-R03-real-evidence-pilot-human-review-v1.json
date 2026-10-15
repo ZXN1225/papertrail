@@ -1,0 +1,61 @@
+{
+  "schema": "papertrail-real-evidence-pilot-human-review-v1",
+  "dataset_id": "arxiv-licensed-r01-r03-pilot-v1",
+  "candidate_dataset_sha256": "9ceb30530faff7fae5a6ea085479b6755d6277077211c306e6758cd52e2ae0e3",
+  "synthetic": false,
+  "review_status": "human_reviewed_single_reviewer",
+  "gold_standard": false,
+  "quality_claim_allowed": false,
+  "label_source": "user-provided in conversation on 2026-10-12",
+  "reviewer_identity": "not provided",
+  "scope": "Original-PDF answerability and support of assistant-authored candidate answers at the specified source locations; not a blind review of system-generated answers.",
+  "labels": [
+    {
+      "id": "R1",
+      "answerability": "answerable",
+      "candidate_support": "supported",
+      "selected_source_retrieved_top8": false,
+      "reviewer_note": "The designated source chunk was absent from the frozen BM25 top eight; this support judgment does not count as retrieval success."
+    },
+    {
+      "id": "R2",
+      "answerability": "answerable",
+      "candidate_support": "unsupported",
+      "selected_source_retrieved_top8": true,
+      "reviewer_note": "PDF page 2 says the assistant is a decision-support tool and does not perform control actions; the candidate answer says the opposite."
+    },
+    {
+      "id": "R3",
+      "answerability": "answerable",
+      "candidate_support": "supported",
+      "selected_source_retrieved_top8": true
+    },
+    {
+      "id": "R4",
+      "answerability": "answerable",
+      "candidate_support": "unsupported",
+      "selected_source_retrieved_top8": false,
+      "reviewer_note": "Figure 5 caption on PDF page 9 assigns 70 nm a-Si:H to (d) and 220 nm to (e); the candidate answer reverses them. The designated caption chunk was absent from the BM25 top eight."
+    },
+    {
+      "id": "R5",
+      "answerability": "answerable",
+      "candidate_support": "supported",
+      "selected_source_retrieved_top8": true
+    },
+    {
+      "id": "R6",
+      "answerability": "answerable",
+      "candidate_support": "unsupported",
+      "selected_source_retrieved_top8": true,
+      "reviewer_note": "Table III has the highest NDCG@10 for Hybrid RAG (73.6%), not GraphRAG (73.3%)."
+    }
+  ],
+  "layout_review": {
+    "arxiv_2609_27579_page_3_excerpt_bbox": [304.72, 176.61, 540.32, 496.92],
+    "excerpt_bbox_verdict": "passed_by_user",
+    "excerpt_bbox_note": "Covers exactly the listed right-column excerpt without the heading and body below.",
+    "arxiv_2607_24663_page_10_table_iii_crop_verdict": "passed_by_user",
+    "table_iii_crop_note": "Header and five data rows match the PDF, all columns agree, and no following body text is included."
+  }
+}

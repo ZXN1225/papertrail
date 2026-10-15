@@ -1,0 +1,84 @@
+{
+  "dataset_id": "arxiv-r01-r03-current-v17-v1",
+  "gold_standard": false,
+  "quality_claim_allowed": false,
+  "reference_status": "single_reviewer_selected_reference",
+  "retrieval_method": "bm25",
+  "schema": "papertrail.fulltext-retrieval-diagnostic.v1",
+  "sources": {
+    "2607.24663": {
+      "content_sha256": "52865e04f67a02ed024bd483ae2e157dfc9a3eba249af1e41e5a50af09a7e801",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v17",
+      "source_document_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c"
+    },
+    "2608.02037": {
+      "content_sha256": "a71a93a1d32a88b6beaf5d99f6707c9836190e5a350b8113f86dfa0e0b57381f",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v17",
+      "source_document_sha256": "e3b9029a72c6466c837e8c1b320dbddca1800d353d0e667b383adfd552e04d51"
+    },
+    "2609.27579": {
+      "content_sha256": "5c9c9841e41769e811ae1e5c36fc95a7e5bf88637e469f68ac33d8ed90d4b78a",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v17",
+      "source_document_sha256": "f944b10d58484c1d57c5dba23a1e4c18fcc1a07a18606e0c2b728d9cb46ba20d"
+    }
+  },
+  "synthetic": false,
+  "tasks": [
+    {
+      "question": "Which four layers make up the proposed ELBE RAG framework?",
+      "reference_chunk_id": "arxiv:2609.27579:5c9c9841e41769e8:36",
+      "reference_element_type": "paragraph",
+      "reference_page": 3,
+      "source_id": "2609.27579",
+      "task_id": "R1"
+    },
+    {
+      "question": "Does the proposed ELBE assistant directly perform accelerator control actions?",
+      "reference_chunk_id": "arxiv:2609.27579:5c9c9841e41769e8:13",
+      "reference_element_type": "paragraph",
+      "reference_page": 2,
+      "source_id": "2609.27579",
+      "task_id": "R2"
+    },
+    {
+      "question": "In Figure 5(a), what wavelength and SiN thickness were measured?",
+      "reference_chunk_id": "arxiv:2608.02037:a71a93a1d32a88b6:243",
+      "reference_element_type": "figure_caption",
+      "reference_page": 9,
+      "source_id": "2608.02037",
+      "task_id": "R3"
+    },
+    {
+      "question": "Which a-Si:H thickness belongs to panels d and e of Figure 5?",
+      "reference_chunk_id": "arxiv:2608.02037:a71a93a1d32a88b6:243",
+      "reference_element_type": "figure_caption",
+      "reference_page": 9,
+      "source_id": "2608.02037",
+      "task_id": "R4"
+    },
+    {
+      "question": "What were the strict vital recall and hallucination rate for Agentic GraphRAG in Table II?",
+      "reference_chunk_id": "arxiv:2607.24663:52865e04f67a02ed:339",
+      "reference_element_type": "table",
+      "reference_page": 10,
+      "source_id": "2607.24663",
+      "task_id": "R5"
+    },
+    {
+      "question": "Which system has the highest NDCG at 10 in Table III?",
+      "reference_chunk_id": "arxiv:2607.24663:52865e04f67a02ed:341",
+      "reference_element_type": "table",
+      "reference_page": 10,
+      "source_id": "2607.24663",
+      "task_id": "R6"
+    }
+  ],
+  "top_k": 8,
+  "versioned_from_dataset": "arxiv-r01-r03-current-v15-v1"
+}

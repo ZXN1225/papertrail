@@ -30,6 +30,7 @@ from app.storage.repository import PaperStore, StoreError
 
 MAX_CORPUS_SCAN = 50
 MAX_ABSTRACT_CHARS = 3_000
+_EMBEDDING_TOKEN_OVERHEAD_BYTES = 1_024
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
@@ -161,13 +162,33 @@ class PaperToolRegistry:
 
     @property
     def definitions(self) -> list[dict[str, Any]]:
+        return self.definitions_for(None)
+
+    def definitions_for(self, allowed_names: frozenset[str] | None) -> list[dict[str, Any]]:
         return [
             json.loads(json.dumps(item))
             for item in TOOL_DEFINITIONS
             if item["name"] in self._handlers
+            and (allowed_names is None or item["name"] in allowed_names)
         ]
 
-    def execute(self, name: str, arguments: str) -> dict[str, Any]:
+    def embedding_input_tokens_upper_bound(self, name: str, arguments: str) -> int:
+        """Estimate one evidence-query embedding before executing its provider call."""
+        if name != "retrieve_paper_evidence" or self.embeddings is None:
+            return 0
+        try:
+            parsed = RetrieveEvidenceArgs.model_validate_json(arguments)
+        except (ValidationError, ValueError):
+            return 0
+        if parsed.retrieval_method == "bm25":
+            return 0
+        return len(parsed.query.encode("utf-8")) + _EMBEDDING_TOKEN_OVERHEAD_BYTES
+
+    def execute(
+        self, name: str, arguments: str, *, allowed_names: frozenset[str] | None = None
+    ) -> dict[str, Any]:
+        if allowed_names is not None and name not in allowed_names:
+            return {"status": "error", "code": "tool_not_allowed_for_skill"}
         entry = self._handlers.get(name)
         if entry is None:
             return {"status": "error", "code": "tool_not_allowed"}

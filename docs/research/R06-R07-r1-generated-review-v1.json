@@ -1,0 +1,20 @@
+{
+  "schema": "papertrail-r1-generated-answer-review-v1",
+  "task_id": "R1",
+  "synthetic": false,
+  "report_sha256": "209438d67d2957c232bde68846be67f65dc1ea2cfee87e0e0160200ddfe1cf4f",
+  "report_name": "gpt-5.6-sol-r1-diagnostic-verify-1x1.json",
+  "original_run_status": "invalid_model_output",
+  "offline_mechanical_replay_status": "completed",
+  "review_source": "user-provided in conversation on 2026-10-13",
+  "reviewed_answer_support": "supported",
+  "reviewed_source_type": "arxiv",
+  "reviewed_source_id": "2609.27579",
+  "reviewed_pdf_page": 3,
+  "reviewed_chunk_id": "arxiv:2609.27579:8806728fcc1d5c30:31",
+  "review_scope": "One generated answer's four-layer claim against the cited PDF page and excerpt; original failed run status is preserved.",
+  "selected_source_retrieved_in_this_run": true,
+  "frozen_original_pilot_designated_chunk_top8_hit": false,
+  "gold_standard": false,
+  "quality_claim_allowed": false
+}

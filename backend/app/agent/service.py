@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from app.agent.contracts import AgentResponse
+from collections.abc import Callable, Sequence
+
+from app.agent.contracts import AgentResponse, AgentTurn
 from app.agent.harness import AgentHarness
 from app.agent.model import ModelClient, OpenAIResponsesClient
 from app.agent.tools import PaperToolRegistry
@@ -29,10 +31,21 @@ class AgentService:
         self.openalex = openalex
         self.arxiv = arxiv
 
-    def ask(self, question: str) -> AgentResponse:
+    def ask(
+        self,
+        question: str,
+        *,
+        history: Sequence[AgentTurn] = (),
+        cancellation_requested: Callable[[], bool] | None = None,
+    ) -> AgentResponse:
         if self.model is not None:
-            harness = self._harness(self.model, self.openalex, self.arxiv)
-            return harness.run(question)
+            harness = self._harness(
+                self.model,
+                self.openalex,
+                self.arxiv,
+                cancellation_requested=cancellation_requested,
+            )
+            return harness.run(question, history)
         if self.settings.llm_provider == "disabled":
             return AgentResponse(
                 status="model_disabled",
@@ -55,7 +68,13 @@ class AgentService:
         )
         arxiv = self.arxiv or ArxivClient(timeout_seconds=4)
         try:
-            return self._harness(client, openalex, arxiv, embeddings).run(question)
+            return self._harness(
+                client,
+                openalex,
+                arxiv,
+                embeddings,
+                cancellation_requested=cancellation_requested,
+            ).run(question, history)
         finally:
             client.close()
             if embeddings is not None:
@@ -71,11 +90,16 @@ class AgentService:
         openalex: OpenAlexClient | None = None,
         arxiv: ArxivClient | None = None,
         embeddings: OpenAIEmbeddingClient | None = None,
+        cancellation_requested: Callable[[], bool] | None = None,
     ) -> AgentHarness:
         return AgentHarness(
             model,
             PaperToolRegistry(self.store, openalex, arxiv, embeddings),
             max_steps=self.settings.agent_max_steps,
             max_tool_calls=self.settings.agent_max_tool_calls,
+            max_total_tokens=self.settings.agent_max_total_tokens,
+            max_output_tokens=self.settings.llm_max_output_tokens,
+            max_context_chars=self.settings.agent_max_context_chars,
             deadline_seconds=self.settings.agent_deadline_seconds,
+            cancellation_requested=cancellation_requested,
         )

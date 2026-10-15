@@ -1,0 +1,48 @@
+{
+  "schema": "papertrail-human-evidence-review-v1",
+  "review_status": "human_reviewed",
+  "dataset_id": "arxiv-2608.20519-v1-evidence-support-sample",
+  "synthetic": false,
+  "quality_claim_allowed": false,
+  "source": {
+    "source_type": "arxiv",
+    "source_id": "2608.20519v1",
+    "title": "An integrated diffusion-weighted imaging processing and interpretation platform for MR-guided radiotherapy",
+    "source_url": "https://arxiv.org/abs/2608.20519",
+    "text_source_url": "https://arxiv.org/pdf/2608.20519v1.pdf",
+    "license_id": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "parser_version": "pdfplumber-layout-v6",
+    "indexed_content_sha256": "7b0d97da02fdc2e3d419f29a184257fc3a81aeab207368d8ab78546594f75c63"
+  },
+  "review": {
+    "label_source": "user-provided in conversation",
+    "reviewed_at": "2026-10-12",
+    "reviewer_identity": "not provided",
+    "sample_size": 4,
+    "limitation": "Single-document, single-reviewer evidence-support sample; not an independent benchmark or general RAG quality claim."
+  },
+  "labels": [
+    {
+      "id": "E1",
+      "verdict": "supported",
+      "locator": "page 6, 2 Methods / 2.1 System overview and architecture, Table 1 rows 3-4"
+    },
+    {
+      "id": "E2",
+      "verdict": "supported",
+      "locator": "page 14, 2 Methods / 2.5 Retrieval-augmented clinical-interpretation agent, Table 2 parameter rows"
+    },
+    {
+      "id": "E3",
+      "verdict": "supported",
+      "locator": "page 20, 3 Results / 3.2 Expert evaluation results, Table 3 Overall clinical utility row"
+    },
+    {
+      "id": "E4",
+      "verdict": "unsupported",
+      "reviewer_note": "The column order shows the physician mean is 4.22, below the physicist mean of 5.00, contradicting the candidate answer.",
+      "locator": "page 20, 3 Results / 3.2 Expert evaluation results, Table 3 Clinical-reasoning soundness row"
+    }
+  ]
+}

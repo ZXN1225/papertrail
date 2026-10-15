@@ -13,8 +13,11 @@ PaperTrail 是一个用于学习研究与简历展示的全栈 Agent 项目。�
 
 - **发现与管理论文**：从 OpenAlex、arXiv 搜索元数据，或使用已导入的本地目录；保存查询快照、来源、版本和内容哈希，支持重复导入与历史快照查看。
 - **逐步研究**：Agent 可搜索目录、查看单篇论文、查找词法相似论文、比较元数据，并根据问题决定是否继续调用工具。
-- **许可全文问答**：逐篇登记并确认 CC0 或 CC BY 许可后，才可将本地 UTF-8 文本导入；全文按可追踪位置分块，支持 BM25、Dense 和 Hybrid 检索。
+- **许可全文问答**：逐篇登记并确认 CC0 或 CC BY 许可后，才可将本地 UTF-8 文本导入；全文按结构与保守 UTF-8 token 上界分块，支持 BM25、Dense 和 Hybrid 检索。该上界不等于某个模型 tokenizer 的精确计数。
 - **可核验回答**：引用绑定本轮工具返回的论文 ID、证据片段、来源和位置；引用无效或证据不足时，Harness 会拒绝完成为可信答案。
+- **运行时 Harness**：集成有界 token/context/tool/deadline 预算、协作取消、运行状态查询、幂等 run ID、脱敏追踪与 Skills 版本记录；运行记录不保存原始问题、回答或论文摘录。
+- **Skills 与 MCP**：按研究任务选择三个只读产品 Skills，并用注册表哈希与工具白名单约束；MCP 提供固定只读 stdio 工具集，以 SQLite `mode=ro` 打开已迁移目录库，当前仅公布实际可用的 BM25 全文检索。
+- **Multi-agent 实验框架**：提供默认不接入生产问答路径的 worker/supervisor 对照骨架，共享预算、显式冲突处理；当前只有合成契约测试，真实任务收益仍待许可数据与预算评测。
 - **检索实验**：在相同语料和查询上比较 BM25、Dense cosine 与 RRF Hybrid，输出指标、配置、数据哈希和成本估算。
 - **中文研究工作区**：浏览论文、查看详情、并列比较元数据、向研究助理提问，并查看引用、证据片段和运行 trace。
 
@@ -54,9 +57,11 @@ Agent 使用服务端固定工具，不允许模型执行任意 SQL、shell 或 
 
 - 工具参数经 Pydantic schema 验证，未知工具和多余参数会被拒绝。
 - 每次运行限制决策步数、工具调用次数、总时限和观察内容大小。
-- Harness 校验模型给出的引用是否来自本轮工具观察，并验证证据片段和论文 ID 的对应关系。
-- 元数据只能支持元数据层面的说法；论文结论必须有全文证据。证据不足时明确拒答，不从模型记忆补写论文事实。
-- Trace 记录步骤、工具状态、耗时和 token 计数，不记录密钥或论文正文。
+- 模型只可使用当前 Skill 允许的工具；`SKILL.md` 不得扩大工具权限，工具执行边界再次检查。
+- Harness 要求答案文本与结构化主张规范拼接一致，引用必须绑定当前运行观察到的来源 ID、原文 quote、证据类型和 chunk/字段位置。
+- 受控书目字段只能支持书目信息；论文方法、结果和发现要求许可全文证据。系统只校验来源/摘录绑定，不声称已证明语义蕴含。
+- SQLite run ledger 保存任务状态、问题哈希、token/工具计数和脱敏 trace，不持久化问答正文或全文摘录；重复 run ID 不会重复触发模型调用。中断任务可识别但不会自动重放。
+- MCP 通过真实 SDK Client 与 stdio 子进程契约测试；服务端工具面固定只读。
 
 ### 检索管线
 
@@ -69,15 +74,15 @@ BM25 为默认全文检索，不调用外部 Embeddings 服务。Dense 使用 Op
 
 ## 技术栈
 
-| 层     | 技术                                                                      |
-| ------ | ------------------------------------------------------------------------- |
-| Web    | Next.js 16、React 19、TypeScript                                          |
-| API    | FastAPI、Pydantic、Uvicorn                                                |
-| Agent  | OpenAI Responses API function calling、受限 Agent Harness、服务端引用校验 |
-| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                    |
-| 数据源 | OpenAlex Works / Authors API、arXiv API                                   |
-| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60                  |
-| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions            |
+| 层     | 技术                                                                   |
+| ------ | ---------------------------------------------------------------------- |
+| Web    | Next.js 16、React 19、TypeScript                                       |
+| API    | FastAPI、Pydantic、Uvicorn                                             |
+| Agent  | OpenAI Responses API function calling、受限 Agent Harness、Skills、MCP |
+| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                 |
+| 数据源 | OpenAlex Works / Authors API、arXiv API                                |
+| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60               |
+| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions         |
 
 ## 评测结果与可信边界
 
@@ -107,10 +112,10 @@ BM25 为默认全文检索，不调用外部 Embeddings 服务。Dense 使用 Op
 
 ### Agent / Web 验证
 
-- 后端自动测试：**99 passed**，覆盖 Agent 工具循环、来源客户端、全文许可门禁、精确证据定位、检索与引用校验。
+- 后端自动测试：**219 passed**，包含 Harness、Skills、MCP 只读边界、PDF 结构定位、迁移、request-scoped 多轮上下文、任务运行记录、预算、真实 PDF 引擎的合成文件集成、脱敏 Trace、API 级取消链路、claim 数值/单位/方向/实验组机械一致性门禁和合成 Multi-agent 协调/配对评测契约。机械门禁不能证明语义蕴含或真实 RAG 质量。
 - 离线 Agent 安全评测：**3/3 mock 场景通过**；越权工具尝试被拦截，未授权工具执行为 0。它验证安全和评测管线，不代表真实模型质量。
-- Web Playwright：**15/15 E2E 通过**，包含搜索、详情、比较、Agent 证据展示、错误重试和键盘操作。
-- GitHub Actions：后端与 Web jobs 均通过，包含 Ruff、pytest、OpenAPI 契约、前端类型检查、生产构建及浏览器 E2E。
+- Web Playwright：**18/18 E2E 通过**，覆盖搜索、详情、比较、Agent 证据展示、错误重试、键盘操作及有界追问/清空。
+- GitHub Actions 历史运行通过了后端和 Web jobs；当前本地还增加了 Docker Compose 构建与 readiness smoke job，但修改尚未上传，所以该 job 尚无远程运行结果。
 
 一篇经许可确认的 arXiv 全文完成了本机导入、检索、Agent 引用和删除/恢复 smoke。这只验证单篇闭环，不代表全文检索的统计质量。更多阶段记录见 [`docs/research/`](docs/research/)。
 
@@ -152,6 +157,18 @@ pnpm dev
 
 打开 <http://127.0.0.1:3000>。API 文档位于 <http://127.0.0.1:8001/docs>；存活与就绪检查分别是 `/api/health/live` 和 `/api/health/ready`。首次 Web 安装后如果没有 Playwright 浏览器，执行 `pnpm exec playwright install chromium`。
 
+### Docker Compose
+
+仓库也提供容器化本机部署配置。需要 Docker Engine 和 Compose 插件；首次 build 会获取锁定依赖及基础镜像。后端 API 不直接发布到宿主机，Web 默认仅绑定 `127.0.0.1:3000`，SQLite 放在持久卷中。详细配置、密钥设置和数据保留说明见 [`docs/development.md`](docs/development.md#docker-compose-本地部署)。
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+docker compose up --build -d
+docker compose ps
+```
+
+当前开发主机没有 Docker/Podman，仓库内的镜像与 Compose 配置尚未在此环境实际构建或启动验收；Next standalone 产物已通过本机 `node server.js` 首页 smoke，但这不等于容器部署通过。请勿将容器配置描述为已验证部署。
+
 ### 导入论文数据
 
 导入少量 OpenAlex 元数据到本地 SQLite：
@@ -173,7 +190,7 @@ uv run --locked python -m app.cli.import_arxiv --query 'all:"retrieval augmented
 
 全文导入前，需从原始来源核对具体论文的许可、来源链接和署名要求。当前仅允许明确确认的 `CC0-1.0` 与 `CC-BY-4.0`；“可免费阅读”、`is_oa=true` 或元数据许可均不能代替全文许可。项目不会自动抓取全文，全文和 PDF 不随仓库分发。
 
-准备好本地 UTF-8 `.txt` 和 manifest 后，按[全文导入说明](docs/development.md#许可全文导入与检索-p09)运行导入命令。之后可调用：
+准备好本地 UTF-8 `.txt` 或经许可审核的 PDF 和 manifest 后，按[全文导入说明](docs/development.md#许可全文导入与检索-p09--p17)运行导入命令。PDF 在本地提取版面文本和表格，引用保留页码与页面区域；图表使用论文原文图注辅助检索，不声称能理解图片语义。之后可调用：
 
 ```text
 GET /api/v1/evidence/search?q=knowledge%20base&limit=5&retrieval_method=bm25
@@ -191,7 +208,7 @@ GET /api/v1/evidence/search?q=knowledge%20base&limit=5&retrieval_method=bm25
 }
 ```
 
-响应包含 `status`、答案、引用、警告、工具调用数、模型步骤、token 计数、`run_id` 和 trace。若没有启用 LLM，接口会返回 `model_disabled`；它不会生成伪造的回答。API 的完整 schema 见 [`docs/openapi.json`](docs/openapi.json)。
+响应包含 `status`、答案、逐条主张、引用、警告、工具调用数、模型步骤、模型与 embedding 总 token 计数、`run_id` 和脱敏 trace。可以用 `GET /api/v1/agent/runs/{run_id}` 查询脱敏运行状态，用 `POST /api/v1/agent/runs/{run_id}/cancel` 请求协作取消。任务表不保存问题或回答正文；重启后的 orphaned run 会显示 `interrupted`，需要用户重新提交，系统不会回放模型调用。若没有启用 LLM，接口会返回 `model_disabled`；它不会生成伪造的回答。API 的完整 schema 见 [`docs/openapi.json`](docs/openapi.json)。
 
 ## 评测与测试命令
 

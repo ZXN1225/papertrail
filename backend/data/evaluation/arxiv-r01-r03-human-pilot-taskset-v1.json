@@ -1,0 +1,43 @@
+{
+  "schema_version": "papertrail.multi-agent-taskset.v1",
+  "dataset_id": "arxiv-r01-r03-human-pilot-v1",
+  "synthetic": false,
+  "tasks": [
+    {
+      "task_id": "R1",
+      "synthetic": false,
+      "challenge_type": "architecture_layers",
+      "source_refs": ["arxiv:2609.27579#page=3"]
+    },
+    {
+      "task_id": "R2",
+      "synthetic": false,
+      "challenge_type": "negation_control_action",
+      "source_refs": ["arxiv:2609.27579#page=2"]
+    },
+    {
+      "task_id": "R3",
+      "synthetic": false,
+      "challenge_type": "figure_caption_panel",
+      "source_refs": ["arxiv:2608.02037#page=9"]
+    },
+    {
+      "task_id": "R4",
+      "synthetic": false,
+      "challenge_type": "figure_caption_panel_mapping",
+      "source_refs": ["arxiv:2608.02037#page=9"]
+    },
+    {
+      "task_id": "R5",
+      "synthetic": false,
+      "challenge_type": "table_row_values",
+      "source_refs": ["arxiv:2607.24663#page=10#table=II"]
+    },
+    {
+      "task_id": "R6",
+      "synthetic": false,
+      "challenge_type": "table_column_argmax",
+      "source_refs": ["arxiv:2607.24663#page=10#table=III"]
+    }
+  ]
+}

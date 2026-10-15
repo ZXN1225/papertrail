@@ -39,15 +39,35 @@ export type Citation = {
   evidence: Evidence[];
 };
 
+export type ClaimEvidence = {
+  source_id: string;
+  quote: string;
+  evidence_type: "metadata" | "fulltext";
+  source_field: string;
+  chunk_id: string | null;
+};
+
+export type Claim = {
+  text: string;
+  evidence: ClaimEvidence[];
+};
+
+export type AgentTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type AgentResponse = {
   status: string;
   answer: string;
   citations: Citation[];
+  claims: Claim[];
   warnings: string[];
   tool_calls: number;
   model_steps: number;
   model_input_tokens: number;
   model_output_tokens: number;
+  total_observed_tokens: number;
   run_id: string | null;
   duration_ms: number;
   trace: {

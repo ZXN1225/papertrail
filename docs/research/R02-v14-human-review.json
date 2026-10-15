@@ -1,0 +1,81 @@
+{
+  "schema_version": "papertrail-r02-parser-review-v1",
+  "review_scope": "parser-v14 reindexed table and right-column samples",
+  "reviewed_at": "2026-10-13",
+  "reviewer": "user",
+  "labels_are_independent_gold": false,
+  "items": [
+    {
+      "item_id": "A1",
+      "source_id": "2607.24663",
+      "source_pdf_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c",
+      "content_sha256": "8fde67d2f781af8e119c7801902d92c281e02e4c05f3f88f95d2d81d92493a13",
+      "parser_version": "pdfplumber-layout-v14",
+      "page_number": 10,
+      "element_type": "table",
+      "bbox": [55.99, 110.63, 568.63, 182.96],
+      "status": "unsupported",
+      "notes": "Five data rows, values, and bbox correct. Header fragments were misaligned: a standalone V; '∆ vs. Naive strict' should be '∆V_strict vs. Naive'; 'V (%) strict' should be 'V_strict (%)'."
+    },
+    {
+      "item_id": "A2",
+      "source_id": "2607.24663",
+      "source_pdf_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c",
+      "content_sha256": "8fde67d2f781af8e119c7801902d92c281e02e4c05f3f88f95d2d81d92493a13",
+      "parser_version": "pdfplumber-layout-v14",
+      "page_number": 10,
+      "element_type": "table",
+      "bbox": [113.4, 263.89, 502.7, 325.71],
+      "status": "supported",
+      "notes": "Header, five data rows, percent units, values, and bbox correct; no body prose mixed in."
+    },
+    {
+      "item_id": "B1",
+      "source_id": "2608.20519",
+      "source_pdf_sha256": "7d664debd8dc5c83119c0b1b64a9d8ef2a277eca54cea402dd786fd9d311ce31",
+      "content_sha256": "f6925aaa319f4d1512753ae7335e02eadb4592404e348d7b8b0b3e6394109136",
+      "parser_version": "pdfplumber-layout-v14",
+      "page_number": 6,
+      "element_type": "table",
+      "bbox": [93.44, 114.03, 518.56, 307.07],
+      "status": "supported",
+      "notes": "Extracted content and scope correct. Fourteen physical lines include continued cells; stream-/ing and denois-/ing are each one logical cell."
+    },
+    {
+      "item_id": "B2",
+      "source_id": "2608.20519",
+      "source_pdf_sha256": "7d664debd8dc5c83119c0b1b64a9d8ef2a277eca54cea402dd786fd9d311ce31",
+      "content_sha256": "f6925aaa319f4d1512753ae7335e02eadb4592404e348d7b8b0b3e6394109136",
+      "parser_version": "pdfplumber-layout-v14",
+      "page_number": 14,
+      "element_type": "table",
+      "bbox": [128.04, 517.61, 483.97, 656.45],
+      "status": "unsupported",
+      "notes": "The source has three columns but parsing split it into four, fragmenting categories including brain metastases, head and neck, and MR-guided radiotherapy. IVIM parameter subscripts f_p, D_t, D_p were mispositioned. Bbox correct."
+    },
+    {
+      "item_id": "B3",
+      "source_id": "2608.20519",
+      "source_pdf_sha256": "7d664debd8dc5c83119c0b1b64a9d8ef2a277eca54cea402dd786fd9d311ce31",
+      "content_sha256": "f6925aaa319f4d1512753ae7335e02eadb4592404e348d7b8b0b3e6394109136",
+      "parser_version": "pdfplumber-layout-v14",
+      "page_number": 20,
+      "element_type": "table",
+      "bbox": [141.72, 127.58, 470.28, 218.22],
+      "status": "supported",
+      "notes": "Header, sample sizes, four metric rows, means, standard deviations, and table boundary are correct."
+    },
+    {
+      "item_id": "C",
+      "source_id": "2609.27579",
+      "source_pdf_sha256": "f944b10d58484c1d57c5dba23a1e4c18fcc1a07a18606e0c2b728d9cb46ba20d",
+      "content_sha256": "2af831c17a096f74d6ee5904d3e71f8026e7d0fa6224a5c45b2c0e76ff24123e",
+      "parser_version": "pdfplumber-layout-v14",
+      "page_number": 3,
+      "element_type": "paragraph",
+      "bbox": [304.72, 176.61, 540.32, 561.3],
+      "status": "supported",
+      "notes": "Full right-column parent region matches the PDF in order with no cross-column concatenation. Its larger bbox includes the lower heading, explanation, and Input: User query Q, as expected for this review scope."
+    }
+  ]
+}

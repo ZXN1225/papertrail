@@ -1,0 +1,127 @@
+{
+  "dataset_id": "arxiv-r01-r03-current-v27-v1",
+  "gold_standard": false,
+  "mapping_method": "unique exact retrieval_text, evidence_text, source, page and element_type match within the current approved parser version; no semantic relabeling",
+  "quality_claim_allowed": false,
+  "reference_status": "single_reviewer_selected_reference",
+  "retrieval_method": "bm25",
+  "schema": "papertrail.fulltext-retrieval-diagnostic.v1",
+  "sources": {
+    "2607.24663": {
+      "content_sha256": "0da037fba9f20122cb7bd1f23b40619e24cf44dc2d424179de26768ba0d079b5",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "eea9e7fa8917ca11c62802765865265aa4961c959579cd34633d8622f88ede5c"
+    },
+    "2608.02037": {
+      "content_sha256": "c60ff124687c0c5b9a875d0445dd0994059b2410ddc4baa64770e738bcab4526",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "e3b9029a72c6466c837e8c1b320dbddca1800d353d0e667b383adfd552e04d51"
+    },
+    "2608.20519": {
+      "content_sha256": "ab689e887328f2e61aa976c39526b0e0680d6b52ba41cc982c3d7f8f653f83e6",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "7d664debd8dc5c83119c0b1b64a9d8ef2a277eca54cea402dd786fd9d311ce31"
+    },
+    "2609.27579": {
+      "content_sha256": "198ed0f205db6f60a1221fdd7fa71229f9770fd0997704d694259cf5e07d7f2b",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "f944b10d58484c1d57c5dba23a1e4c18fcc1a07a18606e0c2b728d9cb46ba20d"
+    },
+    "2609.39773": {
+      "content_sha256": "09b6db19f542cd81cce9d7258cdd4a2ed04724bcf5071716c00bba24c4801f79",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "1f3bf6c3e4d019160bc53bc0c0aef4ecc9954a96cda5fecdaa790581ae27b5fe"
+    },
+    "2610.06874": {
+      "content_sha256": "f63eb37a210ec35b5743c935561bffeba5dc10411746f9594d4ce889a2a48aca",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "2ee6b350ef50cbd39b8fc90381853ef4a18bd1def4dbaf3550097a95e1202d74"
+    },
+    "2610.09789": {
+      "content_sha256": "85149afe3e89a885422b6e9041aec982bd91fe24817e6720843db820be6e1771",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "8eb016db8598bd2834654a013fa6fd817a49a869e52218c8d6b823265e37f501"
+    },
+    "2610.10204": {
+      "content_sha256": "589a74aee6326710ace5f58f9fb0bd5d9702a4f8a136db6131f551cccb89935e",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "8185fb09c8b7c63c131bceea90ef9462dd00a0382665f531ae95931c21252e59"
+    },
+    "2610.12662": {
+      "content_sha256": "35de68474a6b00965707b7b2719a23a19520a07e9dac8c10e3bd1c7f876cd78c",
+      "license_id": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "parser_version": "pdfplumber-layout-v27",
+      "source_document_sha256": "3c79ea5ba95e2dcc9a0f758486a3f36c15a8cfd15a81216088a0738ffdc20b2e"
+    }
+  },
+  "synthetic": false,
+  "tasks": [
+    {
+      "question": "Which four layers make up the proposed ELBE RAG framework?",
+      "reference_chunk_id": "arxiv:2609.27579:198ed0f205db6f60:32",
+      "reference_element_type": "paragraph",
+      "reference_page": 3,
+      "source_id": "2609.27579",
+      "task_id": "R1"
+    },
+    {
+      "question": "Does the proposed ELBE assistant directly perform accelerator control actions?",
+      "reference_chunk_id": "arxiv:2609.27579:ced4fc69dffe3c14:13",
+      "reference_element_type": "paragraph",
+      "reference_page": 2,
+      "source_id": "2609.27579",
+      "task_id": "R2"
+    },
+    {
+      "question": "In Figure 5(a), what wavelength and SiN thickness were measured?",
+      "reference_chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:228",
+      "reference_element_type": "figure_caption",
+      "reference_page": 9,
+      "source_id": "2608.02037",
+      "task_id": "R3"
+    },
+    {
+      "question": "Which a-Si:H thickness belongs to panels d and e of Figure 5?",
+      "reference_chunk_id": "arxiv:2608.02037:c60ff124687c0c5b:228",
+      "reference_element_type": "figure_caption",
+      "reference_page": 9,
+      "source_id": "2608.02037",
+      "task_id": "R4"
+    },
+    {
+      "question": "What were the strict vital recall and hallucination rate for Agentic GraphRAG in Table II?",
+      "reference_chunk_id": "arxiv:2607.24663:0da037fba9f20122:216",
+      "reference_element_type": "table",
+      "reference_page": 10,
+      "source_id": "2607.24663",
+      "task_id": "R5"
+    },
+    {
+      "question": "Which system has the highest NDCG at 10 in Table III?",
+      "reference_chunk_id": "arxiv:2607.24663:0da037fba9f20122:218",
+      "reference_element_type": "table",
+      "reference_page": 10,
+      "source_id": "2607.24663",
+      "task_id": "R6"
+    }
+  ],
+  "top_k": 8,
+  "versioned_from_dataset": "arxiv-r01-r03-current-v21-v1"
+}

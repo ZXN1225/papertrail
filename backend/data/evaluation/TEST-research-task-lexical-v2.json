@@ -1,0 +1,591 @@
+{
+  "dataset_id": "TEST-research-task-lexical-v2",
+  "dataset_version": 2,
+  "synthetic": true,
+  "quality_claim_allowed": false,
+  "gold_standard": false,
+  "purpose": "Exercise and regression-test the deterministic lexical retrieval and answerability-decision pipeline only. All examples and labels were authored as synthetic fixtures; they are not human-annotated, literature-derived, or validated evidence.",
+  "limitations": [
+    "Do not use scores as evidence of real-paper retrieval or answer quality.",
+    "Question wording reuses synthetic document vocabulary and can make lexical matching artificially easy.",
+    "No language model generates answers; answerability is a thresholded lexical retrieval decision.",
+    "Labels are fixture expectations, not a gold standard; this dataset cannot support quality claims.",
+    "The dev/test partition is grouped by synthetic document ID to exercise split isolation; it is not an independently authored or quality-valid holdout."
+  ],
+  "documents": [
+    {
+      "id": "TEST-DOC-001",
+      "title": "Thermal conductivity",
+      "text": "The synthetic thermal conductivity experiment measured a conductivity of 4.2 watts per meter kelvin at 300 kelvin using a copper alloy sample.",
+      "synthetic": true,
+      "split": "dev"
+    },
+    {
+      "id": "TEST-DOC-002",
+      "title": "Battery cycle life",
+      "text": "The synthetic battery cycle life study recorded 820 charge cycles before capacity reached 80 percent under a 25 degree Celsius protocol.",
+      "synthetic": true,
+      "split": "dev"
+    },
+    {
+      "id": "TEST-DOC-003",
+      "title": "Graph benchmark",
+      "text": "The synthetic graph benchmark evaluated 16 layers and reported a median inference latency of 38 milliseconds on the fixed test device.",
+      "synthetic": true,
+      "split": "dev"
+    },
+    {
+      "id": "TEST-DOC-004",
+      "title": "Membrane filtration",
+      "text": "The synthetic membrane filtration trial used a pore diameter of 0.20 micrometers and measured a water flux of 14 liters per square meter hour.",
+      "synthetic": true,
+      "split": "dev"
+    },
+    {
+      "id": "TEST-DOC-005",
+      "title": "Solar conversion",
+      "text": "The synthetic solar conversion fixture reported a peak efficiency of 21.4 percent under an irradiance of 1000 watts per square meter.",
+      "synthetic": true,
+      "split": "dev"
+    },
+    {
+      "id": "TEST-DOC-006",
+      "title": "Language model quantization",
+      "text": "The synthetic quantization comparison used 4 bit weights and measured a model size of 3.1 gigabytes after conversion.",
+      "synthetic": true,
+      "split": "dev"
+    },
+    {
+      "id": "TEST-DOC-007",
+      "title": "Fermentation yield",
+      "text": "The synthetic fermentation run lasted 48 hours and produced a yield of 7.6 grams per liter in the controlled vessel.",
+      "synthetic": true,
+      "split": "test"
+    },
+    {
+      "id": "TEST-DOC-008",
+      "title": "Robotic grasping",
+      "text": "The synthetic robotic grasping benchmark tested 240 attempts and achieved a success rate of 91 percent on the fixed object set.",
+      "synthetic": true,
+      "split": "test"
+    },
+    {
+      "id": "TEST-DOC-009",
+      "title": "Network routing",
+      "text": "The synthetic network routing experiment used 12 nodes and observed a median packet delay of 6 milliseconds.",
+      "synthetic": true,
+      "split": "test"
+    },
+    {
+      "id": "TEST-DOC-010",
+      "title": "Drug release",
+      "text": "The synthetic drug release fixture measured 65 percent release after 8 hours in the buffered solution.",
+      "synthetic": true,
+      "split": "test"
+    },
+    {
+      "id": "TEST-DOC-011",
+      "title": "Crop irrigation",
+      "text": "The synthetic crop irrigation trial applied 18 millimeters of water per week and recorded a yield of 5.3 tonnes per hectare.",
+      "synthetic": true,
+      "split": "test"
+    },
+    {
+      "id": "TEST-DOC-012",
+      "title": "Image segmentation",
+      "text": "The synthetic image segmentation fixture contained 1200 images and measured a Dice score of 0.87 on the held-out split.",
+      "synthetic": true,
+      "split": "test"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "TEST-TASK-001",
+      "synthetic": true,
+      "question": "What conductivity did the thermal conductivity experiment measure at 300 kelvin?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-001",
+        "anchor": "conductivity of 4.2 watts per meter kelvin"
+      },
+      "required_fact": "conductivity of 4.2 watts per meter kelvin",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-002",
+      "synthetic": true,
+      "question": "Report the conductivity measured for the copper alloy sample.",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-001",
+        "anchor": "conductivity of 4.2 watts per meter kelvin"
+      },
+      "required_fact": "conductivity of 4.2 watts per meter kelvin",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-003",
+      "synthetic": true,
+      "question": "How many charge cycles were recorded before battery capacity fell to 80 percent?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-002",
+        "anchor": "820 charge cycles before capacity reached 80 percent"
+      },
+      "required_fact": "820 charge cycles before capacity reached 80 percent",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-004",
+      "synthetic": true,
+      "question": "Which charge cycle count was observed in the battery cycle life study?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-002",
+        "anchor": "820 charge cycles before capacity reached 80 percent"
+      },
+      "required_fact": "820 charge cycles before capacity reached 80 percent",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-005",
+      "synthetic": true,
+      "question": "What median inference latency did the graph benchmark report?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-003",
+        "anchor": "median inference latency of 38 milliseconds"
+      },
+      "required_fact": "median inference latency of 38 milliseconds",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-006",
+      "synthetic": true,
+      "question": "How many milliseconds was the median latency in the graph benchmark?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-003",
+        "anchor": "median inference latency of 38 milliseconds"
+      },
+      "required_fact": "median inference latency of 38 milliseconds",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-007",
+      "synthetic": true,
+      "question": "What water flux did the membrane filtration trial measure?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-004",
+        "anchor": "water flux of 14 liters per square meter hour"
+      },
+      "required_fact": "water flux of 14 liters per square meter hour",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-008",
+      "synthetic": true,
+      "question": "Report the measured water flux for the membrane fixture.",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-004",
+        "anchor": "water flux of 14 liters per square meter hour"
+      },
+      "required_fact": "water flux of 14 liters per square meter hour",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-009",
+      "synthetic": true,
+      "question": "What peak efficiency did the solar conversion fixture report?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-005",
+        "anchor": "peak efficiency of 21.4 percent"
+      },
+      "required_fact": "peak efficiency of 21.4 percent",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-010",
+      "synthetic": true,
+      "question": "How efficient was the solar conversion result at peak?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-005",
+        "anchor": "peak efficiency of 21.4 percent"
+      },
+      "required_fact": "peak efficiency of 21.4 percent",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-011",
+      "synthetic": true,
+      "question": "What model size was measured after 4 bit quantization?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-006",
+        "anchor": "model size of 3.1 gigabytes"
+      },
+      "required_fact": "model size of 3.1 gigabytes",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-012",
+      "synthetic": true,
+      "question": "Report the converted quantized model size.",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-006",
+        "anchor": "model size of 3.1 gigabytes"
+      },
+      "required_fact": "model size of 3.1 gigabytes",
+      "challenge_type": "answerable_exact_fact",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-013",
+      "synthetic": true,
+      "question": "What yield did the fermentation run produce after 48 hours?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-007",
+        "anchor": "yield of 7.6 grams per liter"
+      },
+      "required_fact": "yield of 7.6 grams per liter",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-014",
+      "synthetic": true,
+      "question": "How many grams per liter did the controlled fermentation vessel yield?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-007",
+        "anchor": "yield of 7.6 grams per liter"
+      },
+      "required_fact": "yield of 7.6 grams per liter",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-015",
+      "synthetic": true,
+      "question": "What success rate did the robotic grasping benchmark achieve?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-008",
+        "anchor": "success rate of 91 percent"
+      },
+      "required_fact": "success rate of 91 percent",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-016",
+      "synthetic": true,
+      "question": "How many percent of fixed-set grasp attempts succeeded?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-008",
+        "anchor": "success rate of 91 percent"
+      },
+      "required_fact": "success rate of 91 percent",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-017",
+      "synthetic": true,
+      "question": "What median packet delay did the 12-node network experiment observe?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-009",
+        "anchor": "median packet delay of 6 milliseconds"
+      },
+      "required_fact": "median packet delay of 6 milliseconds",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-018",
+      "synthetic": true,
+      "question": "Report the network routing experiment's median packet delay.",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-009",
+        "anchor": "median packet delay of 6 milliseconds"
+      },
+      "required_fact": "median packet delay of 6 milliseconds",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-019",
+      "synthetic": true,
+      "question": "What percentage was released after 8 hours in the drug release fixture?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-010",
+        "anchor": "65 percent release after 8 hours"
+      },
+      "required_fact": "65 percent release after 8 hours",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-020",
+      "synthetic": true,
+      "question": "How much drug release was measured at the 8 hour point?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-010",
+        "anchor": "65 percent release after 8 hours"
+      },
+      "required_fact": "65 percent release after 8 hours",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-021",
+      "synthetic": true,
+      "question": "What crop yield was recorded under the irrigation trial?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-011",
+        "anchor": "yield of 5.3 tonnes per hectare"
+      },
+      "required_fact": "yield of 5.3 tonnes per hectare",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-022",
+      "synthetic": true,
+      "question": "How many tonnes per hectare did the crop irrigation trial yield?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-011",
+        "anchor": "yield of 5.3 tonnes per hectare"
+      },
+      "required_fact": "yield of 5.3 tonnes per hectare",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-023",
+      "synthetic": true,
+      "question": "What Dice score did the image segmentation fixture measure?",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-012",
+        "anchor": "Dice score of 0.87"
+      },
+      "required_fact": "Dice score of 0.87",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-024",
+      "synthetic": true,
+      "question": "Report the held-out split Dice score.",
+      "expected_answerable": true,
+      "evidence": {
+        "document_id": "TEST-DOC-012",
+        "anchor": "Dice score of 0.87"
+      },
+      "required_fact": "Dice score of 0.87",
+      "challenge_type": "answerable_exact_fact",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-025",
+      "synthetic": true,
+      "question": "What conductivity did the thermal fixture measure at 91 watts per meter kelvin?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-001",
+      "required_fact": "conductivity of 91 watts per meter kelvin",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-026",
+      "synthetic": true,
+      "question": "How many battery charge cycles occurred before capacity reached 43 percent?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-002",
+      "required_fact": "battery capacity reached 43 percent after charge cycles",
+      "challenge_type": "threshold_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-027",
+      "synthetic": true,
+      "question": "What graph benchmark latency was measured at 999 milliseconds?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-003",
+      "required_fact": "graph benchmark latency of 999 milliseconds",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-028",
+      "synthetic": true,
+      "question": "What membrane water flux was recorded at 999 liters per square meter hour?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-004",
+      "required_fact": "membrane water flux of 999 liters per square meter hour",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-029",
+      "synthetic": true,
+      "question": "What solar efficiency did the fixture report at 99 percent?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-005",
+      "required_fact": "solar peak efficiency of 99 percent",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-030",
+      "synthetic": true,
+      "question": "What model size did the quantized model reach at 99 gigabytes?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-006",
+      "required_fact": "quantized model size of 99 gigabytes",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-031",
+      "synthetic": true,
+      "question": "What fermentation yield was recorded at 99 grams per liter?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-007",
+      "required_fact": "fermentation yield of 99 grams per liter",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-032",
+      "synthetic": true,
+      "question": "What grasp success rate was measured at 99 percent?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-008",
+      "required_fact": "grasp success rate of 99 percent",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-033",
+      "synthetic": true,
+      "question": "What packet delay did the network routing test measure at 999 milliseconds?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-009",
+      "required_fact": "network median packet delay of 999 milliseconds",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-034",
+      "synthetic": true,
+      "question": "What percentage release occurred after 99 hours in the drug fixture?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-010",
+      "required_fact": "drug release of 99 percent after 99 hours",
+      "challenge_type": "time_condition_mismatch",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-035",
+      "synthetic": true,
+      "question": "What crop yield was measured at 99 tonnes per hectare?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-011",
+      "required_fact": "crop yield of 99 tonnes per hectare",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-036",
+      "synthetic": true,
+      "question": "What Dice score did image segmentation reach at 0.99?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-012",
+      "required_fact": "image segmentation Dice score of 0.99",
+      "challenge_type": "precision_mismatch",
+      "split": "test"
+    },
+    {
+      "id": "TEST-TASK-037",
+      "synthetic": true,
+      "question": "What conductivity was measured at 9.9 watts per meter kelvin?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-001",
+      "required_fact": "conductivity of 9.9 watts per meter kelvin",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-038",
+      "synthetic": true,
+      "question": "What latency did the 16-layer graph benchmark report at 1 millisecond?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-003",
+      "required_fact": "graph benchmark latency of 1 millisecond",
+      "challenge_type": "condition_and_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-039",
+      "synthetic": true,
+      "question": "What quantized model size was measured at 99 gigabytes?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-006",
+      "required_fact": "quantized model size of 99 gigabytes",
+      "challenge_type": "measurement_value_mismatch",
+      "split": "dev"
+    },
+    {
+      "id": "TEST-TASK-040",
+      "synthetic": true,
+      "question": "What drug release percentage was observed after 99 hours?",
+      "expected_answerable": false,
+      "evidence": null,
+      "related_document_id": "TEST-DOC-010",
+      "required_fact": "drug release after 99 hours",
+      "challenge_type": "time_condition_mismatch",
+      "split": "test"
+    }
+  ]
+}

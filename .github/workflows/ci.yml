@@ -38,6 +38,7 @@ jobs:
           uv run --locked ruff format --check .
           uv run --locked pytest -q
           uv run --locked python -m tools.export_openapi
+          uv run --locked pip-audit --progress-spinner off
           git -C .. diff --exit-code -- docs/openapi.json
 
   web:
@@ -49,7 +50,7 @@ jobs:
         with:
           node-version: 24
       - name: Install pinned pnpm
-        run: npm install --global pnpm@11.19.0
+        run: npm install --global pnpm@11.25.0
       - name: Install locked dependencies
         working-directory: web
         run: pnpm install --frozen-lockfile
@@ -59,8 +60,42 @@ jobs:
           pnpm run format:check
           pnpm run typecheck
           pnpm run build
+          pnpm audit --audit-level moderate
       - name: Browser E2E
         working-directory: web
         run: |
           pnpm exec playwright install --with-deps chromium
           pnpm run test:e2e
+
+  container:
+    needs: [backend, web]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build and start isolated stack
+        run: docker compose up --build -d
+      - name: Smoke test Web-to-API readiness and home page
+        shell: bash
+        run: |
+          ready=0
+          for attempt in $(seq 1 40); do
+            if curl --silent --fail --connect-timeout 3 --max-time 20 \
+              http://127.0.0.1:3000/api/status \
+              --output /tmp/papertrail-compose-status.json; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker compose logs
+            exit 1
+          fi
+          python3 -c 'import json; assert json.load(open("/tmp/papertrail-compose-status.json"))["status"] == "ready"'
+          curl --fail --silent --show-error http://127.0.0.1:3000/ --output /dev/null
+      - name: Stop stack and remove its temporary database volume
+        if: always()
+        run: docker compose down --volumes --remove-orphans

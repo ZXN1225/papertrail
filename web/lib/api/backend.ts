@@ -25,7 +25,9 @@ export async function backendRequest(
       ...init,
       cache: "no-store",
       redirect: "error",
-      signal: AbortSignal.timeout(15_000),
+      signal: init?.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)])
+        : AbortSignal.timeout(15_000),
       headers: { Accept: "application/json", ...init?.headers },
     });
   } catch {

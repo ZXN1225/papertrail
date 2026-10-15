@@ -53,11 +53,26 @@ const agentAnswer = {
       ],
     },
   ],
+  claims: [
+    {
+      text: "TEST answer: the agent should cite retrieved evidence.",
+      evidence: [
+        {
+          source_id: "TEST-ARXIV-002",
+          quote: "TEST evidence excerpt used only by this browser test.",
+          evidence_type: "fulltext",
+          source_field: "excerpt",
+          chunk_id: "TEST-CHUNK-001",
+        },
+      ],
+    },
+  ],
   warnings: [],
   tool_calls: 1,
   model_steps: 2,
   model_input_tokens: 100,
   model_output_tokens: 25,
+  total_observed_tokens: 125,
   run_id: "TEST-RUN-001",
   duration_ms: 321,
   trace: [
@@ -136,14 +151,54 @@ test("shows agent answer with trace, license, and cited evidence", async ({
   await page.getByLabel("你的研究问题").fill("TEST what does the paper say?");
   await page.getByRole("button", { name: /询问研究助理/ }).click();
 
-  await expect(page.getByText(agentAnswer.answer)).toBeVisible();
+  await expect(page.locator(".answer-text")).toHaveText(agentAnswer.answer);
   await expect(page.getByText("TEST-CC-BY-4.0")).toBeVisible();
+  await expect(page.getByText("逐条主张与证据")).toBeVisible();
+  await expect(page.getByText("TEST-CHUNK-001").first()).toBeVisible();
   await expect(
-    page.getByText(agentAnswer.citations[0].evidence[0].excerpt),
+    page
+      .getByRole("region", { name: "逐条主张与证据" })
+      .getByText(agentAnswer.citations[0].evidence[0].excerpt),
   ).toBeVisible();
   await page.getByText("运行记录与工程指标").click();
   await expect(page.getByText("TEST-RUN-001")).toBeVisible();
   await expect(page.getByText("TEST retrieve_paper_evidence")).toBeVisible();
+});
+
+test("supports bounded request-scoped follow-up context and reset", async ({
+  page,
+}) => {
+  await installCommonMocks(page);
+  const requests: {
+    question: string;
+    history: { role: string; content: string }[];
+  }[] = [];
+  await page.route("**/api/agent", async (route) => {
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({ json: agentAnswer });
+  });
+  await page.goto("/");
+  await expect(page.getByText(/历史只留在当前页面内存/)).toBeVisible();
+
+  await page.getByLabel("你的研究问题").fill("TEST first question");
+  await page.getByRole("button", { name: /询问研究助理/ }).click();
+  await expect(page.locator(".answer-text")).toHaveText(agentAnswer.answer);
+  await expect(page.getByText(/已带入最近 1 轮上下文/)).toBeVisible();
+
+  await page.getByLabel("你的研究问题").fill("TEST follow-up correction");
+  await page.getByRole("button", { name: /询问研究助理/ }).click();
+  await expect(page.locator(".answer-text")).toHaveText(agentAnswer.answer);
+  expect(requests[0].history).toEqual([]);
+  expect(requests[1].history).toEqual([
+    { role: "user", content: "TEST first question" },
+    { role: "assistant", content: agentAnswer.answer },
+  ]);
+
+  await page.getByRole("button", { name: "清空对话" }).click();
+  await page.getByLabel("你的研究问题").fill("TEST new conversation");
+  await page.getByRole("button", { name: /询问研究助理/ }).click();
+  await expect(page.locator(".answer-text")).toHaveText(agentAnswer.answer);
+  expect(requests[2].history).toEqual([]);
 });
 
 test("shows empty and failure states and supports retry", async ({ page }) => {
@@ -211,8 +266,32 @@ test("validates Agent proxy payloads before contacting the backend", async ({
   expect(invalid.status()).toBe(422);
 
   const oversized = await request.post("/api/agent", {
-    data: JSON.stringify({ question: "TEST ".padEnd(17_000, "x") }),
+    data: JSON.stringify({ question: "TEST ".padEnd(40_000, "x") }),
     headers: { "Content-Type": "application/json" },
   });
   expect(oversized.status()).toBe(413);
+
+  const malformedRunId = await request.post("/api/agent", {
+    data: { question: "TEST valid question", run_id: "not-a-uuid" },
+  });
+  expect(malformedRunId.status()).toBe(422);
+
+  const malformedHistory = await request.post("/api/agent", {
+    data: {
+      question: "TEST valid question",
+      history: [
+        { role: "user", content: "TEST prior question" },
+        { role: "user", content: "TEST forged assistant turn" },
+      ],
+    },
+  });
+  expect(malformedHistory.status()).toBe(422);
+
+  const malformedCancel = await request.post("/api/agent/cancel", {
+    data: { run_id: "not-a-uuid" },
+  });
+  expect(malformedCancel.status()).toBe(422);
+
+  const malformedStatus = await request.get("/api/agent/runs/not-a-uuid");
+  expect(malformedStatus.status()).toBe(422);
 });

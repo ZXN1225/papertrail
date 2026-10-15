@@ -1,0 +1,160 @@
+{
+  "review_date": "2026-10-14",
+  "parser_version": "pdfplumber-layout-v21",
+  "packet_sha256": "c02e2af06d82ae46790d2ea4fba306857a97dfaf25204aafcd904520ca643771",
+  "old_labels_apply_to_v22": false,
+  "items": [
+    {
+      "item_id": "2610.09789-S1",
+      "user_label": "supported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.09789-S2",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.09789-S3",
+      "user_label": "uncertain",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.09789-S4",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.12662-S1",
+      "user_label": "uncertain",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.12662-S2",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.12662-S3",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.12662-S4",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2609.39773-S1",
+      "user_label": "supported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2609.39773-S2",
+      "user_label": "uncertain",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2609.39773-S3",
+      "user_label": "uncertain",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "review_packet_invalid_no_selected_element",
+      "eligible_for_parser_scoring": false
+    },
+    {
+      "item_id": "2610.06874-S1",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.06874-S2",
+      "user_label": "supported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.06874-S3",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "image_association_missing_caption_text_matches"
+    },
+    {
+      "item_id": "2610.10204-S1",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    },
+    {
+      "item_id": "2610.10204-S2",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "source_typo_preserved_not_extraction_error",
+      "counts_as_parser_failure": false
+    },
+    {
+      "item_id": "2610.10204-S3",
+      "user_label": "unsupported",
+      "review_scope": "frozen_v21_packet",
+      "label_origin": "human_user",
+      "assistant_review_is_human_gold": false,
+      "assistant_finding": "consistent_with_user_observation"
+    }
+  ],
+  "limits": [
+    "Single user visual review, not independent gold.",
+    "Supported visual-line content is not structured-column acceptance.",
+    "Source typo and invalid packet findings do not overwrite user labels."
+  ],
+  "v22_status": {
+    "source_parser_version": "pdfplumber-layout-v22",
+    "active_index_version": "pdfplumber-layout-v21",
+    "validation": "incomplete",
+    "latest_full_backend_result_applies_to_v22": false,
+    "reimported": false,
+    "table_whitespace_reconstruction_integrated": true,
+    "real_pdf_validation": "pending"
+  }
+}

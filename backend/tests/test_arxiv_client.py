@@ -6,10 +6,12 @@ import httpx
 import pytest
 
 import app.sources.arxiv as arxiv_module
+from app.cli import import_arxiv
 from app.sources.arxiv import (
     ARXIV_BASE_URL,
     ArxivClient,
     ArxivProtocolError,
+    ArxivRateLimitError,
     normalize_arxiv_id,
 )
 
@@ -142,3 +144,50 @@ def test_arxiv_client_enforces_three_second_minimum_between_requests() -> None:
         client.search("two")
 
     assert sleeps == [3.0]
+
+
+@pytest.mark.parametrize(
+    ("retry_after", "expected"),
+    [("17", 17), ("0", None), ("NaN", None), ("not-a-date", None), (None, None)],
+)
+def test_arxiv_rate_limit_exposes_only_a_bounded_retry_hint(
+    retry_after: str | None, expected: int | None
+) -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+    headers = {"Retry-After": retry_after} if retry_after is not None else {}
+
+    with (
+        ArxivClient(
+            transport=httpx.MockTransport(lambda _: httpx.Response(429, headers=headers))
+        ) as client,
+        pytest.raises(ArxivRateLimitError) as raised,
+    ):
+        client.search("id:2608.20519", max_results=1)
+
+    assert raised.value.retry_after_seconds == expected
+    assert "arXiv API" in raised.value.safe_message
+    assert "not-a-date" not in raised.value.safe_message
+
+
+def test_arxiv_import_cli_prints_actionable_rate_limit_hint(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class LimitedClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def __enter__(self) -> LimitedClient:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def search(self, *_: object, **__: object) -> None:
+            raise ArxivRateLimitError(17)
+
+    monkeypatch.setattr(import_arxiv, "ArxivClient", LimitedClient)
+
+    assert import_arxiv.main(["--query", "id:2608.20519", "--max-results", "1"]) == 2
+    error_output = capsys.readouterr().err
+    assert "arxiv_rate_limited" in error_output
+    assert "17 秒" in error_output

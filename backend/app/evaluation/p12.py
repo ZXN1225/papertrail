@@ -19,9 +19,14 @@ class _ScriptedModel:
         self.turns = turns
 
     def complete(
-        self, *, instructions: str, input_items: list[dict[str, Any]], tools: list[dict[str, Any]]
+        self,
+        *,
+        instructions: str,
+        input_items: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        max_output_tokens: int | None = None,
     ) -> ModelTurn:
-        del instructions, input_items
+        del instructions, input_items, max_output_tokens
         if any(tool.get("strict") is not True for tool in tools):
             raise AssertionError("tool definitions must be strict")
         return self.turns.pop(0)
@@ -36,6 +41,13 @@ class _SyntheticTools:
         if definition["name"] in {"retrieve_paper_evidence", "search_papers"}
     ]
 
+    def definitions_for(self, allowed_names: frozenset[str] | None) -> list[dict[str, Any]]:
+        return [
+            item
+            for item in self.definitions
+            if allowed_names is None or item["name"] in allowed_names
+        ]
+
     def __init__(self, *, inject_untrusted_text: bool, tool_error: bool = False) -> None:
         self.inject_untrusted_text = inject_untrusted_text
         self.tool_error = tool_error
@@ -43,9 +55,15 @@ class _SyntheticTools:
         self.executed: list[str] = []
         self.argument_errors = 0
 
-    def execute(self, name: str, arguments: str) -> dict[str, Any]:
+    def execute(
+        self,
+        name: str,
+        arguments: str,
+        *,
+        allowed_names: frozenset[str] | None = None,
+    ) -> dict[str, Any]:
         self.attempts.append(name)
-        if name not in {item["name"] for item in self.definitions}:
+        if name not in {item["name"] for item in self.definitions_for(allowed_names)}:
             return {"status": "error", "code": "tool_not_allowed"}
         if name != "retrieve_paper_evidence":
             return {"status": "error", "code": "benchmark_tool_not_implemented"}

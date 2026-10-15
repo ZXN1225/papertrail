@@ -1,6 +1,20 @@
 # PaperTrail 项目规格
 
-更新日期：2026-09-24。状态：P01—P16 已完成；仓库已更名为 `papertrail` 并发布到唯一远程分支 `main`。OpenAlex/arXiv 元数据、受限 Agent、许可准入全文 BM25 RAG、可选 Dense/Hybrid 检索及 Web 工作区均已接入。
+2026-10-14 人审状态：用户已提供 17 项 v21 标签。复核确认总体观察合理，但 `2610.10204-S2` 的 `iron-phytolankton` 是原 PDF 拼写，不能计作解析缺陷；`2609.39773-S3` 是无解析元素的无效审核样本，排除 pass/fail 分母。v21 标签仅记录于对应包，不迁移到 parser v25。v25 仍需人工核对 16 项后再考虑活动索引升级。
+
+2026-10-14 R04 预算守卫补充：模型输入与 dense/hybrid embedding query 均在 provider 调用前按 UTF-8 字节保守上界预留；剩余额度限制模型输出，provider 回报 usage 超界后停止本轮。该上界不是精确 tokenizer 或账单硬限制。后端 327 项回归通过；测试环境使用捆绑 Python 和既有依赖目录，标准 uv 离线重建受本机缓存缺轮子阻塞。详见 [R04 验收记录](research/R04-agent-runs-acceptance.md)。
+
+2026-10-14 当前改进状态：parser v26 已通过后端 330 项回归；9 篇许可全文的 217 页 v26 草稿机械审计有 3,254 个元素、0 个重复 ID、0 个非法 bbox；16 个审核项映射无误。v26 的 16 项原文核验包待用户检查，活动 SQLite 仍为 v21。v21→v25 BM25 精确映射诊断为 5/6，单篇 top-8 5/6、全库 4/6；这不是 gold recall，v26 需在人工核验后重算。R01–R03 与整体 R08 质量门槛仍进行中；本机交付的既有验收不代表这些质量目标已达成。GitHub 上传未授权。详见 [最新进度](PROGRESS.md)、[PDF 结构核验](research/R02-pdf-structure-acceptance.md)、[BM25 诊断](research/R01-R03-v25-bm25-diagnostic-2026-10-14.md)。
+
+2026-10-13 parser v19 更新：四篇现有许可全文已重解析，活动索引共 1,369 chunks。细线碎片不再作为整图候选；邻接矢量面板可合并成联合 bbox，分离图组不会被聚成一框。2608.02037 第 9 页 Figure 5 联合框为 `[72.31,298.97,519.68,655.65]`，匹配 confidence=0.965，并包含图内子图标签；等待用户确认叠框范围。A1 表格空逻辑行已从 metadata row/header count 中移除，保留物理 row index。许可复核时间保留原人工记录。未覆盖图像像素理解、OCR 或一般解析准确率。后端回归 286 passed、1 条既有 warning；R02 细节见 [PDF 结构验收](research/R02-pdf-structure-acceptance.md)。
+
+2026-10-13 验收补记：用户明确接受当前本机交付版及已披露的探索性结果。R01–R03 的更大真实质量门槛、远端 CI 和 GitHub 发布仍未完成；本机验收不授权上传。后续质量集条件见 [R01–R03 下一门槛](research/R01-R03-next-quality-gate.md)。
+
+2026-10-13 工程回归更新：Harness 对模型/embedding 用量缺失或无效时失败关闭；embedding 用量不可核验会返回 `usage_unavailable` 并终止本轮，避免错误 observation 后继续模型调用。完整后端 **296 passed**、1 条既有 Starlette/AnyIO 弃用 warning；Ruff、84 文件格式检查与 OpenAPI 导出通过。Web Prettier、Next build（集成 TS）和 E2E 18/18 通过。provider 输入/embedding 用量仍是调用后观测、provider 自报无法担保准确，预算不等同账单硬上限，R04 维持进行中。
+
+后续本机数据更新：2026-10-13 四篇许可 PDF 活动索引先统一至 v14，用户核验后反馈 A1/B2 表格错误；parser 已修复并升级为 v15。用户现已确认 v15 两张表的内容修正；A1 raw structured row count 与可见输出行数相差一条全空解析行，说明已加入本机核验包。旧版全文和评测记录保留。
+
+更新日期：2026-10-13。状态：P01—P16 已完成各阶段声明范围内工作；P17、R01—R04、R06—R08 的部分质量门槛仍在推进中，R05 的一个外部 MCP Host 只读烟测已通过；**当前本机交付版已获用户验收**。四篇逐篇许可的 PDF 已进入本机全文索引；其中新三篇的主要正文、Figure 5、Table II/III 和 2609 收紧 bbox 已完成用户抽样核验。R04 支持不落盘的 request-scoped 多轮约束修正并仅记录历史摘要哈希；R07 协调器默认不接入生产。修复后 `gpt-5.6-sol` 六题三臂试运行已完成 18/18 arm、48/48 请求，本地费用估算 USD 1.219042；8 个机器选定答案经用户核对原 PDF 均为 `supported`，但 R4 旧引用缺 `(d)` 标签且把图注续行误标为段落。parser v15 已修复 2607 Table II 表头及 2608 Table 2 列/IVIM 下标问题，并重建四篇活动本机索引；A1/B2 修复内容现已由用户定向复核通过，A1 空解析行计数口径已说明，旧报告与冻结的 R1/R4 直接 chunk 漏命中保留原样。后端最近回归 **253 passed、1 warning**；Ruff check/format 通过。六题一次不足以证明一般质量收益，多 Agent 成本比约 2.20 且只在 R3 形成 consensus，继续默认关闭。48 次调用授权已用尽；远端 Actions 未运行，本轮改进不上传 GitHub。阶段事实与限制见 [进度记录](PROGRESS.md)、[人审结果](research/R06-R07-live-postfix-result.md)和根目录 [current_contexts.md](../current_contexts.md)。
 
 ## 1. 产品目标
 
@@ -27,7 +41,7 @@
 - 只有能解析到明确许可且许可允许本项目拟定处理方式的全文，才可进入全文索引。
 - 许可未知、仅有开放访问标识、或只有可读网页，不自动视为允许保存和重展示。
 - 保留原始来源 URL、许可名称/URL、许可检查时间、内容哈希、抓取时间和处理版本；权限不明确时仅保留元数据与外链。
-- P09 本地全文导入采用人工核对确认，仅白名单 `CC0-1.0` 与 `CC-BY-4.0`；只读 UTF-8 `.txt`，不自动下载或抓取。每个结果携带原论文链接、许可/证据页面、署名、chunk ID 与字符位置。具体文件版权仍由导入者逐篇确认；系统白名单不是法律意见。
+- 本地全文导入采用人工核对确认，仅白名单 `CC0-1.0` 与 `CC-BY-4.0`；支持 UTF-8 `.txt` 与显式提供的本地 PDF，不自动下载或抓取。PDF 以 pdfplumber 进行本地版面文本提取和表格提取，保存解析器版本、源文件哈希、页码、元素类型及页面区域；双栏分段使用几何启发式，并保留阅读顺序不确定/旋转文字排除等解析 warning，不能把无 warning 当作普遍质量保证。图表以原文图注和图像区域定位支持检索，不生成未经核验的图像语义描述。扫描 PDF/OCR 与复杂图表视觉理解仍未覆盖。具体文件版权仍由导入者逐篇确认；系统白名单不是法律意见。
 
 ## 3. 用户流程
 
@@ -51,11 +65,17 @@
 
 ### 4.1 Harness 组件与当前工具面
 
-Harness 按职责拆分为：模型适配器（Responses API 与可替换 mock）、决策循环/步数预算、严格工具注册表、Pydantic 参数与返回契约、只读执行层、有界 observation、引用证据账本与终答验证、deadline/token 统计、脱敏 run trace、离线 eval 接口。当前不使用多 Agent 或自由规划器：单 Agent + 明确工具契约更易审计；只有后续评测证明有必要才引入专业子 Agent。
+Harness 按职责拆分为：模型适配器（Responses API 与可替换 mock）、决策循环/步数预算、严格工具注册表、Pydantic 参数与返回契约、只读执行层、有界 observation、逐 claim 的证据类型/来源字段绑定、终答验证、deadline/token 统计、任务运行 ledger、脱敏 run trace、离线 eval 接口。Skills 选择和正文完整性由固定 registry 管理；Skill 只提供任务指导，并通过同一白名单限制模型可见工具和实际执行工具。
 
 当前生产模型运行实际注册最多 12 项受限只读工具：本地 BM25 搜索、精确作品详情、词法相似作品、2—5 篇元数据对比、全文证据 unavailable；OpenAlex Works 搜索/详情、Authors 搜索/详情、作者作品列表；arXiv 元数据搜索/精确读取。来源工具仅在对应客户端启用时展示；固定官方 host，ID/查询/页大小有界。arXiv 工具只读元数据，不开放论文文件请求、任意网页抓取或数据库写入。
 
-Harness 强制结构化终答；候选论文、摘要与引用只能来自本轮已执行工具观察，引用由 allow-list 校验。trace 只保留事件类型、工具名、状态、耗时和 token，不保留用户问题、工具参数、论文内容、密钥或异常正文。当前 trace 随响应返回，持久化、导出和仪表盘属于后续工程化工作。
+独立 MCP stdio Server 只公开 5 个本地只读工具，全文检索固定使用 BM25。其 SQLite 连接使用 `mode=ro`；缺失数据库、旧 schema 或 migration checksum 不符都会失败关闭，不在 MCP 调用期间创建或升级数据。MCP Host 启动前由 PaperTrail 后端初始化并迁移数据库；用户已完成一个外部 Host 的只读实际调用，详见 [R05 验收](research/R05-mcp-acceptance.md)。
+
+Harness 强制结构化终答；候选论文、摘要与引用只能来自本轮已执行工具观察，引用由 allow-list 校验。答案正文必须精确等于逐 claim 的规范拼接；全文 claim 必须引用当前 run 返回的 excerpt/chunk，metadata claim 只能引用白名单书目字段（不含 abstract）。另外对有限词表可识别的数字、单位、方向词和实验组标签做确定性一致性筛查；数字须与同一条件标签对应，简单否定词也参与方向核验。该规则只拒绝部分可检测错配，不验证完整语义蕴含、通用单位换算或跨论文实验可比性。
+
+SQLite run ledger 持久化 run UUID、问题 SHA-256、状态、模型/embedding token、工具调用/步骤、耗时与脱敏 trace；不持久化原始问题、答案、工具参数或全文摘录。重复 run UUID 返回冲突，`GET /api/v1/agent/runs/{run_id}` 查询状态，`POST /api/v1/agent/runs/{run_id}/cancel` 请求协作取消。非活动进程留下的 `running` 记录在查询时改为 `interrupted`；系统不会自动重放外部模型调用，不提供持久化多轮问答正文。总 token 限额按 provider 返回 usage 计入模型与 embedding；缺失或格式错误的 usage 不再按零计，embedding 请求错误会以 `usage_unavailable` 终止当前 run；单次在途请求仍可能超出一次，context 上限按字符近似而非精确模型 tokenizer。PDF/plain-text chunks 以 1,800 UTF-8 bytes 作为 byte-level BPE token 数保守上界；migration 0009 将 retrieval_text 与 evidence_text 分离，且用 parent_element_id 记录 PDF child chunk 的父级解析元素，命中时受限扩展相邻 child 证据（同解析元素或同 section path）。未扩展整个 section 或跨多个 section，语义蕴含仍未验证。
+
+生产路径仍是单 Agent。额外 `MultiAgentExperiment` 仅作为默认不接入 `/agent/ask` 的评测框架；顺序 worker 共用观测 token/tool/deadline/cancel budget。至少两 worker 的结构化 claims 与 citation IDs 完全一致才返回 consensus，分歧时不合并答案。合成测试证明状态/预算/冲突处理契约，不证明真实质量收益。
 
 `retrieve_paper_evidence` 仅查询当前人工批准的本地全文版本，最多返回 8 个片段；citation 包含许可署名与命中证据定位。未获准文本不进入索引；撤销命令清除文档全部全文版本/切片，并留存不含正文的哈希删除审计。
 

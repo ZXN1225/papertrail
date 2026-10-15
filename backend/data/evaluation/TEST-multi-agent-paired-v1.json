@@ -1,0 +1,16 @@
+{
+  "dataset_sha256": "5cd905bf5b5a3b942a900846c1a4b536f47225398014fc61b6a5e6e8ccd12ae5",
+  "synthetic": true,
+  "label_source": "synthetic_fixture",
+  "bootstrap_seed": 20261011,
+  "observations": [
+    {"task_id": "TEST-1", "trial": 1, "arm": "single_agent", "task_success": false, "evidence_valid": true, "safety_violation": false, "observed_tokens": 100, "cost_usd": 0.01, "latency_ms": 500},
+    {"task_id": "TEST-1", "trial": 1, "arm": "multi_agent", "task_success": false, "evidence_valid": true, "safety_violation": false, "observed_tokens": 140, "cost_usd": 0.014, "latency_ms": 800},
+    {"task_id": "TEST-1", "trial": 2, "arm": "single_agent", "task_success": false, "evidence_valid": true, "safety_violation": false, "observed_tokens": 100, "cost_usd": 0.01, "latency_ms": 500},
+    {"task_id": "TEST-1", "trial": 2, "arm": "multi_agent", "task_success": true, "evidence_valid": true, "safety_violation": false, "observed_tokens": 140, "cost_usd": 0.014, "latency_ms": 800},
+    {"task_id": "TEST-2", "trial": 1, "arm": "single_agent", "task_success": false, "evidence_valid": true, "safety_violation": false, "observed_tokens": 100, "cost_usd": 0.01, "latency_ms": 500},
+    {"task_id": "TEST-2", "trial": 1, "arm": "multi_agent", "task_success": true, "evidence_valid": true, "safety_violation": false, "observed_tokens": 140, "cost_usd": 0.014, "latency_ms": 800},
+    {"task_id": "TEST-2", "trial": 2, "arm": "single_agent", "task_success": false, "evidence_valid": true, "safety_violation": false, "observed_tokens": 100, "cost_usd": 0.01, "latency_ms": 500},
+    {"task_id": "TEST-2", "trial": 2, "arm": "multi_agent", "task_success": true, "evidence_valid": true, "safety_violation": false, "observed_tokens": 140, "cost_usd": 0.014, "latency_ms": 800}
+  ]
+}

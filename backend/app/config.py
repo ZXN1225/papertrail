@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = Field(default=800, ge=64, le=4_096)
     agent_max_steps: int = Field(default=4, ge=1, le=8)
     agent_max_tool_calls: int = Field(default=8, ge=1, le=16)
+    agent_max_total_tokens: int = Field(default=12_000, ge=256, le=100_000)
+    agent_max_context_chars: int = Field(default=120_000, ge=4_000, le=500_000)
     agent_deadline_seconds: float = Field(default=45.0, gt=0, le=120)
     embedding_provider: Literal["disabled", "openai"] = "disabled"
     embedding_api_key: SecretStr | None = None

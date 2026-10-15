@@ -56,6 +56,21 @@ def test_openai_embedding_client_sends_bounded_fixed_host_request_and_orders_res
         (
             {
                 "model": "text-embedding-3-small",
+                "data": [{"index": 0, "embedding": [1, 2, 3]}],
+            },
+            "invalid_provider_response",
+        ),
+        (
+            {
+                "model": "text-embedding-3-small",
+                "data": [{"index": 0, "embedding": [1, 2, 3]}],
+                "usage": {"prompt_tokens": True},
+            },
+            "invalid_provider_response",
+        ),
+        (
+            {
+                "model": "text-embedding-3-small",
                 "data": [{"index": 0, "embedding": [1, 2]}],
                 "usage": {},
             },

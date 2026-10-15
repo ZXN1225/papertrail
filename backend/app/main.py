@@ -1,11 +1,15 @@
 """HTTP entry point for the PaperTrail API."""
 
+import asyncio
 import sqlite3
+import threading
+from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException, Query, Response, status
+from fastapi import FastAPI, HTTPException, Query, Request, Response, status
 from fastapi import Path as PathParameter
+from fastapi.concurrency import run_in_threadpool
 
-from app.agent.contracts import AgentQuestion, AgentResponse
+from app.agent.contracts import AgentQuestion, AgentResponse, AgentTaskStatus
 from app.agent.service import AgentService
 from app.config import Settings, get_settings
 from app.embeddings.client import EmbeddingError, OpenAIEmbeddingClient
@@ -21,6 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         description="Academic paper discovery and research assistant API.",
     )
+    application.state.active_agent_runs = {}
 
     @application.get("/api/health/live", tags=["health"])
     def live() -> dict[str, str]:
@@ -31,14 +36,87 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response_model=AgentResponse,
         tags=["agent"],
     )
-    def ask_agent(body: AgentQuestion, response: Response) -> AgentResponse:
-        result = AgentService(
-            app_settings,
-            PaperStore(app_settings.resolved_data_storage_path),
-        ).ask(body.question)
-        if result.status in {"model_disabled", "model_unavailable"}:
+    async def ask_agent(body: AgentQuestion, request: Request, response: Response) -> AgentResponse:
+        run_id = str(body.run_id or uuid4())
+        store = PaperStore(app_settings.resolved_data_storage_path)
+        if not store.create_agent_run(
+            run_id,
+            body.question,
+            [(turn.role, turn.content) for turn in body.history],
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "duplicate_run_id", "run_id": run_id},
+            )
+        cancellation = threading.Event()
+        application.state.active_agent_runs[run_id] = cancellation
+        execution = asyncio.create_task(
+            run_in_threadpool(
+                AgentService(
+                    app_settings,
+                    store,
+                ).ask,
+                body.question,
+                history=body.history,
+                cancellation_requested=cancellation.is_set,
+            )
+        )
+        while not execution.done():
+            if await request.is_disconnected():
+                cancellation.set()
+            await asyncio.sleep(0.05)
+        try:
+            result = await execution
+        except Exception:
+            cancellation.set()
+            store.mark_agent_run_interrupted(run_id)
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "agent_run_interrupted", "run_id": run_id},
+            ) from None
+        finally:
+            application.state.active_agent_runs.pop(run_id, None)
+        result = result.model_copy(update={"run_id": run_id})
+        store.finish_agent_run(run_id, result)
+        if result.status in {"model_disabled", "model_unavailable", "usage_unavailable"}:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return result
+
+    @application.get(
+        "/api/v1/agent/runs/{run_id}",
+        response_model=AgentTaskStatus,
+        tags=["agent"],
+    )
+    def get_agent_run(run_id: UUID) -> AgentTaskStatus:
+        store = PaperStore(app_settings.resolved_data_storage_path)
+        run = store.get_agent_run(str(run_id))
+        if run is None:
+            raise HTTPException(status_code=404, detail="agent run not found")
+        if run["status"] == "running" and str(run_id) not in application.state.active_agent_runs:
+            store.mark_agent_run_interrupted(str(run_id))
+            run = store.get_agent_run(str(run_id))
+            assert run is not None
+        return AgentTaskStatus.model_validate(run)
+
+    @application.post("/api/v1/agent/runs/{run_id}/cancel", tags=["agent"])
+    def cancel_agent_run(run_id: UUID) -> dict[str, object]:
+        identifier = str(run_id)
+        cancellation = application.state.active_agent_runs.get(identifier)
+        if cancellation is None:
+            store = PaperStore(app_settings.resolved_data_storage_path)
+            run = store.get_agent_run(identifier)
+            if run is None:
+                raise HTTPException(status_code=404, detail="agent run not found")
+            if run["status"] == "running":
+                store.mark_agent_run_interrupted(identifier)
+                run["status"] = "interrupted"
+            return {
+                "run_id": identifier,
+                "status": run["status"],
+                "cancellation_requested": False,
+            }
+        cancellation.set()
+        return {"run_id": identifier, "status": "running", "cancellation_requested": True}
 
     @application.get("/api/health/ready", tags=["health"])
     def ready(response: Response) -> dict[str, object]:
@@ -236,6 +314,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         retrieval_method: str = Query(default="bm25", pattern=r"^(bm25|dense|hybrid)$"),
     ) -> dict[str, object]:
         try:
+            if (source_type is None) != (source_id is None):
+                raise ValueError("source_type and source_id must be provided together")
             query_embedding = None
             embedding_model = None
             if retrieval_method != "bm25":

@@ -7,11 +7,14 @@ dependencies = [
     "fastapi>=0.115,<1.0",
     "httpx>=0.28,<1.0",
     "pydantic-settings>=2.7,<3.0",
+    "pdfplumber>=0.11.7,<1.0",
     "uvicorn[standard]>=0.34,<1.0",
+    "mcp==2.2.0",
 ]
 
 [dependency-groups]
 dev = [
+    "pip-audit==2.10.1",
     "pytest>=9.0.3,<10.0",
     "ruff>=0.11,<1.0",
 ]
@@ -20,10 +23,39 @@ dev = [
 testpaths = ["tests"]
 addopts = "-ra"
 pythonpath = ["."]
+# This workspace keeps ACL-restricted scratch directories from earlier local runs
+# (tests/tmp*, tmp/, .pytest-tmp/, .pytest_cache/, probe*). Collecting them raises
+# PermissionError and aborts the whole run, so never recurse into them.
+norecursedirs = [
+    "tmp*",
+    "probe*",
+    ".*",
+    "__pycache__",
+    "_darcs",
+    "build",
+    "CVS",
+    "dist",
+    "node_modules",
+    "venv",
+    "*.egg",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# `backend/.ruff_cache` is not writable in this workspace; use a fresh directory.
+cache-dir = ".ruff-cache"
+# Scratch/report directories above contain unreadable leftovers; ruff's walker
+# panics on them instead of skipping them, so they are excluded explicitly.
+extend-exclude = [
+    "reports",
+    "tmp",
+    ".pytest-tmp",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".ruff-cache",
+    "tests/tmp*",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

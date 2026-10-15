@@ -1,0 +1,19 @@
+{
+  "schema_version": "papertrail.multi-agent-taskset.v1",
+  "dataset_id": "TEST-multi-agent-taskset-v1",
+  "synthetic": true,
+  "tasks": [
+    {
+      "task_id": "TEST-1",
+      "synthetic": true,
+      "challenge_type": "paired-outcome-aggregation",
+      "source_refs": []
+    },
+    {
+      "task_id": "TEST-2",
+      "synthetic": true,
+      "challenge_type": "paired-outcome-aggregation",
+      "source_refs": []
+    }
+  ]
+}

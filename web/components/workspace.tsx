@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentResponse,
+  AgentTurn,
   Citation,
   Paper,
   SearchResponse,
@@ -39,9 +40,12 @@ export function Workspace() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
+  const [history, setHistory] = useState<AgentTurn[]>([]);
   const [answer, setAnswer] = useState<AgentResponse | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
+  const agentAbortController = useRef<AbortController | null>(null);
+  const agentRunId = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -56,6 +60,8 @@ export function Workspace() {
       .catch(() => setServiceStatus("unavailable"));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => () => agentAbortController.current?.abort(), []);
 
   const visibleResults = useMemo(() => {
     const from = yearFrom ? Number(yearFrom) : null;
@@ -151,26 +157,66 @@ export function Workspace() {
     setAgentLoading(true);
     setAgentError(null);
     setAnswer(null);
+    const controller = new AbortController();
+    const runId = crypto.randomUUID();
+    agentRunId.current = runId;
+    agentAbortController.current = controller;
     try {
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: question.trim() }),
+        body: JSON.stringify({
+          question: question.trim(),
+          history,
+          run_id: runId,
+        }),
+        signal: controller.signal,
       });
       const body = await response.json();
       if (!response.ok) throw new Error(readError(body));
-      setAnswer(body as AgentResponse);
+      const completedAnswer = body as AgentResponse;
+      setAnswer(completedAnswer);
+      setHistory((current) =>
+        appendConversation(current, question.trim(), completedAnswer.answer),
+      );
     } catch (cause) {
       setAgentError(
-        cause instanceof Error ? cause.message : "研究助理暂时不可用，请重试。",
+        cause instanceof DOMException && cause.name === "AbortError"
+          ? "任务已取消。"
+          : cause instanceof Error
+            ? cause.message
+            : "研究助理暂时不可用，请重试。",
       );
     } finally {
+      if (agentAbortController.current === controller) {
+        agentAbortController.current = null;
+      }
+      if (agentRunId.current === runId) agentRunId.current = null;
       setAgentLoading(false);
     }
   }
 
+  function cancelAgentRun() {
+    const runId = agentRunId.current;
+    if (runId) {
+      void fetch("/api/agent/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: runId }),
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+    agentAbortController.current?.abort();
+  }
+
   function useSampleQuestion(value: string) {
     setQuestion(value);
+  }
+
+  function resetAgentConversation() {
+    setHistory([]);
+    setAnswer(null);
+    setAgentError(null);
   }
 
   return (
@@ -209,15 +255,11 @@ export function Workspace() {
           <div className="intro-block">
             <div className="eyebrow">
               <span>研究工作区</span>
-              <i />
-              从问题出发，沿证据前进
             </div>
             <h1>
-              把文献线索，<em>变成研究脉络。</em>
+              基于Agent的<em>论文查询和研究辅助助手</em>
             </h1>
-            <p>
-              搜索可信学术来源，比较关键研究，并让每个回答都能回到原文证据。
-            </p>
+            <p>搜索可信学术来源，比较关键研究，论文引用可溯源。</p>
           </div>
 
           <section
@@ -579,7 +621,7 @@ export function Workspace() {
             <span className="section-index">04 / SYNTHESIZE</span>
             <h2 id="assistant-title">研究助理</h2>
             <p className="assistant-intro">
-              围绕论文提出问题。回答将基于本轮工具实际读取到的资料，并列出可追溯引用。
+              围绕论文追问。历史只留在当前页面内存，刷新或清空后即丢弃；每轮引用都重新检索并核验。
             </p>
             <div className="sample-prompts" aria-label="示例问题">
               {sampleQuestions.map((sample) => (
@@ -604,6 +646,20 @@ export function Workspace() {
               />
               <div className="agent-form-footer">
                 <span>{question.length}/1000</span>
+                {history.length > 0 && (
+                  <span role="status">
+                    已带入最近 {history.length / 2} 轮上下文；引用需本轮重新检索
+                  </span>
+                )}
+                {history.length > 0 && (
+                  <button
+                    className="secondary-button"
+                    onClick={resetAgentConversation}
+                    type="button"
+                  >
+                    清空对话
+                  </button>
+                )}
                 <button
                   className="ask-button"
                   disabled={agentLoading || !question.trim()}
@@ -612,6 +668,15 @@ export function Workspace() {
                   {agentLoading ? "正在研究…" : "询问研究助理"}
                   <span aria-hidden="true">↗</span>
                 </button>
+                {agentLoading && (
+                  <button
+                    className="cancel-button"
+                    onClick={cancelAgentRun}
+                    type="button"
+                  >
+                    取消
+                  </button>
+                )}
               </div>
             </form>
             {agentError && (
@@ -745,25 +810,84 @@ function CompareRow({ label, values }: { label: string; values: string[] }) {
   );
 }
 
+function appendConversation(
+  current: AgentTurn[],
+  question: string,
+  answer: string,
+): AgentTurn[] {
+  const turns = [
+    ...current,
+    { role: "user" as const, content: question },
+    { role: "assistant" as const, content: answer },
+  ];
+  while (
+    turns.length > 8 ||
+    turns.reduce((total, turn) => total + turn.content.length, 0) > 8_000
+  ) {
+    turns.splice(0, 2);
+  }
+  return turns;
+}
+
 function AgentResult({ answer }: { answer: AgentResponse }) {
+  const statusLabel: Record<string, string> = {
+    completed: "已完成",
+    insufficient_evidence: "证据不足",
+    unverified_evidence: "证据核验失败",
+    context_budget_exceeded: "上下文预算已用尽",
+    token_budget_exceeded: "Token 预算已用尽",
+    usage_unavailable: "用量无法核验，已停止调用",
+    cancelled: "任务已取消",
+    model_disabled: "模型未启用",
+  };
   return (
     <div className="agent-result" aria-live="polite">
       <div className={`answer-status ${answer.status}`}>
         <span className="status-dot" />
-        {answer.status === "completed"
-          ? "已完成"
-          : answer.status === "insufficient_evidence"
-            ? "证据不足"
-            : answer.status === "model_disabled"
-              ? "模型未启用"
-              : answer.status}
+        {statusLabel[answer.status] ?? answer.status}
       </div>
       <p className="answer-text">{answer.answer}</p>
+      {answer.claims.length > 0 && (
+        <section className="claim-list" aria-label="逐条主张与证据">
+          <h3>逐条主张与证据</h3>
+          {answer.claims.map((claim, index) => (
+            <article className="claim-card" key={`${claim.text}-${index}`}>
+              <p>{claim.text}</p>
+              {claim.evidence.map((evidence, evidenceIndex) => (
+                <blockquote
+                  key={`${evidence.source_id}-${evidence.chunk_id}-${evidenceIndex}`}
+                >
+                  <p>{evidence.quote}</p>
+                  <cite>
+                    {evidence.source_id} ·{" "}
+                    {evidence.evidence_type === "fulltext" && evidence.chunk_id
+                      ? (answer.citations
+                          .find(
+                            (citation) =>
+                              citation.openalex_id === evidence.source_id ||
+                              citation.arxiv_id === evidence.source_id,
+                          )
+                          ?.evidence.find(
+                            (span) => span.chunk_id === evidence.chunk_id,
+                          )?.locator ?? evidence.chunk_id)
+                      : `元数据字段：${evidence.source_field}`}
+                  </cite>
+                </blockquote>
+              ))}
+            </article>
+          ))}
+        </section>
+      )}
       {answer.warnings.map((warning) => (
         <p className="answer-warning" key={warning}>
           {warning}
         </p>
       ))}
+      {answer.status === "completed" && (
+        <p className="answer-warning">
+          已核对来源和摘录位置；系统尚未判断摘录是否在语义上充分支持主张。
+        </p>
+      )}
       {answer.citations.length > 0 && (
         <div className="citation-list">
           <h3>
@@ -787,9 +911,7 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
           <span>耗时 {answer.duration_ms} ms</span>
           <span>工具调用 {answer.tool_calls}</span>
           <span>模型轮次 {answer.model_steps}</span>
-          <span>
-            Token {answer.model_input_tokens + answer.model_output_tokens}
-          </span>
+          <span>Token {answer.total_observed_tokens}</span>
         </div>
         <ol>
           {answer.trace.map((event) => (
