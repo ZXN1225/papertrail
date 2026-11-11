@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Sequence
 from typing import Any
@@ -65,4 +66,36 @@ def score_weak_retrieval(
         **scored,
         f"precision@{k}": hits / k,
         f"recall@{k}": hits / len(relevant) if relevant else 0.0,
+    }
+
+
+def partition_candidates(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    """Partition by source identity so chunks from one paper cannot cross splits."""
+    by_source: dict[str, list[dict[str, Any]]] = {}
+    for candidate in candidates:
+        source_id = candidate.get("source_id")
+        if not isinstance(source_id, str) or not source_id:
+            raise ValueError("each weak candidate requires a source_id")
+        by_source.setdefault(source_id, []).append(candidate)
+    splits: dict[str, list[dict[str, Any]]] = {"train": [], "dev": [], "test": []}
+    for source_id, source_candidates in by_source.items():
+        bucket = int(hashlib.sha256(source_id.encode()).hexdigest()[:8], 16) % 10
+        split = "train" if bucket < 7 else "dev" if bucket < 8 else "test"
+        splits[split].extend(source_candidates)
+    source_ids = {
+        split: sorted({candidate["source_id"] for candidate in rows})
+        for split, rows in splits.items()
+    }
+    return {
+        "schema": "papertrail.weak-supervision-splits.v1",
+        "synthetic": False,
+        "weak_supervision": True,
+        "gold_standard": False,
+        "quality_claim_allowed": False,
+        "split_method": "sha256_source_id_mod_10_70_10_20",
+        "source_ids": source_ids,
+        "splits": splits,
+        "sha256": hashlib.sha256(
+            json.dumps(splits, ensure_ascii=False, sort_keys=True).encode()
+        ).hexdigest(),
     }
