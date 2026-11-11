@@ -2,6 +2,7 @@
 
 ## 2026-11-11 PR #23 CI 修复与弱监督评测加固
 
+- GitHub Actions 的 Web E2E 首次重跑因 Ubuntu apt 镜像域名 DNS 失败，`playwright install --with-deps` 无法安装系统包；runner 镜像已提供浏览器运行依赖，CI 改为仅下载 Chromium，避免 E2E 步骤依赖 apt 镜像。待本次 PR 检查确认。
 - GitHub Actions 原失败来自锁定依赖漏洞审计：后端 certifi/filelock/Pillow 与 Web Next.js 已更新；提交 `f2a856d` 的后端、Web 和容器 job 均成功，CI 安全审计无已知漏洞。Node 20 弃用提示属于 runner/action 警告，不影响该次通过。
 - 评测候选改为从只读 PaperStore 当前已批准全文生成，并拒绝非公开来源、未知许可或缺少内容哈希；任务采用单词遮蔽伪查询，显式记录答案词、来源、许可、解析器/切块器版本和快照哈希。训练/dev/test 按来源稳定分组，缺少任一 split 时报告不完整。
 - 新增构建和离线 BM25 回放 CLI；评测前验证当前全文库与冻结来源快照一致，并验证每条弱相关 chunk 的来源和版本，报告 Hit/Precision/Recall/MRR/nDCG@k、分桶、延迟和 provider-call 数。

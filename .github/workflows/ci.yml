@@ -64,7 +64,7 @@ jobs:
       - name: Browser E2E
         working-directory: web
         run: |
-          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright install chromium
           pnpm run test:e2e
 
   container:
