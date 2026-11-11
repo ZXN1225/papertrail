@@ -4,7 +4,7 @@
 
 - PR #23：弱监督候选与多口径 BM25 回放，修复 GitHub Actions apt DNS 脆弱点；backend、web/E2E、container 全通过，保持 draft。
 - PR #24：安全边界内的 LLM-as-judge 诊断；361 项后端测试及 GitHub 全部检查通过，保持 draft。
-- PR #25：账号/会话/个人论文工作区和自适应 Agent Harness。Coverage 缺口、预算跳过、重复补查由服务端最终披露并阻止误报完成。PR 分支后端 506 passed，Ruff/OpenAPI/pip-audit 和 Web format/typecheck/build/E2E 66/66/audit 通过；上传并发额度有回归覆盖，删除事务失败可恢复且启动时清理中断删除。待 GitHub CI 确认。
+- PR #25：账号/会话/个人论文工作区和自适应 Agent Harness。Coverage 缺口、预算跳过、重复补查由服务端最终披露并阻止误报完成。PR 分支后端 506 passed，Ruff/OpenAPI/pip-audit 和 Web format/typecheck/build/E2E 66/66/audit 通过；上传并发额度有回归覆盖，删除事务失败可恢复且启动时清理中断删除。GitHub backend/web Browser E2E/container CI 全绿，保持 draft、未合并。
 - 三个 PR 均未合并 main；原工作区未暂存改动及本机数据仍保留。
 
 ## 2026-11-11 Agent/RAG 架构与零标注评测启动
