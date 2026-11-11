@@ -4,7 +4,7 @@ The labels here are authored by AI agents (``label_source: ai_agent_review``). T
 module refuses any dataset that claims human review, synthetic status, or gold-standard
 standing, so an AI-labeled set can never be reported as human-verified quality.
 
-It measures, deterministically and with zero provider calls:
+It measures retrieval deterministically, with optional precomputed query embeddings:
 
 * **evidence grounding** — for an answerable task, does BM25 over the whole approved
   corpus retrieve its evidence anchors? Multi-hop tasks can declare all required chunks;
@@ -29,7 +29,7 @@ from app.evaluation.metrics import score_query
 from app.retrieval.tokenizer import TOKENIZER_VERSION
 from app.storage.repository import PaperStore
 
-REPORT_SCHEMA = "papertrail.ai-labeled-tasks-report.v2"
+REPORT_SCHEMA = "papertrail.ai-labeled-tasks-report.v3"
 DATASET_SCHEMA = "papertrail.ai-labeled-tasks.v1"
 LABEL_SOURCE = "ai_agent_review"
 TEST_LABEL_SOURCE = "test_fixture"
@@ -164,13 +164,44 @@ def _valid_evidence_anchor(evidence: Any, source_id: str) -> bool:
 
 
 def run_evaluation(
-    store: PaperStore, dataset: dict[str, Any], dataset_sha256: str
+    store: PaperStore,
+    dataset: dict[str, Any],
+    dataset_sha256: str,
+    *,
+    retrieval_method: str = "bm25",
+    query_embeddings: dict[str, list[float]] | None = None,
+    embedding_model: str | None = None,
 ) -> dict[str, Any]:
     if getattr(store, "readonly", False) is not True:
         raise AiLabeledTaskError("evaluation requires a read-only PaperStore")
     validate_dataset(dataset)
     if not _is_sha256(dataset_sha256):
         raise AiLabeledTaskError("dataset_sha256 must be a lowercase SHA-256 digest")
+    if retrieval_method not in {"bm25", "dense", "hybrid"}:
+        raise AiLabeledTaskError("retrieval_method must be bm25, dense or hybrid")
+    if retrieval_method == "bm25":
+        if query_embeddings is not None or embedding_model is not None:
+            raise AiLabeledTaskError("BM25 evaluation does not accept query embeddings")
+    elif (
+        not isinstance(query_embeddings, dict)
+        or set(query_embeddings) != {task["task_id"] for task in dataset["tasks"]}
+        or not isinstance(embedding_model, str)
+        or not embedding_model.strip()
+    ):
+        raise AiLabeledTaskError("dense and hybrid evaluation require one embedding per task")
+    if query_embeddings is not None and any(
+        not isinstance(vector, list)
+        or not vector
+        or len(vector) > 8_192
+        or any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            for value in vector
+        )
+        for vector in query_embeddings.values()
+    ):
+        raise AiLabeledTaskError("query embeddings must be finite vectors with 1-8192 dimensions")
 
     source_results: dict[str, dict[str, Any]] = {}
     expected_total = 0
@@ -198,7 +229,9 @@ def run_evaluation(
             limit=top_k,
             source_type="arxiv",
             source_id=None,
-            retrieval_method="bm25",
+            retrieval_method=retrieval_method,
+            query_embedding=(query_embeddings or {}).get(task["task_id"]),
+            embedding_model=embedding_model,
         )
         if result.get("status") not in {"ok", "no_results"}:
             raise AiLabeledTaskError(f"retrieval returned {result.get('status')}")
@@ -222,7 +255,7 @@ def run_evaluation(
             "retrieved_chunk_ids": [item.get("chunk_id") for item in items],
             "retrieved_source_ids": [item.get("source_id") for item in items],
             "top1_score": scores[0] if scores else None,
-            "lexical_candidate_count": len(items),
+            "retrieved_candidate_count": len(items),
         }
         if task["expected_answerable"]:
             reference_chunk_id = task["evidence"]["chunk_id"]
@@ -274,7 +307,7 @@ def run_evaluation(
             }
         else:
             row["absent_fact"] = task["absent_fact"]
-            row["lexical_candidate_returned"] = bool(items)
+            row["retrieval_candidate_returned"] = bool(items)
         task_rows.append(row)
 
     answerable = [row for row in task_rows if row["expected_answerable"]]
@@ -291,7 +324,7 @@ def run_evaluation(
                 "task_count": 0,
                 "answerable_count": 0,
                 "hit_at_k": 0,
-                "lexical_candidate_return_count": 0,
+                "candidate_return_count": 0,
                 "mrr_at_k": [],
                 "ndcg_at_k": [],
                 "complete_evidence_count": 0,
@@ -308,7 +341,7 @@ def run_evaluation(
                 group["complete_evidence_denominator"] += 1
                 group["complete_evidence_count"] += int(row["complete_evidence_coverage"])
         else:
-            group["lexical_candidate_return_count"] += int(row["lexical_candidate_returned"])
+            group["candidate_return_count"] += int(row["retrieval_candidate_returned"])
     for _name, group in by_type.items():
         group["mrr_at_k_mean"] = statistics.fmean(group["mrr_at_k"]) if group["mrr_at_k"] else None
         group["ndcg_at_k_mean"] = (
@@ -323,9 +356,8 @@ def run_evaluation(
         group["evidence_hit_at_k_rate"] = (
             group["hit_at_k"] / group["answerable_count"] if group["answerable_count"] else None
         )
-        group["lexical_candidate_return_rate"] = (
-            group["lexical_candidate_return_count"]
-            / (group["task_count"] - group["answerable_count"])
+        group["candidate_return_rate"] = (
+            group["candidate_return_count"] / (group["task_count"] - group["answerable_count"])
             if group["task_count"] - group["answerable_count"]
             else None
         )
@@ -362,11 +394,13 @@ def run_evaluation(
             "human_reviewed": False,
         },
         "retrieval": {
-            "method": "bm25_fulltext_v3",
+            "method": result.get("retrieval_method", f"{retrieval_method}_fulltext_v1"),
             "top_k": top_k,
             "source_scope": dataset["source_scope"],
-            "provider_calls": 0,
+            "retrieval_provider_calls": 0,
             "scanned_chunks_per_query": expected_total,
+            "query_embedding_model": embedding_model,
+            "query_embedding_count": len(query_embeddings) if query_embeddings is not None else 0,
         },
         "runner_config": {
             "scoring": SCORING_VERSION,
@@ -385,11 +419,11 @@ def run_evaluation(
                 "denominator": len(answerable),
                 "rate": hit_at_k / len(answerable) if answerable else None,
             },
-            "unanswerable_lexical_retrieval": {
-                "count": sum(1 for row in negative if row["lexical_candidate_returned"]),
+            "unanswerable_candidate_retrieval": {
+                "count": sum(1 for row in negative if row["retrieval_candidate_returned"]),
                 "denominator": len(negative),
                 "meaning": (
-                    "negative tasks for which the retriever still returned candidates; "
+                    "negative tasks for which this retrieval method still returned candidates; "
                     "diagnostic only, since abstention is not decided by BM25 alone"
                 ),
             },

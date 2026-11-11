@@ -1,5 +1,10 @@
 # 任务台账
 
+## 2026-11-12 PR #27 同题检索方法比较（进行中）
+
+- 扩展 AI 标注评测 CLI，同一题集支持 BM25/Dense/Hybrid；BM25 默认保持零 Provider 调用，Dense/Hybrid 必须显式确认查询数据外传并设置题数与费用预算，生成包含各方法指标及 embedding 用量的对比报告。
+- 先完成独立复核、全量检查，再提交基于 PR #26 的 Draft PR；不得合并 main。标签仍非人工金标，查询 embedding 会传给配置的 OpenAI 服务，实际检索质量/泛化能力未由本项证明。
+
 ## 2026-11-12 PR #26 检索评测更正
 
 - 修复共享 `MRR@k` 把 cutoff 后命中计分的问题；AI 标签构建器逐个验证多证据锚点，AI 任务评测新增完整 evidence coverage、MRR/NDCG/precision/recall@k，并将未答题的词法候选计数改为不误导的名称。

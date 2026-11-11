@@ -115,7 +115,11 @@ class _ReadOnlyStore:
             )
         return {
             "status": "ok" if items else "no_results",
-            "retrieval_method": "bm25_fulltext_v3",
+            "retrieval_method": {
+                "bm25": "bm25_fulltext_v3",
+                "dense": "dense_cosine_v1",
+                "hybrid": "hybrid_rrf_v3",
+            }[kwargs["retrieval_method"]],
             "scanned_chunks": 3,
             "truncated": False,
             "items": items,
@@ -136,7 +140,7 @@ def test_synthetic_fixture_scores_and_keeps_ai_labeling_visible() -> None:
     assert report["summary"]["evidence_hit_at_1"]["count"] == 0
     assert report["summary"]["evidence_hit_at_2"]["count"] == 1
     negative = next(row for row in report["tasks"] if not row["expected_answerable"])
-    assert negative["lexical_candidate_returned"] is True
+    assert negative["retrieval_candidate_returned"] is True
     assert negative["top1_score"] == 9.5
     assert report["summary"]["top1_score_separability"]["answerable_mean"] == 9.5
 
@@ -282,6 +286,51 @@ def test_non_finite_retrieval_scores_fail_closed() -> None:
     store.search_fulltext_evidence = non_finite_score  # type: ignore[method-assign]
     with pytest.raises(AiLabeledTaskError, match="non-finite score"):
         run_evaluation(store, _dataset(), DATASET_SHA)
+
+
+def test_dense_retrieval_uses_frozen_query_vectors() -> None:
+    store = _ReadOnlyStore()
+    task_ids = [task["task_id"] for task in _dataset()["tasks"]]
+    vectors = {task_id: [0.5, 0.5] for task_id in task_ids}
+
+    report = run_evaluation(
+        store,
+        _dataset(),
+        DATASET_SHA,
+        retrieval_method="dense",
+        query_embeddings=vectors,
+        embedding_model="TEST-embedding-model",
+    )
+
+    assert report["retrieval"]["method"] == "dense_cosine_v1"
+    assert report["retrieval"]["query_embedding_count"] == 2
+    assert store.search_calls[0]["retrieval_method"] == "dense"
+    assert store.search_calls[0]["query_embedding"] == [0.5, 0.5]
+    assert store.search_calls[0]["embedding_model"] == "TEST-embedding-model"
+
+
+def test_dense_retrieval_requires_complete_finite_vectors() -> None:
+    task_id = _dataset()["tasks"][0]["task_id"]
+    with pytest.raises(AiLabeledTaskError, match="one embedding per task"):
+        run_evaluation(
+            _ReadOnlyStore(),
+            _dataset(),
+            DATASET_SHA,
+            retrieval_method="dense",
+            query_embeddings={task_id: [1.0]},
+            embedding_model="TEST-model",
+        )
+
+    task_ids = [task["task_id"] for task in _dataset()["tasks"]]
+    with pytest.raises(AiLabeledTaskError, match="finite vectors"):
+        run_evaluation(
+            _ReadOnlyStore(),
+            _dataset(),
+            DATASET_SHA,
+            retrieval_method="hybrid",
+            query_embeddings={task_id: [float("nan")] for task_id in task_ids},
+            embedding_model="TEST-model",
+        )
 
 
 def test_evaluation_requires_a_read_only_store() -> None:

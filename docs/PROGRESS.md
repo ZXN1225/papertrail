@@ -1,5 +1,11 @@
 # 进度
 
+## 2026-11-12 PR #27 同题 BM25/Dense/Hybrid 诊断（实现与验证中）
+
+- AI 标注任务评测 CLI 可选择 BM25、Dense、Hybrid 并对同一固定任务集逐方法运行；BM25 默认零 Provider 调用。Dense/Hybrid 在发送查询前要求 `--confirm-data-transfer`、覆盖全题集的 `--max-query-embeddings`、正数 `--max-cost-usd` 和已配置的 OpenAI embedding 价格；先用 UTF-8 字节数作 token 上界估算并在预计超预算时拒绝发送，报告记录实际 provider tokens/calls 与按配置单价计算的费用。
+- 结果通用化为检索候选指标，不把 Dense/Hybrid 候选称为词法候选；对比 envelope 与各方法报告仍显式标记 AI 标注、非金标、`quality_claim_allowed=false`。向量只在内存中用于当次评测，不写报告。
+- 当前全后端回归 521 passed；Ruff check/format、OpenAPI 导出、pip-audit 与 diff check 通过。独立只读复核无阻断项。若 embedding 批次在中途失败，提供方可能已处理失败批次但没有返回 usage；已成功批次的 usage 不会写入完整评测报告，CLI 会中止并提示失败，故费用上限是调用前上界门控而非对提供方账单的独立核验。人工复核中的跨论文多跳与真实检索质量仍未覆盖；Web 未改动，浏览器 E2E 与 PR CI 待完成。
+
 ## 2026-11-12 检索评测指标与多证据覆盖
 
 - 修正公共 `MRR@k` 截断语义，k 之后才命中的结果不再被计入；relevance grade/cutoff 限为有限的 0–3 整数与正整数，检索返回非有限分数时失败关闭。为 AI 标注任务报告加入 MRR、NDCG、precision/recall@k 与显式多证据完整覆盖率。unanswerable 结果字段改为“是否返回词法候选”，避免把检索候选误称为生成错误。
