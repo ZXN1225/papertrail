@@ -69,6 +69,7 @@ class BudgetedModelClient:
         input_items: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         max_output_tokens: int | None = None,
+        output_schema: dict[str, Any] | None = None,
     ) -> ModelTurn:
         if self.halt_reason is not None:
             raise ModelUnavailable("Live evaluation has stopped.")
@@ -84,6 +85,7 @@ class BudgetedModelClient:
             input_items=input_items,
             tools=tools,
             max_output_tokens=output_limit,
+            output_schema=output_schema,
         )
         reserved = self._cost(input_upper, output_limit)
         if self.estimated_spend + reserved > self.max_cost:
@@ -91,12 +93,15 @@ class BudgetedModelClient:
             raise ModelUnavailable("Live evaluation cost preflight cap reached.")
         self.calls_attempted += 1
         try:
-            turn = self.inner.complete(
-                instructions=instructions,
-                input_items=input_items,
-                tools=tools,
-                max_output_tokens=output_limit,
-            )
+            request = {
+                "instructions": instructions,
+                "input_items": input_items,
+                "tools": tools,
+                "max_output_tokens": output_limit,
+            }
+            if output_schema is not None:
+                request["output_schema"] = output_schema
+            turn = self.inner.complete(**request)
         except Exception:
             # A failed HTTP request may still have been billed. Hold the full
             # preflight reservation and stop rather than retrying blindly.

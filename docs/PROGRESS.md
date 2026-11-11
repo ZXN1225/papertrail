@@ -8,6 +8,13 @@
 - 新增构建和离线 BM25 回放 CLI；评测前验证当前全文库与冻结来源快照一致，并验证每条弱相关 chunk 的来源和版本，报告 Hit/Precision/Recall/MRR/nDCG@k、分桶、延迟和 provider-call 数。
 - 明确区分固定分母 Precision@k 与已返回结果 precision；MRR 只看 top-k。拒绝非法 k/重复排序及越界来源 qrel；哈希和内置 Skill 校验对 Windows CRLF/LF 归一，修复 Windows 检出文件造成的 Skill 哈希及评测清单误失败。
 - 验收：后端 **354 passed**；Ruff check/format、OpenAPI 导出、pip-audit 通过。Windows 系统临时目录权限不足，测试改用仓库 `.local` 临时目录。弱监督题目仍非真实用户问法或金标；LLM-as-judge 与人工锚点校准未完成。用法和边界见 [评测说明](research/weak-supervision-evaluation-2026-11-11.md)。
+## 2026-11-12 LLM-as-judge 第一版
+
+- 新增显式授权后可运行的盲评 CLI：默认 dry-run 零 provider 调用；实时评测要求 `--execute --confirm-data-transfer`，只读精确 lineage 的公开 CC-BY 全文证据，附带本地调用/费用预算与结构化评分。
+- 评审提示与 schema 均可追溯，答案 cohort 隐去；报告明确标为未校准 AI 诊断，不是人工金标或质量声明。provider 中断时逐条报告未判断项、不漏出分母，并分别统计已尝试/成功调用；证据 ID 前缀重叠时按最长 ID 先替换。
+- 全量后端回归暴露 Windows CRLF checkout 下已有的冻结评测清单 digest 不一致；SHA-256 对 CRLF/LF 统一规范化，并加入回归测试。
+- 全量后端 352 passed；Ruff check/format 与 OpenAPI 导出通过。pip-audit 在 main 基线上仍报告 certifi/filelock/Pillow 漏洞；PR #24 以 PR #23 为基分支，包含其锁定依赖升级。
+- 未调用外部模型或传输论文内容。
 
 ## 2026-10-15 AI 标注真实语料评测（R01/R03）与简历材料刷新
 

@@ -138,6 +138,7 @@ class ModelClient(Protocol):
         input_items: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         max_output_tokens: int | None = None,
+        output_schema: dict[str, Any] | None = None,
     ) -> ModelTurn: ...
 
 
@@ -147,13 +148,14 @@ def estimate_input_tokens_upper_bound(
     input_items: list[dict[str, Any]],
     tools: list[dict[str, Any]],
     max_output_tokens: int,
+    output_schema: dict[str, Any] | None = None,
 ) -> int:
     """Return a conservative UTF-8 byte bound plus provider-envelope reserve."""
     request_shape = {
         "instructions": instructions,
         "input": input_items,
         "tools": tools,
-        "text": {"format": FINAL_ANSWER_SCHEMA},
+        "text": {"format": output_schema or FINAL_ANSWER_SCHEMA},
         "max_output_tokens": max_output_tokens,
     }
     return len(json.dumps(request_shape, ensure_ascii=False).encode("utf-8")) + (
@@ -196,6 +198,7 @@ class OpenAIResponsesClient:
         input_items: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         max_output_tokens: int | None = None,
+        output_schema: dict[str, Any] | None = None,
     ) -> ModelTurn:
         output_limit = (
             self.settings.llm_max_output_tokens if max_output_tokens is None else max_output_tokens
@@ -207,9 +210,9 @@ class OpenAIResponsesClient:
             "instructions": instructions,
             "input": input_items,
             "tools": tools,
-            "tool_choice": "auto",
+            "tool_choice": "auto" if tools else "none",
             "parallel_tool_calls": False,
-            "text": {"format": FINAL_ANSWER_SCHEMA},
+            "text": {"format": output_schema or FINAL_ANSWER_SCHEMA},
             "max_output_tokens": output_limit,
             "store": False,
         }

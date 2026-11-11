@@ -8,6 +8,12 @@
 - 增加安全的本地候选集生成与 BM25 replay CLI：校验当前全库与冻结 lineage，并校验每个弱 qrel chunk 确为指定来源/内容版本。指标包括 Hit/Precision/Recall/MRR/nDCG@k、分桶和延迟；空 split 不允许误报测试通过。用法与限制记录在 `docs/research/weak-supervision-evaluation-2026-11-11.md`。
 - Windows 行尾归一修复技能完整性哈希与评测数据集哈希在 CRLF checkout 下不一致。完整后端测试 354 passed，Ruff、OpenAPI 导出及 pip-audit 通过。
 - 仍待：基于被评测系统之外的生成器构造真实用户风格任务；加入多意图、改写/多约束/不可回答分桶及 latency/source coverage；实现受预算限制的独立 LLM-as-judge，并用独立复核样本校准分歧。弱监督分数不得表述为金标准或用户任务质量。
+## 2026-11-12 LLM-as-judge 第一版
+
+- 已实现：零调用 dry-run、显式数据传输确认、只读许可/lineage校验、盲化 cohort 与证据别名、严格结构化输出、预算保护、失败/中断状态追踪和 AI 诊断报告。复核发现并修复失败请求漏计与重叠 chunk ID 替换问题。
+- Windows CRLF 导致的现有弱监督评测清单 hash 用例失败已通过统一换行规范化修复。
+- 后端全量检查与安全审计已完成；PR #24 以 PR #23 为基分支，避免重复维护依赖升级。
+- 不执行真实模型调用，不把 AI judge 评分表述为金标或准确率。
 
 ## 2026-10-15 AI 标注真实语料评测（R01/R03）与简历材料刷新（追加）
 
