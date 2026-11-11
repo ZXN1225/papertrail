@@ -8,6 +8,8 @@ __pycache__/
 .venv/
 .pytest_cache/
 backend/.pytest-tmp-*/
+backend/.pytest-tmp/
+backend/.test-tmp/
 backend/tests/.pytest-tmp-*/
 backend/tests/tmp*/
 # Scratch working area: rendered paper page images, one-off probe scripts and
@@ -38,6 +40,9 @@ data/raw/
 data/private/
 data/storage/
 data/indexes/
+data/mineru-models/
+backend/data/mineru-models/
+backend/data/private-papers/
 backups/
 .local/
 *.tsbuildinfo

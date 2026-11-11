@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from html import unescape
 from typing import Any
 
 CHUNKER_VERSION = "paragraph-utf8-token-upper-bound-v3"
-PDF_CHUNKER_VERSION = "pdf-element-structure-token-upper-bound-v4"
+PDF_CHUNKER_VERSION = "pdf-element-structure-token-upper-bound-v5"
 MAX_CHUNK_TOKEN_UPPER_BOUND = 1_800
 # Backward-compatible name for callers/tests; this limit is now UTF-8 bytes, not characters.
 MAX_CHUNK_CHARS = MAX_CHUNK_TOKEN_UPPER_BOUND
@@ -189,6 +190,73 @@ def _format_source_rows(rows: list[int]) -> str:
     return ",".join(parts)
 
 
+def _chunk_mineru_html_table(
+    text: str,
+    page: int,
+    section_path: list[str],
+    bbox: str | None,
+    element_id: str | None,
+    ordinal_start: int,
+) -> list[TextChunk]:
+    """Split MinerU HTML by source rows while keeping exact evidence offsets."""
+    rows = list(re.finditer(r"<tr(?:\s[^>]*)?>.*?</tr\s*>", text, re.I | re.S))
+    if not rows:
+        return []
+
+    def readable(source: str) -> str:
+        source = re.sub(r"</t[dh]\s*>", " | ", source, flags=re.I)
+        return " ".join(unescape(re.sub(r"<[^>]*>", " ", source)).split())
+
+    header = readable(text[: rows[0].start()] + rows[0].group())
+    header = header[
+        : _choose_stop(
+            header,
+            0,
+            400,
+        )
+    ]
+    prefix = f"{header}\n" if header else ""
+    available = MAX_CHUNK_TOKEN_UPPER_BOUND - len(prefix.encode("utf-8"))
+    chunks: list[TextChunk] = []
+    spans = [(0, rows[0].start(), "标题")]
+    spans.extend(
+        (
+            row.start(),
+            rows[index + 1].start() if index + 1 < len(rows) else len(text),
+            str(index + 1),
+        )
+        for index, row in enumerate(rows)
+    )
+    for span_start, span_end, label in spans:
+        position = span_start
+        while position < span_end:
+            stop = min(span_end, _choose_stop(text, position, available))
+            if stop <= position:
+                raise ValueError("MinerU table fragment cannot fit in a chunk")
+            excerpt = text[position:stop]
+            body = readable(excerpt)
+            if body:
+                chunks.append(
+                    TextChunk(
+                        ordinal=ordinal_start + len(chunks),
+                        locator=f"第 {page} 页 · table · HTML 行 {label} · 字符 {position}-{stop}",
+                        char_start=position,
+                        char_end=stop,
+                        text=prefix + body if label != "标题" else body,
+                        evidence_text=excerpt,
+                        page_number=page,
+                        element_type="table",
+                        section_path=json.dumps(
+                            section_path, ensure_ascii=False, separators=(",", ":")
+                        ),
+                        bbox=bbox,
+                        element_id=element_id,
+                    )
+                )
+            position = stop
+    return chunks
+
+
 def _chunk_table(
     element: dict[str, Any],
     text: str,
@@ -202,6 +270,12 @@ def _chunk_table(
     structured = element.get("structured")
     structured = structured if isinstance(structured, dict) else {}
     rows_value = structured.get("rows")
+    if not rows_value and "<table" in text.lower():
+        html_chunks = _chunk_mineru_html_table(
+            text, page, section_path, bbox, element_id, ordinal_start
+        )
+        if html_chunks:
+            return html_chunks
     title = lines[0][0] if lines else ""
     header = ""
     data_rows: list[tuple[str, int, int, list[int]]] = []

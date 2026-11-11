@@ -1,4 +1,5 @@
-import { defineConfig } from "@playwright/test";
+import { chromium, defineConfig } from "@playwright/test";
+import { existsSync } from "node:fs";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -6,6 +7,7 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   use: {
+    channel: existsSync(chromium.executablePath()) ? undefined : "msedge",
     baseURL: "http://127.0.0.1:3001",
     trace: "retain-on-failure",
   },

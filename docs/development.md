@@ -147,7 +147,9 @@ uv run --frozen python -m app.cli.review_qrels import `
 
 ## P06 Agent 本地运行
 
-Agent 默认关闭 LLM。若要做后续真实模型烟测，可在服务端 `.env` 配置 `LLM_PROVIDER=openai`、`LLM_API_KEY` 和账户可用且支持 function calling/structured outputs 的 `LLM_MODEL`，并按需调整 `AGENT_MAX_STEPS`、`AGENT_MAX_TOOL_CALLS`、`AGENT_DEADLINE_SECONDS`；默认限制分别为 4 轮、8 次工具调用和 45 秒。保存 `.env` 后重启后端。
+Agent 默认关闭 LLM。若要做后续真实模型烟测，可在服务端 `.env` 配置 `LLM_PROVIDER=openai`、`LLM_API_KEY` 和账户可用且支持 function calling/structured outputs 的 `LLM_MODEL`，并按需调整 `AGENT_MAX_STEPS`、`AGENT_MAX_TOOL_CALLS`、`AGENT_DEADLINE_SECONDS`；默认限制分别为 4 轮、8 次工具调用和 120 秒。`AGENT_DAILY_USER_TOKEN_BUDGET` 可设为不小于 `AGENT_MAX_TOTAL_TOKENS` 的正整数，以限制每个账号按 UTC 创建日统计的 token 预算；默认 `0` 表示不启用日额度。活跃 run 预留各自完整的单次上限，完成后按实际已报告 token 结算，并发创建通过 SQLite 写锁串行检查。该额度按 token 计，不是美元上限，也不能约束单次 provider 调用或供应商账单。保存 `.env` 后重启后端。
+
+`AGENT_MAX_TOTAL_TOKENS` 是每轮 Agent 的累计上限，包含模型输入/输出和可计量的 embedding 输入，默认 300,000。`LLM_MAX_OUTPUT_TOKENS` 限制单次模型输出，默认 8,192；对推理模型也包含推理 tokens。预算守卫按 UTF-8 字节数预留输入，因此可能在实际用量低于上限时阻止下一次调用。可通过 `LLM_REASONING_EFFORT` 为支持该参数的模型设置推理强度；不设置时使用提供商默认值。当前本机 `gpt-5.6-luna` 设为 `low`，速度和成本可能降低，也可能影响复杂问题的回答质量。设置新的模型前请核对其支持的参数。修改后重启后端。
 
 请求 `POST http://127.0.0.1:8001/api/v1/agent/ask`，JSON 格式例如：
 
@@ -155,7 +157,7 @@ Agent 默认关闭 LLM。若要做后续真实模型烟测，可在服务端 `.e
 {"question":"请找出 RAG 检索质量评测的代表论文，并说明本地元数据能支持什么结论。"}
 ```
 
-当前 Agent 可读本地导入的 OpenAlex/arXiv 元数据，也可调用固定在线只读工具：Works 搜索/详情、Authors 搜索/详情、作者作品列表、arXiv 元数据搜索/详情；本地工具支持 BM25 搜索、查单篇、词法相关、元数据比较和许可全文片段检索。无批准全文时返回 `no_results`。在线 OpenAlex 工具每次调用 timeout 4 秒且不重试；若没有 OpenAlex Key，仍尝试 OpenAlex 的 keyless 服务额度。若没有设置 LLM，接口返回 503 `model_disabled`。自动测试使用假模型/HTTP mock，不消耗 API 额度。
+当前 Agent API 需要登录，可读固定只读工具可访问的 OpenAlex/arXiv 元数据、获准共享全文以及当前账号的私有 PDF。每个账号有独立会话历史；网页可列出并切换最近 100 个会话、新建会话或清空当前会话。消息读取最多 500 条，Agent 每轮最多取最近 8 条历史。个人论文库保存搜索结果的来源 ID 和带哈希的元数据快照，可按标题/ID 检索、打开来源页或移除。Agent 收到该用户最多 50 个已保存来源 ID 作为检索线索，必须重新调用只读工具取证；快照不能作为事实证据。用户可将 PDF 关联至本人文库条目，也可在“我的稿件”只填标题上传未发表论文；两种情况均需逐篇声明拥有版权或已获授权。文件、MinerU chunks 与检索结果仅供该账号私有处理，支持状态查看、失败重试和删除；个人稿件引用无公开来源链接，只显示私有定位。登录态 Agent 证据检索使用本地 BM25，不向 embedding provider 发送查询；若启用云端 LLM，问答命中的私有摘录仍会发送给所配置的模型服务。该声明不授予共享全文导入权限。若没有设置 LLM，接口返回 503 `model_disabled`。自动测试使用假模型/HTTP mock，不消耗 API 额度。
 
 请求可附带客户端生成的 UUID `run_id`（Web 工作区会自动生成）：
 
@@ -163,9 +165,21 @@ Agent 默认关闭 LLM。若要做后续真实模型烟测，可在服务端 `.e
 {"question":"请找出 RAG 检索质量评测的代表论文。","run_id":"8bf11a32-52a0-4f8e-a3f1-d7f5521748d1"}
 ```
 
-同一 `run_id` 重复提交返回 HTTP 409，避免重复触发调用。响应包含 run ID、总耗时、token 用量和脱敏模型/工具 trace；状态可通过 `GET /api/v1/agent/runs/{run_id}` 查询，取消可通过 `POST /api/v1/agent/runs/{run_id}/cancel` 请求。取消是协作式的，在当前模型/工具调用返回后生效，不能强制中断 provider 网络请求。SQLite 运行账本仅保存 run ID、问题 SHA-256、状态、用量/计数和脱敏 trace，不保存原始问题、回答、工具参数或论文摘录。遗留 `running` 状态在查询时标记为 `interrupted`，不会自动重放。模型与 embedding 使用同一累计观测 token 预算；provider 用量在调用完成后才可结算，因此单次在途调用可能使预算超出一次。上下文长度按字符近似，不等于 tokenizer token 额度。当前不持久化多轮问答正文，也不估算货币费用。
+同一 `run_id` 重复提交返回 HTTP 409，避免重复触发调用。响应包含 run ID、总耗时、token 用量和脱敏模型/工具 trace；状态可通过 `GET /api/v1/agent/runs/{run_id}` 查询，取消可通过 `POST /api/v1/agent/runs/{run_id}/cancel` 请求。取消是协作式的，在当前模型/工具调用返回后生效，不能强制中断 provider 网络请求。运行账本不保存原始问题、回答、工具参数或论文摘录；如请求带有用户 `conversation_id`，对话正文会单独保存到该用户会话表中，用户可清空或删除会话。遗留 `running` 状态在查询时标记为 `interrupted`，不会自动重放。模型与 embedding 使用同一累计观测 token 预算；provider 用量在调用完成后才可结算，因此单次在途调用可能使预算超出一次。上下文长度按字符近似，不等于 tokenizer token 额度。当前不估算货币费用。
 
-本地 MCP stdio Server 可用 `uv run --locked python -m app.mcp_server` 启动。MCP 进程仅以 SQLite 引擎只读模式打开**已存在且已迁移**的数据库；首次初始化和 schema 升级需由 PaperTrail 后端完成。Host 配置应显式设置 `DATA_STORAGE_PATH`，不需要向 Host 传入 Agent/Embedding API key。Cursor Windows 配置范例及手工 smoke 步骤见 [R05 验收记录](research/R05-mcp-acceptance.md)。三个内置 Product Skills 由 Harness 按任务选择，并受固定工具白名单约束，见 [R06 验收记录](research/R06-skills-acceptance.md)。多 Agent 协调器仅用于受控实验，默认不接入生产 ask 路径；其当前框架范围和未完成的真实收益对照见 [R07 验收记录](research/R07-multi-agent-experiment.md)。
+本地 MCP stdio Server 可用 `uv run --locked python -m app.mcp_server` 启动。MCP 进程仅以 SQLite 引擎只读模式打开**已存在且已迁移**的数据库；首次初始化和 schema 升级需由 PaperTrail 后端完成。Host 配置应显式设置 `DATA_STORAGE_PATH`，不需要向 Host 传入 Agent/Embedding API key。Cursor Windows 配置范例及手工 smoke 步骤见 [R05 验收记录](research/R05-mcp-acceptance.md)。五个内置 Product Skills（问答、比较、综述、文稿修订、引用核验）由 Harness 确定性选择，并受固定工具白名单约束。文稿 Skills 只给修改建议，不会写回或保存用户文件。多 Agent 协调器仅用于受控实验，默认不接入生产 ask 路径；其当前框架范围和未完成的真实收益对照见 [R07 验收记录](research/R07-multi-agent-experiment.md)。
+
+### 网页中的真实 Agent 烟测
+
+自动化测试使用假模型，不会验证真实模型回答。要从网页发起一次真实调用：
+
+1. 编辑仓库根目录 `.env`（保留已有设置），配置 `LLM_PROVIDER=openai`、自己的 `LLM_API_KEY`，以及账户当前可用且支持 Responses API 工具调用和结构化输出的 `LLM_MODEL`。密钥只放在服务端环境，不要发到聊天或填写在网页里。
+2. 按 [Docker Compose 本地部署](#docker-compose-本地部署) 重启服务；若手动启动后端，停止旧进程后再从 `backend/` 启动，并确保该进程读取到模型配置。Web 代理也必须指向这个后端。
+3. 登录持久化数据库中的账号。在“发现论文”里保存一篇论文的元数据；要验证全文证据，上传你有权处理的 PDF 并等待解析完成。“加入个人库”只保存元数据，不会自动下载 PDF。
+4. 打开“科研助手”，先问一个可由该论文明确回答的问题，再追问一次以检查会话上下文。检查答案、右侧证据片段、论文来源和页码；再问一个资料无法回答的细节，确认助手说明证据不足。
+5. 展开“运行记录与工程指标”，检查模型、工具调用和 token 用量。`AGENT_DAILY_USER_TOKEN_BUDGET` 是 token 限额，不是金额上限；费用上限需在模型提供方账户中设置。
+
+启用云端模型后，问题及检索到的论文摘录会发送给所配置的模型服务。只使用你有权分享给该服务的数据。当前禁用 LLM、点选示例问题或运行 E2E 测试都不会产生真实 Agent 回答；验收模型行为必须从启用模型的网页发起请求。
 
 ## arXiv 元数据（P08）
 
@@ -179,7 +193,7 @@ uv run --directory backend --frozen python -m app.cli.import_arxiv --query 'all:
 
 ## 许可全文导入与检索（P09 / P17）
 
-系统不会从网页下载论文。先在论文原始来源页面逐篇确认使用许可确实允许你的用途，再准备本地 UTF-8 `.txt` 或 PDF 文件和 JSON manifest。当前准入白名单仅为 `CC0-1.0` 与 `CC-BY-4.0`；`is_oa=true`、可免费阅读、仅有 DOI 或 arXiv 元数据 CC0 都不够。未知、NC、ND、SA 等许可不会入库。命令行确认不构成法律意见，也不代替你核对原始许可。
+系统不会从网页下载论文。先在论文原始来源页面逐篇确认使用许可确实允许你的用途，再准备本地 UTF-8 `.txt` 或 PDF 文件和 JSON manifest。当前准入白名单仅为 `CC0-1.0` 与 `CC-BY-4.0`；`is_oa=true`、可免费阅读、仅有 DOI 或 arXiv 元数据 CC0 都不够。未知、NC、ND、SA 等许可不会进入共享全文索引。命令行确认不构成法律意见，也不代替你核对原始许可。
 
 Manifest 示例（请用实际论文和许可证据替换示例值；不要将全文或真实个人信息提交到 Git）：
 
@@ -196,13 +210,33 @@ Manifest 示例（请用实际论文和许可证据替换示例值；不要将�
 }
 ```
 
-只有当你已从允许的来源合法取得文件并核对许可后才执行。文本输入必须是 `.txt` 且不超过 8 MB；PDF 输入上限 40 MB / 500 页。PDF 在本机用 pdfplumber 提取版面文本和表格，并记录页码、元素类型及区域；图表只检索作者原文图注，不生成推测性视觉描述，扫描 PDF/OCR 尚不支持。论文 ID 需要先导入本地元数据目录：
+只有当你已从允许的来源合法取得文件并核对许可后才执行。文本输入必须是 `.txt` 且不超过 8 MB；PDF 输入上限 40 MB / 500 页。PDF 默认由本机 MinerU 解析版面、表格、公式和图表，并保留页码/元素区域；图表不生成推测性视觉描述。首次使用前需安装并校验本地 MinerU 模型（见下节）。旧 pdfplumber 解析器可通过 `PAPERTRAIL_PDF_PARSER=pdfplumber` 显式选择。论文 ID 需要先导入本地元数据目录：
 
 ```powershell
 uv run --directory backend --frozen python -m app.cli.import_licensed_fulltext --manifest path/to/manifest.json --text path/to/paper.txt --confirm-license-reviewed
 # 或导入经许可审核的本地 PDF
 uv run --directory backend --frozen python -m app.cli.import_licensed_fulltext --manifest path/to/manifest.json --pdf path/to/paper.pdf --confirm-license-reviewed
 ```
+
+### MinerU 本机模型准备
+
+在 `backend/` 安装锁定的可选解析依赖；标准档使用本地 ONNX + llama.cpp 模型。模型目录在 `.gitignore` 中排除，不应提交模型或全文：
+
+```powershell
+uv sync --locked --extra pdf-mineru
+New-Item -ItemType Directory -Force .\data\mineru-models | Out-Null
+$env:MINERU_HOME = (Resolve-Path .\data\mineru-models).Path
+$env:MINERU_MODEL_SOURCE = "local"
+$env:MINERU_TELEMETRY_DISABLED = "1"
+uv run --locked mineru-kit models download --tier standard --small-backend onnx --vlm-engine llama-cpp --source huggingface
+uv run --locked mineru-kit models verify --tier standard --small-backend onnx --vlm-engine llama-cpp
+```
+
+首次模型下载需要网络并占用数 GB 磁盘；解析本身在本机执行。Docker 使用持久化 `papertrail-models` 卷，需在首次解析前将相同标准档模型下载到该卷；服务不会在请求时自动联网下载模型。`PAPERTRAIL_MINERU_TIER` 支持 `basic`、`standard`、`advanced`，仓库默认 standard。私有 PDF 解析在本机子进程执行，30 分钟超时，远程 VLM 配置会被拒绝；该子进程尚无操作系统级网络/内存隔离。MinerU 输出经过页数、字符数、bbox 与结构转换边界校验；跨布局人工盲审尚未完成，因此这次接入不代表解析质量已经全面证明。
+
+本机检查单篇 PDF 可运行 `uv run --locked python -m tools.evaluate_mineru_sample ../paper_test/<文件名>.pdf --tier standard`；命令只打印结构与耗时指标。加 `--save-review` 会将原文解析元素写入已忽略的 `backend/reports/live_eval/mineru/`，仅用于本机复核。五篇样本的探索性记录见 [MinerU 试验](research/mineru-five-paper-pilot-2026-11-06.md)。若 Hugging Face 大模型下载停滞，可用同一 `MINERU_HOME` 运行 `uv run --locked mineru-kit models download MinerU2.5-Pro-2605-1.2B-GGUF --source modelscope` 后重新执行 `models verify`。
+
+目前真实样本抽查发现 MinerU 的表格单元格有错列，图注有错配和 OCR 错字。私有 PDF 的图表片段会保留供本机复核，但 Agent 检索暂不将它们作为可引用证据；依赖图表细节的问题可能因此明确返回证据不足。旧适配器版本的私有文档会显示 `reindex_required`，用户可重试解析。请勿将解析片段数量理解为可引用图表数量。
 
 重复导入相同版本幂等；新内容产生新版本，只检索当前版本。查询许可证据：
 
@@ -274,3 +308,14 @@ uv run --locked python -m tools.export_openapi
 ```
 
 OpenAPI 契约输出到 `docs/openapi.json`；CI 会重新生成并检查提交版本没有差异。
+# 私有向量索引更新
+
+用户同意将正文发送至配置的 embedding 服务后，在 backend 目录运行：
+
+```powershell
+uv run --locked python -m tools.index_private_embeddings --user-id <账号UUID>
+```
+
+命令编码该账号缺失或文本已变化的可检索正文块，会产生 embedding 用量；不包含待验证图表。
+新上传或重新解析后需再次运行。已索引块在 Agent 请求 hybrid 时使用 BM25 与向量召回的 RRF 融合；无可用向量时退回 BM25，返回的 retrieval_method 表明实际方法。
+向量按账号、模型、维度和块文本哈希过滤；删除文档会级联删除向量。

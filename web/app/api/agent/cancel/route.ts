@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import {
   backendRequest,
   invalidResponse,
@@ -26,10 +27,16 @@ export async function POST(request: NextRequest) {
     return invalidResponse("任务标识无效。");
   }
   try {
+    const session = (await cookies()).get("papertrail_session")?.value;
     return await jsonResponse(
       await backendRequest(
         `/api/v1/agent/runs/${encodeURIComponent((body as { run_id: string }).run_id)}/cancel`,
-        { method: "POST" },
+        {
+          method: "POST",
+          headers: session
+            ? { Cookie: `papertrail_session=${encodeURIComponent(session)}` }
+            : {},
+        },
       ),
     );
   } catch {

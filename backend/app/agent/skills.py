@@ -77,7 +77,7 @@ class SkillLoadError(RuntimeError):
 _DEFINITIONS: tuple[SkillDefinition, ...] = (
     SkillDefinition(
         skill_id="paper-qa",
-        version="1.0.0",
+        version="1.1.0",
         description="Answer a focused research question from traceable paper evidence.",
         filename="paper-qa.SKILL.md",
         triggers=("paper-qa", "论文问答", "论文问题", "研究问题", "paper question"),
@@ -88,20 +88,20 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_arxiv_metadata",
             "get_arxiv_metadata",
         ),
-        content_sha256="1eacc79e1a5caa97eb1fd9e32117d57d280f4665a9ce438c2af8d5cc8d84e160",
+        content_sha256="72bafae6e84c6543fc38ff9d766f05a2c6d1dfc61c3d909011ffbdb4f052856b",
     ),
     SkillDefinition(
         skill_id="compare-papers",
-        version="1.0.0",
+        version="1.1.0",
         description="Compare selected papers while keeping metadata and findings distinct.",
         filename="compare-papers.SKILL.md",
         triggers=("compare-papers", "比较论文", "对比论文", "论文异同", "compare papers"),
         recommended_tools=("compare_papers", "get_paper_details", "retrieve_paper_evidence"),
-        content_sha256="23956415131a859928e9b4efc3e81d9c265df26e3b2f130c1c194085927b2d10",
+        content_sha256="ef02de92e0812208ca7e2a7139f9cf1e7965f7881b21bb1069e59921aad05337",
     ),
     SkillDefinition(
         skill_id="research-brief",
-        version="1.0.0",
+        version="1.1.0",
         description="Create a concise, evidence-linked research brief or literature overview.",
         filename="research-brief.SKILL.md",
         triggers=("research-brief", "研究简报", "文献综述", "研究综述", "literature review"),
@@ -113,7 +113,29 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_openalex_works",
             "search_arxiv_metadata",
         ),
-        content_sha256="0d504fc8a996a8c1dc69307347f55a26a39ea4bf41924efda103d929d2cfdb61",
+        content_sha256="766c4cb339e5c5cc2e6e408a5bd8f94cac064b0c13e67b7e3f55dbec9ebf5fce",
+    ),
+    SkillDefinition(
+        skill_id="draft-revision",
+        version="1.1.0",
+        description=(
+            "Revise research prose while preserving meaning and separating edits from evidence."
+        ),
+        filename="draft-revision.SKILL.md",
+        triggers=("draft-revision", "修改论文", "润色论文", "改写论文", "revise my draft"),
+        recommended_tools=("retrieve_paper_evidence", "search_papers", "get_paper_details"),
+        content_sha256="bff82dabadd46382f12ed6637827074c61edfbe541567479cf72dd96f14cf00f",
+    ),
+    SkillDefinition(
+        skill_id="citation-check",
+        version="1.1.0",
+        description=(
+            "Check whether citations and nearby claims are supported by retrieved paper evidence."
+        ),
+        filename="citation-check.SKILL.md",
+        triggers=("citation-check", "核验引用", "检查引用", "引用是否支持", "check citations"),
+        recommended_tools=("retrieve_paper_evidence", "search_papers", "get_paper_details"),
+        content_sha256="2ffd46a89fc5b97055076c5f2a499169128e8c819ee03187fc99011ece4cc900",
     ),
 )
 
@@ -148,6 +170,14 @@ _COMPARE_PATTERNS = re.compile(
 )
 _BRIEF_PATTERNS = re.compile(
     r"文献综述|研究综述|研究简报|综述|literature\s+review|research\s+brief", re.IGNORECASE
+)
+_CITATION_PATTERNS = re.compile(
+    r"核验引用|检查引用|引用是否支持|引用核查|citation[- ]check|check citations?",
+    re.IGNORECASE,
+)
+_REVISION_PATTERNS = re.compile(
+    r"修改论文|润色论文|改写论文|修改这段|润色这段|改写这段|revise my draft|proofread",
+    re.IGNORECASE,
 )
 
 
@@ -232,6 +262,10 @@ def prepare_skill(task_text: str, *, requested_skill: str | None = None) -> Load
 
 def _select_from_text(task_text: str) -> tuple[SkillDefinition, str]:
     normalized = task_text.strip().casefold()
+    if _CITATION_PATTERNS.search(normalized):
+        return SKILL_REGISTRY["citation-check"], "matched_citation_check_cue"
+    if _REVISION_PATTERNS.search(normalized):
+        return SKILL_REGISTRY["draft-revision"], "matched_draft_revision_cue"
     if _BRIEF_PATTERNS.search(normalized):
         return SKILL_REGISTRY["research-brief"], "matched_research_brief_cue"
     if _COMPARE_PATTERNS.search(normalized):

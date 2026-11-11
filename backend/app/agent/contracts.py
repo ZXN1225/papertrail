@@ -15,12 +15,13 @@ class StrictModel(BaseModel):
 
 class AgentTurn(StrictModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=4_000)
+    content: str = Field(min_length=1, max_length=20_000)
 
 
 class AgentQuestion(StrictModel):
     question: str = Field(min_length=3, max_length=1_000)
     run_id: UUID | None = None
+    conversation_id: UUID | None = None
     history: list[AgentTurn] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode="after")
@@ -80,13 +81,15 @@ class GetArxivArgs(StrictModel):
 class RetrieveEvidenceArgs(StrictModel):
     query: str = Field(min_length=1, max_length=256)
     limit: int = Field(ge=1, le=8)
-    source_type: Literal["openalex", "arxiv"] | None = None
+    source_type: Literal["openalex", "arxiv", "personal"] | None = None
     source_id: str | None = Field(default=None, min_length=4, max_length=64)
     retrieval_method: Literal["bm25", "dense", "hybrid"] = "bm25"
 
     @model_validator(mode="after")
     def validate_optional_source(self) -> RetrieveEvidenceArgs:
-        if (self.source_type is None) != (self.source_id is None):
+        if self.source_type is None and self.source_id is not None:
+            raise ValueError("source_type and source_id must be supplied together")
+        if self.source_type in {"openalex", "arxiv"} and self.source_id is None:
             raise ValueError("source_type and source_id must be supplied together")
         if self.source_type == "openalex" and not re.fullmatch(r"W\d+", self.source_id or ""):
             raise ValueError("invalid OpenAlex source ID")
@@ -94,6 +97,8 @@ class RetrieveEvidenceArgs(StrictModel):
             from app.sources.arxiv import normalize_arxiv_id
 
             normalize_arxiv_id(self.source_id or "")
+        if self.source_type == "personal" and self.source_id is not None:
+            UUID(self.source_id)
         return self
 
 
@@ -114,6 +119,7 @@ class FinalAnswer(StrictModel):
     answer: str = Field(max_length=4_000)
     cited_openalex_ids: list[str] = Field(max_length=10)
     cited_arxiv_ids: list[str] = Field(default_factory=list, max_length=10)
+    cited_personal_ids: list[str] = Field(default_factory=list, max_length=10)
     claims: list[Claim] = Field(default_factory=list, max_length=30)
     insufficient_evidence: bool
 
@@ -136,6 +142,14 @@ class FinalAnswer(StrictModel):
             raise ValueError("arXiv citations must be unique canonical IDs")
         return normalized
 
+    @field_validator("cited_personal_ids")
+    @classmethod
+    def validate_personal_citations(cls, values: list[str]) -> list[str]:
+        normalized = [str(UUID(item)) for item in values]
+        if len(set(normalized)) != len(values) or normalized != values:
+            raise ValueError("personal citations must be unique canonical UUIDs")
+        return values
+
 
 class EvidenceSpan(StrictModel):
     chunk_id: str = Field(max_length=180)
@@ -157,22 +171,35 @@ class Claim(StrictModel):
 
 
 class Citation(StrictModel):
-    source: Literal["openalex", "arxiv"] = "openalex"
+    source: Literal["openalex", "arxiv", "personal"] = "openalex"
     openalex_id: str | None = None
     arxiv_id: str | None = None
+    personal_id: str | None = None
     title: str
     source_url: str
     license_id: str | None = None
     license_url: str | None = None
     attribution: str | None = None
+    private_processing: bool = False
     evidence: list[EvidenceSpan] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode="after")
     def require_matching_source_identifier(self) -> Citation:
-        if self.source == "openalex" and (not self.openalex_id or self.arxiv_id):
+        if self.source == "openalex" and (
+            not self.openalex_id or self.arxiv_id or self.personal_id
+        ):
             raise ValueError("OpenAlex citation must contain only an OpenAlex ID")
-        if self.source == "arxiv" and (not self.arxiv_id or self.openalex_id):
+        if self.source == "arxiv" and (not self.arxiv_id or self.openalex_id or self.personal_id):
             raise ValueError("arXiv citation must contain only an arXiv ID")
+        if self.source == "personal":
+            if self.openalex_id or self.arxiv_id or not self.personal_id:
+                raise ValueError("personal citation must contain only a personal ID")
+            if (
+                str(UUID(self.personal_id)) != self.personal_id
+                or self.source_url != ""
+                or not self.private_processing
+            ):
+                raise ValueError("personal citation requires private UUID and no public URL")
         return self
 
 
@@ -182,7 +209,7 @@ class AgentTraceEvent(StrictModel):
     sequence: int = Field(ge=1)
     kind: Literal["model", "tool"]
     name: str = Field(max_length=80)
-    status: Literal["ok", "error", "refusal"]
+    status: Literal["ok", "error", "refusal", "no_results", "incomplete"]
     duration_ms: int = Field(ge=0)
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
@@ -191,6 +218,19 @@ class AgentTraceEvent(StrictModel):
 class AgentTaskStatus(StrictModel):
     run_id: UUID
     status: Literal["running", "completed", "failed", "cancelled", "interrupted"]
+    phase: Literal[
+        "accepted",
+        "executing",
+        "cancel_requested",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted",
+    ]
+    cancel_requested_at: str | None = None
+    token_budget: int = Field(ge=0)
+    token_reserved: int = Field(ge=0)
+    token_actual: int = Field(ge=0)
     result_status: str | None = None
     question_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     history_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -215,9 +255,15 @@ class SkillUsage(StrictModel):
     registry_version: str = Field(max_length=32)
     registry_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     selection_reason: str = Field(max_length=120)
+    task_id: str = Field(pattern=r"^[a-z0-9-]{1,64}$")
+    task_registry_version: str = Field(max_length=32)
+    task_registry_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workflow: list[str] = Field(min_length=1, max_length=8)
+    prompt_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class AgentResponse(StrictModel):
+    context_state: dict = Field(default_factory=dict)
     status: Literal[
         "completed",
         "insufficient_evidence",
@@ -225,6 +271,7 @@ class AgentResponse(StrictModel):
         "unverified_evidence",
         "max_steps_exceeded",
         "tool_budget_exceeded",
+        "workflow_incomplete",
         "token_budget_exceeded",
         "context_budget_exceeded",
         "cancelled",

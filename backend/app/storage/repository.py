@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,10 @@ MAX_ACTIVE_FULLTEXT_CHUNKS = 50_000
 
 class StoreError(RuntimeError):
     """Safe local storage error."""
+
+
+class DailyAgentTokenBudgetExceeded(StoreError):
+    """The owner's UTC-day token budget cannot reserve another run."""
 
 
 class UnsupportedSchemaVersion(StoreError):
@@ -128,7 +132,10 @@ class PaperStore:
                         "database migration checksum does not match code"
                     )
                 continue
-            rebuild_snapshot_table = migration_path.name == "0005_openalex_page_size.sql"
+            rebuild_snapshot_table = migration_path.name in {
+                "0005_openalex_page_size.sql",
+                "0017_personal_documents.sql",
+            }
             try:
                 if rebuild_snapshot_table:
                     connection.execute("PRAGMA foreign_keys = OFF")
@@ -139,6 +146,10 @@ class PaperStore:
                     (index, migration_path.stem, checksum, _now()),
                 )
                 connection.execute(f"PRAGMA user_version = {index}")
+                if rebuild_snapshot_table:
+                    violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+                    if violations:
+                        raise StoreError("migration left invalid foreign keys")
                 connection.commit()
             except Exception:
                 connection.rollback()
@@ -158,31 +169,92 @@ class PaperStore:
         run_id: str,
         question: str,
         prior_turns: Sequence[tuple[str, str]] = (),
+        user_id: str | None = None,
+        worker_id: str | None = None,
+        token_budget: int = 0,
+        harness_metadata: dict[str, Any] | None = None,
+        daily_token_budget: int = 0,
     ) -> bool:
         """Persist request and history digests only; never store prompt text or answers."""
+        if token_budget < 0 or daily_token_budget < 0:
+            raise ValueError("token budgets must be nonnegative")
+        if daily_token_budget > 0 and token_budget == 0:
+            raise ValueError("daily token budgets require a positive run reservation")
         question_sha256 = hashlib.sha256(question.encode("utf-8")).hexdigest()
         history_payload = json.dumps(list(prior_turns), ensure_ascii=False, separators=(",", ":"))
         history_sha256 = hashlib.sha256(history_payload.encode("utf-8")).hexdigest()
         now = _now()
+        lease_expires_at = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
+        harness_metadata_json = json.dumps(
+            harness_metadata or {}, ensure_ascii=False, separators=(",", ":")
+        )
         with self._connection() as connection:
             self._ensure_schema(connection)
+            if user_id is not None and daily_token_budget > 0:
+                connection.execute("BEGIN IMMEDIATE")
+                existing_run = connection.execute(
+                    "SELECT 1 FROM agent_runs WHERE run_id = ?", (run_id,)
+                ).fetchone()
+                if existing_run is not None:
+                    return False
+                day_start = (
+                    datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+                )
+                row = connection.execute(
+                    """SELECT COALESCE(SUM(
+                        CASE
+                            WHEN status = 'running' AND token_budget > 0 THEN token_budget
+                            WHEN status = 'running' THEN token_actual + token_reserved
+                            WHEN token_reserved > 0 THEN token_actual + token_reserved
+                            ELSE token_actual
+                        END
+                    ), 0) AS used_tokens FROM agent_runs
+                    WHERE user_id = ? AND created_at >= ?""",
+                    (user_id, day_start),
+                ).fetchone()
+                used_tokens = int(row["used_tokens"])
+                if used_tokens + token_budget > daily_token_budget:
+                    raise DailyAgentTokenBudgetExceeded("daily_agent_token_budget_exceeded")
             try:
                 connection.execute(
                     """INSERT INTO agent_runs (
-                        run_id, question_sha256, history_sha256, status, created_at, updated_at
+                        run_id, question_sha256, history_sha256, status, created_at,
+                        updated_at, user_id, phase, worker_id, lease_expires_at,
+                        token_budget, heartbeat_at, harness_metadata_json
                     )
-                    VALUES (?, ?, ?, 'running', ?, ?)""",
-                    (run_id, question_sha256, history_sha256, now, now),
+                    VALUES (?, ?, ?, 'running', ?, ?, ?, 'accepted', ?, ?, ?, ?, ?)""",
+                    (
+                        run_id,
+                        question_sha256,
+                        history_sha256,
+                        now,
+                        now,
+                        user_id,
+                        worker_id,
+                        lease_expires_at,
+                        token_budget,
+                        now,
+                        harness_metadata_json,
+                    ),
                 )
             except sqlite3.IntegrityError:
                 return False
         return True
 
-    def finish_agent_run(self, run_id: str, response: Any) -> None:
+    def finish_agent_run(
+        self,
+        run_id: str,
+        response: Any,
+        *,
+        model_id: str | None = None,
+        pdf_parser_adapter: str | None = None,
+        pdf_chunker_version: str | None = None,
+    ) -> None:
         """Store redacted status/usage/trace metadata, excluding answer and evidence text."""
         failed_statuses = {
             "max_steps_exceeded",
             "tool_budget_exceeded",
+            "workflow_incomplete",
             "token_budget_exceeded",
             "context_budget_exceeded",
             "deadline_exceeded",
@@ -203,16 +275,63 @@ class PaperStore:
             ensure_ascii=False,
             separators=(",", ":"),
         )
+        skill = response.skill
+        harness_metadata_json = json.dumps(
+            {
+                "model_id": model_id,
+                "runtime_version": response.context_state.get("runtime_version"),
+                "semantic_plan": response.context_state.get("plan"),
+                "runtime_skill": response.context_state.get("skill"),
+                "pdf_parser_adapter": pdf_parser_adapter,
+                "pdf_chunker_version": pdf_chunker_version,
+                "task_id": skill.task_id if skill else None,
+                "task_registry_version": skill.task_registry_version if skill else None,
+                "task_registry_sha256": skill.task_registry_sha256 if skill else None,
+                "workflow": skill.workflow if skill else None,
+                "skill_id": skill.skill_id if skill else None,
+                "skill_version": skill.version if skill else None,
+                "skill_instructions_sha256": skill.instructions_sha256 if skill else None,
+                "skill_registry_version": skill.registry_version if skill else None,
+                "skill_registry_sha256": skill.registry_sha256 if skill else None,
+                "prompt_sha256": skill.prompt_sha256 if skill else None,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         with self._connection() as connection:
             self._ensure_schema(connection)
+            existing = connection.execute(
+                "SELECT harness_metadata_json FROM agent_runs "
+                "WHERE run_id = ? AND status = 'running'",
+                (run_id,),
+            ).fetchone()
+            if existing is not None:
+                merged_metadata = json.loads(existing["harness_metadata_json"])
+                merged_metadata.update(
+                    {
+                        key: value
+                        for key, value in json.loads(harness_metadata_json).items()
+                        if value is not None
+                    }
+                )
+                harness_metadata_json = json.dumps(
+                    merged_metadata, ensure_ascii=False, separators=(",", ":")
+                )
             cursor = connection.execute(
-                """UPDATE agent_runs SET status = ?, result_status = ?, updated_at = ?,
+                """UPDATE agent_runs SET status = ?, phase = ?, result_status = ?, updated_at = ?,
+                token_reserved = CASE WHEN ? THEN token_reserved ELSE 0 END,
+                token_actual = ?, heartbeat_at = ?,
                 model_input_tokens = ?, model_output_tokens = ?, total_observed_tokens = ?,
-                tool_calls = ?, model_steps = ?, duration_ms = ?, trace_json = ?
+                tool_calls = ?, model_steps = ?, duration_ms = ?, trace_json = ?,
+                harness_metadata_json = ?
                 WHERE run_id = ? AND status = 'running'""",
                 (
                     state,
+                    state,
                     response.status,
+                    _now(),
+                    response.status in {"model_unavailable", "usage_unavailable"},
+                    response.total_observed_tokens,
                     _now(),
                     response.model_input_tokens,
                     response.model_output_tokens,
@@ -221,31 +340,149 @@ class PaperStore:
                     response.model_steps,
                     response.duration_ms,
                     trace_json,
+                    harness_metadata_json,
                     run_id,
                 ),
             )
             if cursor.rowcount != 1:
                 raise StoreError("agent run is missing or no longer active")
 
-    def get_agent_run(self, run_id: str) -> dict[str, Any] | None:
+    def update_agent_run_progress(
+        self,
+        run_id: str,
+        worker_id: str,
+        *,
+        token_reserved: int,
+        token_actual: int,
+        trace: Sequence[Any],
+    ) -> bool:
+        if token_reserved < 0 or token_actual < 0 or len(trace) > 32:
+            raise ValueError("invalid agent run progress")
+        trace_json = json.dumps(
+            [event.model_dump(mode="json") for event in trace],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        model_input = sum(event.input_tokens for event in trace if event.kind == "model")
+        model_output = sum(event.output_tokens for event in trace if event.kind == "model")
+        total_actual = sum(event.input_tokens + event.output_tokens for event in trace)
+        if token_actual != total_actual:
+            raise ValueError("agent run progress usage does not match its trace")
+        tool_calls = sum(event.kind == "tool" for event in trace)
+        model_steps = sum(event.kind == "model" for event in trace)
+        duration_ms = sum(event.duration_ms for event in trace)
+        now = _now()
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            cursor = connection.execute(
+                """UPDATE agent_runs SET token_reserved = ?, token_actual = ?,
+                heartbeat_at = ?, lease_expires_at = ?, updated_at = ?,
+                model_input_tokens = ?, model_output_tokens = ?, total_observed_tokens = ?,
+                tool_calls = ?, model_steps = ?, duration_ms = ?, trace_json = ?
+                WHERE run_id = ? AND worker_id = ? AND status = 'running'""",
+                (
+                    token_reserved,
+                    token_actual,
+                    now,
+                    _lease_expiry(),
+                    now,
+                    model_input,
+                    model_output,
+                    token_actual,
+                    tool_calls,
+                    model_steps,
+                    duration_ms,
+                    trace_json,
+                    run_id,
+                    worker_id,
+                ),
+            )
+            return cursor.rowcount == 1
+
+    def get_agent_run(self, run_id: str, user_id: str | None = None) -> dict[str, Any] | None:
         with self._connection() as connection:
             self._ensure_schema(connection)
             row = connection.execute(
-                "SELECT * FROM agent_runs WHERE run_id = ?", (run_id,)
+                "SELECT * FROM agent_runs WHERE run_id = ? AND (? IS NULL OR user_id = ?)",
+                (run_id, user_id, user_id),
             ).fetchone()
         if row is None:
             return None
         result = dict(row)
+        result.pop("user_id", None)
         result["trace"] = json.loads(result.pop("trace_json"))
+        result["harness_metadata"] = json.loads(result.pop("harness_metadata_json"))
         return result
 
-    def mark_agent_run_interrupted(self, run_id: str) -> bool:
+    def request_agent_run_cancel(self, run_id: str, user_id: str) -> bool:
+        """Persist cancellation intent for an owned, active run."""
         with self._connection() as connection:
             self._ensure_schema(connection)
             cursor = connection.execute(
-                """UPDATE agent_runs SET status = 'interrupted', result_status = 'interrupted',
-                updated_at = ? WHERE run_id = ? AND status = 'running'""",
-                (_now(), run_id),
+                """UPDATE agent_runs SET cancel_requested_at = COALESCE(cancel_requested_at, ?),
+                phase = 'cancel_requested',
+                updated_at = ? WHERE run_id = ? AND user_id = ? AND status = 'running'""",
+                (_now(), _now(), run_id, user_id),
+            )
+            return cursor.rowcount == 1
+
+    def set_agent_run_phase(self, run_id: str, phase: str) -> bool:
+        if phase not in {"executing"}:
+            raise ValueError("unsupported active agent run phase")
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            cursor = connection.execute(
+                """UPDATE agent_runs SET phase = ?, updated_at = ?, lease_expires_at = ?
+                WHERE run_id = ? AND status = 'running' AND cancel_requested_at IS NULL""",
+                (phase, _now(), _lease_expiry(), run_id),
+            )
+            return cursor.rowcount == 1
+
+    def renew_agent_run_lease(self, run_id: str, worker_id: str) -> bool:
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            cursor = connection.execute(
+                """UPDATE agent_runs SET lease_expires_at = ?
+                WHERE run_id = ? AND worker_id = ? AND status = 'running'""",
+                (_lease_expiry(), run_id, worker_id),
+            )
+            return cursor.rowcount == 1
+
+    def is_agent_run_lease_expired(self, run_id: str) -> bool:
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            row = connection.execute(
+                "SELECT lease_expires_at FROM agent_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        return bool(row and (row["lease_expires_at"] is None or row["lease_expires_at"] <= _now()))
+
+    def is_agent_run_cancel_requested(self, run_id: str) -> bool:
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            row = connection.execute(
+                "SELECT cancel_requested_at FROM agent_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        return bool(row and row["cancel_requested_at"])
+
+    def resolve_agent_run_stop(self, run_id: str, *, expired_only: bool = False) -> bool:
+        """Atomically resolve an active run to cancelled or interrupted."""
+        now = _now()
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            cursor = connection.execute(
+                """UPDATE agent_runs SET
+                status = CASE WHEN cancel_requested_at IS NULL
+                    THEN 'interrupted' ELSE 'cancelled' END,
+                phase = CASE WHEN cancel_requested_at IS NULL
+                    THEN 'interrupted' ELSE 'cancelled' END,
+                result_status = CASE WHEN cancel_requested_at IS NULL
+                    THEN 'interrupted' ELSE 'cancelled' END,
+                updated_at = ?
+                WHERE run_id = ? AND status = 'running'
+                AND (? = 0 OR lease_expires_at IS NULL OR lease_expires_at <= ?)""",
+                (now, run_id, expired_only, now),
             )
             return cursor.rowcount == 1
 
@@ -1678,3 +1915,7 @@ def _normalize_doi(value: str | None) -> str | None:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _lease_expiry() -> str:
+    return (datetime.now(UTC) + timedelta(seconds=30)).isoformat()

@@ -1,5 +1,7 @@
 # PaperTrail 项目规格
 
+2026-11-07 多用户迭代：当前产品范围与未完成门槛以 [总体方案](General_Plan.md)、[实施计划](IMPLEMENTATION_PLAN.md) 和 [进度](PROGRESS.md) 顶部为准。已加入账号隔离、双工作区、未发表“我的稿件”、私有 MinerU 索引及任务 Skills；登录态 Agent 证据检索使用本地 BM25，个人稿件引用不生成公开链接。以下早期阶段记录保留历史验收口径，不表示本轮图表解析质量已通过。
+
 2026-10-14 人审状态：用户已提供 17 项 v21 标签。复核确认总体观察合理，但 `2610.10204-S2` 的 `iron-phytolankton` 是原 PDF 拼写，不能计作解析缺陷；`2609.39773-S3` 是无解析元素的无效审核样本，排除 pass/fail 分母。v21 标签仅记录于对应包，不迁移到 parser v25。v25 仍需人工核对 16 项后再考虑活动索引升级。
 
 2026-10-14 R04 预算守卫补充：模型输入与 dense/hybrid embedding query 均在 provider 调用前按 UTF-8 字节保守上界预留；剩余额度限制模型输出，provider 回报 usage 超界后停止本轮。该上界不是精确 tokenizer 或账单硬限制。后端 327 项回归通过；测试环境使用捆绑 Python 和既有依赖目录，标准 uv 离线重建受本机缓存缺轮子阻塞。详见 [R04 验收记录](research/R04-agent-runs-acceptance.md)。

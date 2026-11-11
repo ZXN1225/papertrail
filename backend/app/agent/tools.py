@@ -23,7 +23,9 @@ from app.agent.contracts import (
     SearchPapersArgs,
 )
 from app.embeddings.client import EmbeddingError, EmbeddingProvider
+from app.private_documents import PrivateDocumentService
 from app.retrieval.bm25 import BM25Index
+from app.retrieval.vectors import reciprocal_rank_fusion
 from app.sources.arxiv import ArxivClient, ArxivError
 from app.sources.openalex import OpenAlexClient, OpenAlexError
 from app.storage.repository import PaperStore, StoreError
@@ -97,16 +99,29 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "type": "function",
         "name": "retrieve_paper_evidence",
         "description": (
-            "Search approved CC0/CC BY chunks by BM25, Dense or Hybrid. Dense/Hybrid require an "
-            "enabled embedding provider and a current vector index; returns cited excerpts."
+            "Search approved shared CC0/CC BY chunks and this signed-in user's attested private "
+            "PDFs. Signed-in private PDFs support BM25 plus indexed semantic vectors with RRF; "
+            "without an index they fall back to BM25. Shared results are merged by RRF. "
+            "Anonymous Dense/Hybrid require embeddings and a current vector index. "
+            "Private PDF table and figure chunks are excluded pending verification. "
+            "Returns excerpts with source locations."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {"type": "string", "minLength": 1, "maxLength": 256},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 8},
-                "source_type": {"type": ["string", "null"], "enum": ["openalex", "arxiv", None]},
-                "source_id": {"type": ["string", "null"], "minLength": 4, "maxLength": 64},
+                "source_type": {
+                    "type": ["string", "null"],
+                    "enum": ["openalex", "arxiv", "personal", None],
+                },
+                "source_id": {
+                    "type": ["string", "null"],
+                    "minLength": 4,
+                    "maxLength": 64,
+                    "description": "For personal papers use the exact observed document UUID. "
+                    "If unknown use null. Never put a paper title or the word all here.",
+                },
                 "retrieval_method": {"type": "string", "enum": ["bm25", "dense", "hybrid"]},
             },
             "required": ["query", "limit", "source_type", "source_id", "retrieval_method"],
@@ -124,11 +139,16 @@ class PaperToolRegistry:
         openalex: OpenAlexClient | None = None,
         arxiv: ArxivClient | None = None,
         embeddings: EmbeddingProvider | None = None,
+        user_id: str | None = None,
     ) -> None:
         self.store = store
         self.openalex = openalex
         self.arxiv = arxiv
         self.embeddings = embeddings
+        self.user_id = user_id
+        self.library_only = False
+        self.account_documents_only = False
+        self.document_target: tuple[str, str] | None = None
         self._handlers: dict[str, tuple[type, Callable[[Any], dict[str, Any]]]] = {
             "search_papers": (SearchPapersArgs, self._search),
             "get_paper_details": (GetPaperArgs, self._details),
@@ -180,9 +200,33 @@ class PaperToolRegistry:
             parsed = RetrieveEvidenceArgs.model_validate_json(arguments)
         except (ValidationError, ValueError):
             return 0
-        if parsed.retrieval_method == "bm25":
+        if self.user_id is not None:
+            return (
+                len(parsed.query.encode("utf-8")) + _EMBEDDING_TOKEN_OVERHEAD_BYTES
+                if parsed.retrieval_method != "bm25" and self._private_vectors_available()
+                else 0
+            )
+        if (
+            parsed.retrieval_method == "bm25"
+            or parsed.source_type == "personal"
+            or self.user_id is not None
+        ):
             return 0
         return len(parsed.query.encode("utf-8")) + _EMBEDDING_TOKEN_OVERHEAD_BYTES
+
+    def _private_vectors_available(self) -> bool:
+        model = getattr(self.embeddings, "model", None)
+        if not self.user_id or not model:
+            return False
+        with self.store._connection() as db:
+            return (
+                db.execute(
+                    "SELECT 1 FROM user_chunk_embeddings e JOIN user_document_chunks c "
+                    "ON c.chunk_id=e.chunk_id WHERE c.user_id=? AND e.model=? LIMIT 1",
+                    (self.user_id, model),
+                ).fetchone()
+                is not None
+            )
 
     def execute(
         self, name: str, arguments: str, *, allowed_names: frozenset[str] | None = None
@@ -195,7 +239,16 @@ class PaperToolRegistry:
         argument_model, handler = entry
         try:
             parsed = argument_model.model_validate_json(arguments)
-        except (ValidationError, ValueError):
+        except ValidationError as error:
+            return {
+                "status": "error",
+                "code": "invalid_arguments",
+                "fields": [
+                    {"field": ".".join(str(part) for part in entry["loc"]), "reason": entry["type"]}
+                    for entry in error.errors(include_input=False, include_context=False)
+                ],
+            }
+        except ValueError:
             return {"status": "error", "code": "invalid_arguments"}
         try:
             return handler(parsed)
@@ -282,10 +335,60 @@ class PaperToolRegistry:
         }
 
     def _retrieve_evidence(self, args: RetrieveEvidenceArgs) -> dict[str, Any]:
+        if self.library_only and args.source_type == "personal":
+            return {"status": "error", "code": "library_scope_requires_nonpersonal_source"}
+        if self.document_target:
+            source_type, source_id = self.document_target
+            if (
+                args.source_id is not None
+                and (args.source_type, args.source_id) != self.document_target
+            ):
+                return {"status": "error", "code": "document_target_mismatch"}
+            args = args.model_copy(update={"source_type": source_type, "source_id": source_id})
+        vector = None
+        model = None
+        tokens = 0
+        if args.retrieval_method != "bm25" and self._private_vectors_available():
+            try:
+                batch = self.embeddings.embed([args.query])
+            except EmbeddingError as error:
+                return {"status": "embedding_error", "code": error.code}
+            vector, model, tokens = batch.vectors[0], batch.model, batch.input_tokens
+        if self.library_only or self.account_documents_only:
+            if self.user_id is None:
+                return {"status": "no_results", "items": [], "scanned_chunks": 0}
+            result = PrivateDocumentService(self.store).search_evidence(
+                args.query,
+                user_id=self.user_id,
+                source_type=args.source_type,
+                source_id=args.source_id,
+                limit=args.limit,
+                query_vector=vector,
+                embedding_model=model,
+                library_only=self.library_only or args.source_type != "personal",
+            )
+            result["_embedding_input_tokens"] = tokens
+            return result
+        if args.source_type == "personal":
+            if self.user_id is None:
+                return {"status": "no_results", "items": [], "scanned_chunks": 0}
+            result = PrivateDocumentService(self.store).search_evidence(
+                args.query,
+                user_id=self.user_id,
+                source_type="personal",
+                source_id=args.source_id,
+                limit=args.limit,
+                query_vector=vector,
+                embedding_model=model,
+            )
+            result.setdefault("retrieval_method", "private_bm25")
+            result["_embedding_input_tokens"] = tokens
+            return result
+        retrieval_method = "bm25" if self.user_id is not None else args.retrieval_method
         query_embedding = None
         embedding_model = None
         embedding_input_tokens = 0
-        if args.retrieval_method != "bm25":
+        if retrieval_method != "bm25":
             if self.embeddings is None:
                 return {"status": "embedding_unavailable"}
             try:
@@ -300,12 +403,43 @@ class PaperToolRegistry:
             limit=args.limit,
             source_type=args.source_type,
             source_id=args.source_id,
-            retrieval_method=args.retrieval_method,
+            retrieval_method=retrieval_method,
             query_embedding=query_embedding,
             embedding_model=embedding_model,
         )
-        if args.retrieval_method != "bm25":
+        if self.user_id is not None:
+            private_result = PrivateDocumentService(self.store).search_evidence(
+                args.query,
+                user_id=self.user_id,
+                source_type=args.source_type,
+                source_id=args.source_id,
+                limit=args.limit,
+                query_vector=vector,
+                embedding_model=model,
+            )
+            private_items = private_result.get("items", [])
+            shared_items = result.get("items", [])
+            if private_items:
+                candidates = {item["chunk_id"]: item for item in [*shared_items, *private_items]}
+                fused = reciprocal_rank_fusion(
+                    [
+                        [item["chunk_id"] for item in shared_items],
+                        [item["chunk_id"] for item in private_items],
+                    ]
+                )
+                result["items"] = [candidates[chunk_id] for chunk_id, _ in fused[: args.limit]]
+                result["status"] = "ok"
+                result["scanned_chunks"] = int(result.get("scanned_chunks", 0)) + int(
+                    private_result.get("scanned_chunks", 0)
+                )
+                result["retrieval_method"] = (
+                    f"{result.get('retrieval_method', retrieval_method)}+"
+                    f"{private_result.get('retrieval_method', 'private_bm25')}_rrf"
+                )
+        if retrieval_method != "bm25":
             result["_embedding_input_tokens"] = embedding_input_tokens
+        elif tokens:
+            result["_embedding_input_tokens"] = tokens
         return result
 
     def _search_openalex_works(self, args: OpenAlexSearchArgs) -> dict[str, Any]:

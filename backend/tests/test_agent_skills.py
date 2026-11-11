@@ -15,8 +15,14 @@ from app.agent.skills import (
 )
 
 
-def test_registry_contains_only_the_three_product_skills() -> None:
-    assert set(SKILL_REGISTRY) == {"paper-qa", "compare-papers", "research-brief"}
+def test_registry_contains_the_five_product_skills() -> None:
+    assert set(SKILL_REGISTRY) == {
+        "paper-qa",
+        "compare-papers",
+        "research-brief",
+        "draft-revision",
+        "citation-check",
+    }
     with pytest.raises(TypeError):
         SKILL_REGISTRY["other"] = SKILL_REGISTRY["paper-qa"]  # type: ignore[index]
 
@@ -26,6 +32,8 @@ def test_registry_contains_only_the_three_product_skills() -> None:
     [
         ("请比较论文 A 和论文 B 的实验设置", "compare-papers", "matched_comparison_cue"),
         ("写一份该方向的文献综述", "research-brief", "matched_research_brief_cue"),
+        ("请帮我润色这段论文", "draft-revision", "matched_draft_revision_cue"),
+        ("请检查引用是否支持这些结论", "citation-check", "matched_citation_check_cue"),
         ("What is the main result of this paper?", "paper-qa", "default_focused_question"),
         ("paper-qa: explain the abstract", "paper-qa", "matched_skill_trigger:paper-qa"),
     ],
@@ -47,7 +55,10 @@ def test_explicit_skill_selection_wins_and_unknown_names_are_rejected() -> None:
         select_skill("question", requested_skill="../../arbitrary-file")
 
 
-@pytest.mark.parametrize("skill_id", ["paper-qa", "compare-papers", "research-brief"])
+@pytest.mark.parametrize(
+    "skill_id",
+    ["paper-qa", "compare-papers", "research-brief", "draft-revision", "citation-check"],
+)
 def test_loaded_skill_is_registry_pinned_and_reports_its_content_hash(skill_id: str) -> None:
     loaded = prepare_skill("ordinary question", requested_skill=skill_id)
     definition = SKILL_REGISTRY[skill_id]

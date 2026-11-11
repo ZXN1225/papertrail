@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import {
   backendRequest,
   invalidResponse,
@@ -16,8 +17,13 @@ export async function GET(
   const { run_id: runId } = await context.params;
   if (!UUID_PATTERN.test(runId)) return invalidResponse("任务标识无效。");
   try {
+    const session = (await cookies()).get("papertrail_session")?.value;
     return await jsonResponse(
-      await backendRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}`),
+      await backendRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}`, {
+        headers: session
+          ? { Cookie: `papertrail_session=${encodeURIComponent(session)}` }
+          : {},
+      }),
     );
   } catch {
     return unavailableResponse();

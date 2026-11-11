@@ -11,7 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --no-dev --no-install-project
+RUN uv sync --locked --extra pdf-mineru --no-dev --no-install-project
 
 FROM python-base AS runtime
 
@@ -20,13 +20,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app \
     APP_ENV=production \
-    DATA_STORAGE_PATH=/data/papertrail.sqlite3
+    DATA_STORAGE_PATH=/data/papertrail.sqlite3 \
+    MINERU_HOME=/models \
+    PAPERTRAIL_PDF_PARSER=mineru \
+    MINERU_MODEL_SOURCE=local
 
 WORKDIR /app
 RUN groupadd --system --gid 10001 papertrail \
     && useradd --system --uid 10001 --gid papertrail --home-dir /app papertrail \
-    && mkdir -p /data \
-    && chown papertrail:papertrail /data
+    && mkdir -p /data /models \
+    && chown papertrail:papertrail /data /models
 
 COPY --from=dependencies --chown=papertrail:papertrail /app/.venv /app/.venv
 COPY --chown=papertrail:papertrail app ./app

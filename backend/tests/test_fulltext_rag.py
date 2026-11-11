@@ -368,7 +368,7 @@ def test_pdf_ingest_keeps_parser_metadata_and_page_region_in_retrieved_evidence(
             ).fetchone()
         assert version["parser_version"] == "pdfplumber-layout-v1"
         assert version["source_document_sha256"] == "a" * 64
-        assert version["chunker_version"] == "pdf-element-structure-token-upper-bound-v4"
+        assert version["chunker_version"] == "pdf-element-structure-token-upper-bound-v5"
         with store._connection() as connection:
             assert connection.execute("SELECT COUNT(*) FROM fulltext_elements").fetchone()[0] == 1
     finally:

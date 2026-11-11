@@ -263,7 +263,7 @@ def _parse_atom(content: bytes, *, start: int) -> ArxivPage:
                     source_url=source_url,
                 )
             )
-        if page_size != len(entries) or len(entries) > 25:
+        if page_size < len(entries) or page_size > 25:
             raise ValueError
         return ArxivPage(
             total_results=total,

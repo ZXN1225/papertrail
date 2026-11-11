@@ -28,14 +28,16 @@ export type Evidence = {
 };
 
 export type Citation = {
-  source: "openalex" | "arxiv";
+  source: "openalex" | "arxiv" | "personal";
   openalex_id: string | null;
   arxiv_id: string | null;
+  personal_id?: string | null;
   title: string;
   source_url: string;
   license_id: string | null;
   license_url: string | null;
   attribution: string | null;
+  private_processing: boolean;
   evidence: Evidence[];
 };
 
@@ -58,6 +60,12 @@ export type AgentTurn = {
 };
 
 export type AgentResponse = {
+  context_state?: {
+    objective?: string;
+    summary?: string;
+    catalog?: Record<string, { title: string }>;
+    plan?: { intent: string; steps: { scope: string; query: string }[] };
+  };
   status: string;
   answer: string;
   citations: Citation[];

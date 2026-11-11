@@ -19,16 +19,19 @@ function apiBaseUrl(): string {
 export async function backendRequest(
   path: string,
   init?: RequestInit,
+  timeoutMs = 15_000,
 ): Promise<Response> {
   try {
+    const headers = new Headers(init?.headers);
+    if (!headers.has("Accept")) headers.set("Accept", "application/json");
     return await fetch(`${apiBaseUrl()}${path}`, {
       ...init,
       cache: "no-store",
       redirect: "error",
       signal: init?.signal
-        ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)])
-        : AbortSignal.timeout(15_000),
-      headers: { Accept: "application/json", ...init?.headers },
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs),
+      headers,
     });
   } catch {
     throw new Error("backend_unavailable");

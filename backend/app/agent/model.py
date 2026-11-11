@@ -32,18 +32,27 @@ FINAL_ANSWER_SCHEMA: dict[str, Any] = {
         "properties": {
             "answer": {
                 "type": "string",
+                "maxLength": 4000,
                 "description": "Exactly the claim texts joined by one newline, with no extras.",
             },
             "cited_openalex_ids": {
                 "type": "array",
+                "maxItems": 10,
                 "items": {"type": "string", "pattern": "^W[0-9]+$"},
             },
             "cited_arxiv_ids": {
                 "type": "array",
+                "maxItems": 10,
                 "items": {"type": "string", "minLength": 4, "maxLength": 64},
+            },
+            "cited_personal_ids": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {"type": "string", "minLength": 36, "maxLength": 36},
             },
             "claims": {
                 "type": "array",
+                "maxItems": 30,
                 "items": {
                     "type": "object",
                     "properties": {
@@ -105,6 +114,7 @@ FINAL_ANSWER_SCHEMA: dict[str, Any] = {
             "answer",
             "cited_openalex_ids",
             "cited_arxiv_ids",
+            "cited_personal_ids",
             "claims",
             "insufficient_evidence",
         ],
@@ -128,6 +138,8 @@ class ModelTurn:
     refusal: bool
     input_tokens: int
     output_tokens: int
+    incomplete: bool = False
+    incomplete_reason: str | None = None
 
 
 class ModelClient(Protocol):
@@ -149,6 +161,7 @@ def estimate_input_tokens_upper_bound(
     tools: list[dict[str, Any]],
     max_output_tokens: int,
     output_schema: dict[str, Any] | None = None,
+    reasoning_effort: str | None = None,
 ) -> int:
     """Return a conservative UTF-8 byte bound plus provider-envelope reserve."""
     request_shape = {
@@ -158,6 +171,8 @@ def estimate_input_tokens_upper_bound(
         "text": {"format": output_schema or FINAL_ANSWER_SCHEMA},
         "max_output_tokens": max_output_tokens,
     }
+    if reasoning_effort is not None:
+        request_shape["reasoning"] = {"effort": reasoning_effort}
     return len(json.dumps(request_shape, ensure_ascii=False).encode("utf-8")) + (
         _INPUT_TOKEN_OVERHEAD_BYTES
     )
@@ -165,6 +180,10 @@ def estimate_input_tokens_upper_bound(
 
 class ModelUnavailable(RuntimeError):
     """A safe, non-sensitive model provider error."""
+
+    def __init__(self, code: str = "provider_error") -> None:
+        super().__init__(code)
+        self.code = code
 
 
 class OpenAIResponsesClient:
@@ -181,6 +200,7 @@ class OpenAIResponsesClient:
         ):
             raise ValueError("OpenAI LLM provider is not configured")
         self.settings = settings
+        self.output_schema = FINAL_ANSWER_SCHEMA
         self._owns_client = http_client is None
         self.client = http_client or httpx.Client(
             timeout=httpx.Timeout(settings.llm_timeout_seconds),
@@ -212,10 +232,12 @@ class OpenAIResponsesClient:
             "tools": tools,
             "tool_choice": "auto" if tools else "none",
             "parallel_tool_calls": False,
-            "text": {"format": output_schema or FINAL_ANSWER_SCHEMA},
+            "text": {"format": output_schema or self.output_schema},
             "max_output_tokens": output_limit,
             "store": False,
         }
+        if self.settings.llm_reasoning_effort is not None:
+            payload["reasoning"] = {"effort": self.settings.llm_reasoning_effort}
         try:
             response = self.client.post(
                 API_URL,
@@ -225,10 +247,21 @@ class OpenAIResponsesClient:
                 },
                 json=payload,
             )
+        except httpx.TimeoutException as error:
+            raise ModelUnavailable("model_timeout") from error
         except httpx.HTTPError as error:
-            raise ModelUnavailable("OpenAI Responses API request failed.") from error
+            raise ModelUnavailable("model_connection_error") from error
         if response.status_code < 200 or response.status_code >= 300:
-            raise ModelUnavailable(f"OpenAI Responses API returned HTTP {response.status_code}.")
+            code = (
+                "model_auth_error"
+                if response.status_code in {401, 403}
+                else "model_rate_limited"
+                if response.status_code == 429
+                else "model_provider_error"
+                if response.status_code >= 500
+                else "model_request_rejected"
+            )
+            raise ModelUnavailable(code)
         try:
             body = response.json()
         except ValueError as error:
@@ -267,6 +300,10 @@ class OpenAIResponsesClient:
         if not _is_nonnegative_int(input_tokens) or not _is_nonnegative_int(output_tokens):
             raise ModelUnavailable("OpenAI Responses API returned invalid token usage.")
         final_text = _collapse_identical_complete_json("".join(final_fragments)) or None
+        incomplete_details = body.get("incomplete_details")
+        incomplete_reason = (
+            incomplete_details.get("reason") if isinstance(incomplete_details, dict) else None
+        )
         return ModelTurn(
             tool_calls=calls,
             continuation_items=[item for item in output_items if isinstance(item, dict)],
@@ -274,6 +311,12 @@ class OpenAIResponsesClient:
             refusal=refusal,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            incomplete=body.get("status") == "incomplete",
+            incomplete_reason=(
+                incomplete_reason
+                if incomplete_reason in {"max_output_tokens", "content_filter"}
+                else None
+            ),
         )
 
 

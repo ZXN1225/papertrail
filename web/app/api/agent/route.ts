@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import {
   backendRequest,
   invalidResponse,
@@ -43,7 +44,11 @@ export async function POST(request: NextRequest) {
     !(body as { question: string }).question.trim() ||
     (body as { question: string }).question.length > 1_000 ||
     Object.keys(body).some(
-      (key) => key !== "question" && key !== "run_id" && key !== "history",
+      (key) =>
+        key !== "question" &&
+        key !== "run_id" &&
+        key !== "history" &&
+        key !== "conversation_id",
     ) ||
     !isAgentHistory((body as { history?: unknown }).history) ||
     ((body as { run_id?: unknown }).run_id !== undefined &&
@@ -55,19 +60,36 @@ export async function POST(request: NextRequest) {
     return invalidResponse("问题或历史上下文格式不符合限制。");
   }
   try {
+    const jar = await cookies();
+    const session = jar.get("papertrail_session")?.value;
     return await jsonResponse(
-      await backendRequest("/api/v1/agent/ask", {
-        method: "POST",
-        signal: request.signal,
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          question: (body as { question: string }).question.trim(),
-          history: (body as { history?: AgentTurn[] }).history ?? [],
-          ...((body as { run_id?: string }).run_id
-            ? { run_id: (body as { run_id: string }).run_id }
-            : {}),
-        }),
-      }),
+      await backendRequest(
+        "/api/v1/agent/ask",
+        {
+          method: "POST",
+          signal: request.signal,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            ...(session
+              ? { Cookie: `papertrail_session=${encodeURIComponent(session)}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            question: (body as { question: string }).question.trim(),
+            history: (body as { history?: AgentTurn[] }).history ?? [],
+            ...((body as { run_id?: string }).run_id
+              ? { run_id: (body as { run_id: string }).run_id }
+              : {}),
+            ...((body as { conversation_id?: string }).conversation_id
+              ? {
+                  conversation_id: (body as { conversation_id: string })
+                    .conversation_id,
+                }
+              : {}),
+          }),
+        },
+        195_000,
+      ),
     );
   } catch {
     return unavailableResponse();
