@@ -136,9 +136,47 @@ def test_synthetic_fixture_scores_and_keeps_ai_labeling_visible() -> None:
     assert report["summary"]["evidence_hit_at_1"]["count"] == 0
     assert report["summary"]["evidence_hit_at_2"]["count"] == 1
     negative = next(row for row in report["tasks"] if not row["expected_answerable"])
-    assert negative["false_answer"] is True
+    assert negative["lexical_candidate_returned"] is True
     assert negative["top1_score"] == 9.5
     assert report["summary"]["top1_score_separability"]["answerable_mean"] == 9.5
+
+
+def test_multihop_measures_all_required_evidence_coverage() -> None:
+    dataset = _dataset()
+    task = dataset["tasks"][0]
+    task["challenge_type"] = "multi_hop"
+    task["question"] = "TEST which results list the study parameters?"
+    task["required_evidence"] = [
+        task["evidence"],
+        {
+            "source_id": "2608.20519",
+            "chunk_id": OTHER_CHUNK_ID,
+            "page_number": 13,
+            "element_type": "paragraph",
+            "quote": "TEST additional evidence anchor",
+        },
+    ]
+
+    report = run_evaluation(_ReadOnlyStore(), dataset, DATASET_SHA)
+
+    answerable = report["tasks"][0]
+    assert answerable["required_evidence_count"] == 2
+    assert answerable["required_evidence_retrieved_count"] == 1
+    assert answerable["complete_evidence_coverage"] is False
+    assert answerable["evidence_metrics"]["recall_at_k"] == 0.5
+    assert report["dataset"]["multi_hop_without_required_evidence"] == 0
+    assert report["summary"]["answerable_retrieval_metrics"]["complete_evidence_coverage"] == 0.0
+
+
+def test_multihop_without_required_evidence_is_reported_as_unmeasured() -> None:
+    dataset = _dataset()
+    dataset["tasks"][0]["challenge_type"] = "multi_hop"
+
+    report = run_evaluation(_ReadOnlyStore(), dataset, DATASET_SHA)
+
+    assert report["tasks"][0]["complete_evidence_coverage"] is None
+    assert report["dataset"]["multi_hop_without_required_evidence"] == 1
+    assert report["summary"]["answerable_retrieval_metrics"]["complete_evidence_denominator"] == 0
 
 
 def test_dataset_claiming_human_review_or_gold_status_is_rejected() -> None:
@@ -164,6 +202,11 @@ def test_unanswerable_task_with_evidence_or_without_absent_fact_is_rejected() ->
         validate_dataset(dataset)
 
     dataset = _dataset()
+    dataset["tasks"][1]["required_evidence"] = [dataset["tasks"][0]["evidence"]]
+    with pytest.raises(AiLabeledTaskError, match="must not carry evidence"):
+        validate_dataset(dataset)
+
+    dataset = _dataset()
     dataset["tasks"][1]["absent_fact"] = "   "
     with pytest.raises(AiLabeledTaskError):
         validate_dataset(dataset)
@@ -174,6 +217,35 @@ def test_evidence_anchor_from_a_foreign_source_is_rejected() -> None:
     dataset["tasks"][0]["evidence"]["source_id"] = "9999.99999"
 
     with pytest.raises(AiLabeledTaskError):
+        validate_dataset(dataset)
+
+
+def test_required_evidence_must_be_unique_and_include_primary_anchor() -> None:
+    dataset = _dataset()
+    task = dataset["tasks"][0]
+    task["required_evidence"] = [task["evidence"], task["evidence"]]
+    with pytest.raises(AiLabeledTaskError, match="unique"):
+        validate_dataset(dataset)
+
+    dataset = _dataset()
+    task = dataset["tasks"][0]
+    task["required_evidence"] = [
+        {
+            "source_id": "2608.20519",
+            "chunk_id": OTHER_CHUNK_ID,
+            "page_number": 13,
+            "element_type": "paragraph",
+            "quote": "TEST different anchor only",
+        },
+        {
+            "source_id": "2608.20519",
+            "chunk_id": f"arxiv:2608.20519:{CONTENT_SHA[:16]}:2",
+            "page_number": 15,
+            "element_type": "paragraph",
+            "quote": "TEST another anchor",
+        },
+    ]
+    with pytest.raises(AiLabeledTaskError, match="include the primary"):
         validate_dataset(dataset)
 
 
@@ -195,6 +267,20 @@ def test_partial_corpus_scan_is_rejected() -> None:
     store.search_fulltext_evidence = partial  # type: ignore[method-assign]
 
     with pytest.raises(AiLabeledTaskError, match="complete approved corpus"):
+        run_evaluation(store, _dataset(), DATASET_SHA)
+
+
+def test_non_finite_retrieval_scores_fail_closed() -> None:
+    store = _ReadOnlyStore()
+    original_search = store.search_fulltext_evidence
+
+    def non_finite_score(query: str, **kwargs):
+        response = original_search(query, **kwargs)
+        response["items"][0]["score"] = float("nan")
+        return response
+
+    store.search_fulltext_evidence = non_finite_score  # type: ignore[method-assign]
+    with pytest.raises(AiLabeledTaskError, match="non-finite score"):
         run_evaluation(store, _dataset(), DATASET_SHA)
 
 

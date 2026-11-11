@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 PR #26 检索评测更正
+
+- 修复共享 `MRR@k` 把 cutoff 后命中计分的问题；AI 任务评测新增多证据锚点、完整 evidence coverage、MRR/NDCG/precision/recall@k，并将未答题的词法候选计数改为不误导的名称。
+- 旧 multi-hop 题没有全证据 qrels 时明确报告“未测量”，不会补造标签；任务和报告仍标记 AI 标注、非金标、不可作通用质量声明。
+- 后端 513 passed，Ruff check/format、OpenAPI、pip-audit 通过；独立复核确认 MRR/多证据语义正确，NaN 和非法 cutoff 均失败关闭。待 PR #26 远程 CI；分支 `codex/rag-evaluation-v2` 堆叠在 PR #25 上，不合并 main。
+
 ## 2026-11-12 PR #23/#24 与 Agent workspace 批次
 
 - PR #23：弱监督候选与多口径 BM25 回放，修复 GitHub Actions apt DNS 脆弱点；backend、web/E2E、container 全通过，保持 draft。

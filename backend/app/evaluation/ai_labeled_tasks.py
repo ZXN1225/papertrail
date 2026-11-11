@@ -7,8 +7,8 @@ standing, so an AI-labeled set can never be reported as human-verified quality.
 It measures, deterministically and with zero provider calls:
 
 * **evidence grounding** — for an answerable task, does BM25 over the whole approved
-  corpus put the labeled evidence chunk inside the top-k? The reference chunk and its
-  page/element type were verified against the database when the dataset was built.
+  corpus retrieve its evidence anchors? Multi-hop tasks can declare all required chunks;
+  older tasks without them are explicitly reported as unmeasured for complete coverage.
 * **negative-task behaviour** — for a task the corpus cannot answer, how much lexical
   material does the retriever still surface? Reported as diagnostics, never as a
   quality claim.
@@ -18,20 +18,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import platform
 import re
 import statistics
 from pathlib import Path
 from typing import Any
 
+from app.evaluation.metrics import score_query
 from app.retrieval.tokenizer import TOKENIZER_VERSION
 from app.storage.repository import PaperStore
 
-REPORT_SCHEMA = "papertrail.ai-labeled-tasks-report.v1"
+REPORT_SCHEMA = "papertrail.ai-labeled-tasks-report.v2"
 DATASET_SCHEMA = "papertrail.ai-labeled-tasks.v1"
 LABEL_SOURCE = "ai_agent_review"
 TEST_LABEL_SOURCE = "test_fixture"
-SCORING_VERSION = "bm25-fulltext-evidence-top-k-v1"
+SCORING_VERSION = "bm25-fulltext-evidence-top-k-v2-multi-anchor"
 
 
 class AiLabeledTaskError(ValueError):
@@ -113,32 +115,52 @@ def validate_dataset(dataset: Any) -> None:
         seen.add(task_id)
         if task["expected_answerable"]:
             evidence = task.get("evidence")
-            if not isinstance(evidence, dict):
+            if not _valid_evidence_anchor(evidence, source_id):
                 raise AiLabeledTaskError("answerable tasks require an evidence anchor")
-            chunk_id = evidence.get("chunk_id")
-            if (
-                evidence.get("source_id") != source_id
-                or not isinstance(chunk_id, str)
-                or not chunk_id.startswith(f"arxiv:{source_id}:")
-                or type(evidence.get("page_number")) is not int
-                or evidence["page_number"] < 1
-                or not isinstance(evidence.get("element_type"), str)
-                or not evidence["element_type"]
-                or not isinstance(evidence.get("quote"), str)
-                or not evidence["quote"].strip()
-            ):
-                raise AiLabeledTaskError(
-                    "evidence anchor is incomplete or references another source"
-                )
+            required_evidence = task.get("required_evidence")
+            if required_evidence is not None:
+                if (
+                    not isinstance(required_evidence, list)
+                    or not 2 <= len(required_evidence) <= 8
+                    or any(
+                        not _valid_evidence_anchor(item, source_id) for item in required_evidence
+                    )
+                ):
+                    raise AiLabeledTaskError("required_evidence must contain 2-8 valid anchors")
+                anchor_ids = [item["chunk_id"] for item in required_evidence]
+                if (
+                    len(anchor_ids) != len(set(anchor_ids))
+                    or evidence["chunk_id"] not in anchor_ids
+                ):
+                    raise AiLabeledTaskError(
+                        "required_evidence anchors must be unique and include the primary anchor"
+                    )
         else:
-            if task.get("evidence") is not None:
-                raise AiLabeledTaskError("unanswerable tasks must not carry an evidence anchor")
+            if task.get("evidence") is not None or task.get("required_evidence") is not None:
+                raise AiLabeledTaskError("unanswerable tasks must not carry evidence anchors")
             if task.get("related_source_id") != source_id or not isinstance(
                 task.get("absent_fact"), str
             ):
                 raise AiLabeledTaskError("unanswerable tasks need a related source and absent fact")
             if task["absent_fact"].strip() == "":
                 raise AiLabeledTaskError("unanswerable tasks need a non-empty absent fact")
+
+
+def _valid_evidence_anchor(evidence: Any, source_id: str) -> bool:
+    if not isinstance(evidence, dict):
+        return False
+    chunk_id = evidence.get("chunk_id")
+    return (
+        evidence.get("source_id") == source_id
+        and isinstance(chunk_id, str)
+        and chunk_id.startswith(f"arxiv:{source_id}:")
+        and type(evidence.get("page_number")) is int
+        and evidence["page_number"] >= 1
+        and isinstance(evidence.get("element_type"), str)
+        and bool(evidence["element_type"])
+        and isinstance(evidence.get("quote"), str)
+        and bool(evidence["quote"].strip())
+    )
 
 
 def run_evaluation(
@@ -190,6 +212,8 @@ def run_evaluation(
         ):
             raise AiLabeledTaskError("retrieved evidence lineage differs from the dataset")
         scores = [float(item.get("score") or 0.0) for item in items]
+        if any(not math.isfinite(score) for score in scores):
+            raise AiLabeledTaskError("retrieval returned a non-finite score")
         row: dict[str, Any] = {
             "task_id": task["task_id"],
             "source_id": task["source_id"],
@@ -202,21 +226,55 @@ def run_evaluation(
         }
         if task["expected_answerable"]:
             reference_chunk_id = task["evidence"]["chunk_id"]
-            rank = next(
-                (
-                    index
-                    for index, item in enumerate(items, start=1)
-                    if item.get("chunk_id") == reference_chunk_id
-                ),
-                None,
+            required_evidence = task.get("required_evidence")
+            evidence_anchors = required_evidence or [task["evidence"]]
+            anchor_ids = {anchor["chunk_id"] for anchor in evidence_anchors}
+            retrieved_ids = {item.get("chunk_id") for item in items}
+            ranks = {
+                anchor_id: next(
+                    (
+                        index
+                        for index, item in enumerate(items, start=1)
+                        if item.get("chunk_id") == anchor_id
+                    ),
+                    None,
+                )
+                for anchor_id in anchor_ids
+            }
+            rank = ranks[reference_chunk_id]
+            anchor_metrics = score_query(
+                [item.get("chunk_id") for item in items],
+                {anchor_id: 1 for anchor_id in anchor_ids},
+                cutoffs=(1, top_k),
             )
             row["reference_chunk_id"] = reference_chunk_id
             row["evidence_rank"] = rank
             row["hit_at_1"] = rank == 1
             row["hit_at_k"] = rank is not None
+            row["required_evidence_count"] = (
+                len(anchor_ids)
+                if required_evidence is not None or task["challenge_type"] != "multi_hop"
+                else None
+            )
+            row["required_evidence_retrieved_count"] = (
+                sum(anchor_id in retrieved_ids for anchor_id in anchor_ids)
+                if row["required_evidence_count"] is not None
+                else None
+            )
+            row["complete_evidence_coverage"] = (
+                row["required_evidence_retrieved_count"] == row["required_evidence_count"]
+                if row["required_evidence_count"] is not None
+                else None
+            )
+            row["evidence_metrics"] = {
+                "mrr_at_k": anchor_metrics[f"mrr@{top_k}"],
+                "ndcg_at_k": anchor_metrics[f"ndcg@{top_k}"],
+                "precision_at_k": len(anchor_ids & retrieved_ids) / top_k,
+                "recall_at_k": len(anchor_ids & retrieved_ids) / len(anchor_ids),
+            }
         else:
             row["absent_fact"] = task["absent_fact"]
-            row["false_answer"] = bool(items)
+            row["lexical_candidate_returned"] = bool(items)
         task_rows.append(row)
 
     answerable = [row for row in task_rows if row["expected_answerable"]]
@@ -229,23 +287,54 @@ def run_evaluation(
     for row in task_rows:
         group = by_type.setdefault(
             row["challenge_type"],
-            {"task_count": 0, "answerable_count": 0, "hit_at_k": 0, "false_answer_count": 0},
+            {
+                "task_count": 0,
+                "answerable_count": 0,
+                "hit_at_k": 0,
+                "lexical_candidate_return_count": 0,
+                "mrr_at_k": [],
+                "ndcg_at_k": [],
+                "complete_evidence_count": 0,
+                "complete_evidence_denominator": 0,
+            },
         )
         group["task_count"] += 1
         if row["expected_answerable"]:
             group["answerable_count"] += 1
             group["hit_at_k"] += int(row["hit_at_k"])
+            group["mrr_at_k"].append(row["evidence_metrics"]["mrr_at_k"])
+            group["ndcg_at_k"].append(row["evidence_metrics"]["ndcg_at_k"])
+            if row["complete_evidence_coverage"] is not None:
+                group["complete_evidence_denominator"] += 1
+                group["complete_evidence_count"] += int(row["complete_evidence_coverage"])
         else:
-            group["false_answer_count"] += int(row["false_answer"])
+            group["lexical_candidate_return_count"] += int(row["lexical_candidate_returned"])
     for _name, group in by_type.items():
+        group["mrr_at_k_mean"] = statistics.fmean(group["mrr_at_k"]) if group["mrr_at_k"] else None
+        group["ndcg_at_k_mean"] = (
+            statistics.fmean(group["ndcg_at_k"]) if group["ndcg_at_k"] else None
+        )
+        group["complete_evidence_coverage_rate"] = (
+            group["complete_evidence_count"] / group["complete_evidence_denominator"]
+            if group["complete_evidence_denominator"]
+            else None
+        )
+        del group["mrr_at_k"], group["ndcg_at_k"]
         group["evidence_hit_at_k_rate"] = (
             group["hit_at_k"] / group["answerable_count"] if group["answerable_count"] else None
         )
-        group["false_answer_rate"] = (
-            group["false_answer_count"] / (group["task_count"] - group["answerable_count"])
+        group["lexical_candidate_return_rate"] = (
+            group["lexical_candidate_return_count"]
+            / (group["task_count"] - group["answerable_count"])
             if group["task_count"] - group["answerable_count"]
             else None
         )
+
+    known_coverage = [
+        row["complete_evidence_coverage"]
+        for row in answerable
+        if row["complete_evidence_coverage"] is not None
+    ]
 
     return {
         "report_schema": REPORT_SCHEMA,
@@ -265,6 +354,10 @@ def run_evaluation(
             "task_count": len(task_rows),
             "answerable_count": len(answerable),
             "unanswerable_count": len(negative),
+            "multi_hop_without_required_evidence": sum(
+                row["challenge_type"] == "multi_hop" and row["required_evidence_count"] is None
+                for row in answerable
+            ),
             "label_source": dataset["label_source"],
             "human_reviewed": False,
         },
@@ -293,12 +386,38 @@ def run_evaluation(
                 "rate": hit_at_k / len(answerable) if answerable else None,
             },
             "unanswerable_lexical_retrieval": {
-                "count": sum(1 for row in negative if row["lexical_candidate_count"] > 0),
+                "count": sum(1 for row in negative if row["lexical_candidate_returned"]),
                 "denominator": len(negative),
                 "meaning": (
                     "negative tasks for which the retriever still returned candidates; "
                     "diagnostic only, since abstention is not decided by BM25 alone"
                 ),
+            },
+            "answerable_retrieval_metrics": {
+                "mrr_at_k": statistics.fmean(
+                    row["evidence_metrics"]["mrr_at_k"] for row in answerable
+                )
+                if answerable
+                else None,
+                "ndcg_at_k": statistics.fmean(
+                    row["evidence_metrics"]["ndcg_at_k"] for row in answerable
+                )
+                if answerable
+                else None,
+                "precision_at_k": statistics.fmean(
+                    row["evidence_metrics"]["precision_at_k"] for row in answerable
+                )
+                if answerable
+                else None,
+                "recall_at_k": statistics.fmean(
+                    row["evidence_metrics"]["recall_at_k"] for row in answerable
+                )
+                if answerable
+                else None,
+                "complete_evidence_coverage": (
+                    statistics.fmean(known_coverage) if known_coverage else None
+                ),
+                "complete_evidence_denominator": len(known_coverage),
             },
             "top1_score_separability": {
                 "answerable_mean": (
