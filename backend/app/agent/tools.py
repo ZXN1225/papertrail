@@ -444,7 +444,7 @@ class PaperToolRegistry:
 
     def _search_openalex_works(self, args: OpenAlexSearchArgs) -> dict[str, Any]:
         assert self.openalex is not None
-        page = self.openalex.search_works(args.query, per_page=args.limit)
+        page = self.openalex.search_works(args.query, page=args.page, per_page=args.limit)
         items = [_openalex_work_observation(work) for work in page.results]
         return {
             "status": "ok" if items else "no_results",
@@ -484,7 +484,7 @@ class PaperToolRegistry:
 
     def _search_arxiv(self, args: SearchArxivArgs) -> dict[str, Any]:
         assert self.arxiv is not None
-        page = self.arxiv.search(args.query, max_results=args.limit)
+        page = self.arxiv.search(args.query, start=args.start, max_results=args.limit)
         return {
             "status": "ok" if page.works else "no_results",
             "items": [_arxiv_work_observation(work) for work in page.works],
@@ -568,6 +568,30 @@ def _search_tool(name: str, description: str) -> dict[str, Any]:
     }
 
 
+def _paged_search_tool(name: str, description: str, *, page_property: str) -> dict[str, Any]:
+    page_schema = (
+        {"type": "integer", "minimum": 1, "maximum": 1_000}
+        if page_property == "page"
+        else {"type": "integer", "minimum": 0, "maximum": 9_975}
+    )
+    return {
+        "type": "function",
+        "name": name,
+        "description": description,
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "minLength": 1, "maxLength": 256},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+                page_property: page_schema,
+            },
+            "required": ["query", "limit", page_property],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    }
+
+
 def _get_tool(name: str, description: str) -> dict[str, Any]:
     return {
         "type": "function",
@@ -618,7 +642,11 @@ def _author_works_tool() -> dict[str, Any]:
 
 TOOL_DEFINITIONS.extend(
     [
-        _search_tool("search_openalex_works", "Search live OpenAlex Works metadata; no full text."),
+        _paged_search_tool(
+            "search_openalex_works",
+            "Search a bounded page of live OpenAlex Works metadata; no full text.",
+            page_property="page",
+        ),
         _get_tool("get_openalex_work", "Read one live OpenAlex Work by ID."),
         _search_tool("search_openalex_authors", "Search live OpenAlex author metadata."),
         _get_author_tool(),
@@ -628,8 +656,10 @@ TOOL_DEFINITIONS.extend(
 
 TOOL_DEFINITIONS.extend(
     [
-        _search_tool(
-            "search_arxiv_metadata", "Search arXiv metadata only; never fetch paper files."
+        _paged_search_tool(
+            "search_arxiv_metadata",
+            "Search a bounded page of arXiv metadata only; never fetch paper files.",
+            page_property="start",
         ),
         {
             "type": "function",

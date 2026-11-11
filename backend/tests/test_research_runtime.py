@@ -7,6 +7,7 @@ from app.agent.model import ModelTurn
 from app.agent.research_runtime import (
     ResearchRuntime,
     _explicit_comparison_request,
+    _explicit_discovery_count,
     _explicit_multi_local_request,
     _negates_intent_cue,
 )
@@ -445,6 +446,295 @@ def test_discovery_renders_records_without_review(count, expected):
     assert result.model_steps == 1
     assert not result.claims
     assert len(result.citations) == count
+
+
+def test_discovery_paginates_requested_results_with_bounded_tool_calls():
+    class PagedModel:
+        output_schema = None
+
+        def complete(self, **kwargs):
+            return ModelTurn(
+                [],
+                [],
+                json.dumps(
+                    {
+                        "intent": "discover",
+                        "objective": "Find 25 papers",
+                        "clarification": "",
+                        "external_request_quote": "OpenAlex",
+                        "result_count": 25,
+                        "steps": [{"scope": "openalex", "documents": [], "query": "TEST"}],
+                    }
+                ),
+                False,
+                10,
+                10,
+            )
+
+    class PagedRegistry:
+        def __init__(self):
+            self.calls = []
+
+        def embedding_input_tokens_upper_bound(self, *args):
+            return 0
+
+        def execute(self, name, arguments, **kwargs):
+            args = json.loads(arguments)
+            self.calls.append(args)
+            start = (args["page"] - 1) * 10
+            return {
+                "status": "ok",
+                "items": [
+                    {
+                        "openalex_id": f"W{i}",
+                        "title": f"TEST paper {i}",
+                        "source_url": f"https://openalex.org/W{i}",
+                    }
+                    for i in range(start + 1, start + args["limit"] + 1)
+                ],
+            }
+
+    registry = PagedRegistry()
+    result = ResearchRuntime(Settings(_env_file=None), PagedModel(), registry).run(
+        "OpenAlex find 25 papers", [], [], {}
+    )
+    assert result.status == "completed"
+    assert [call["page"] for call in registry.calls] == [1, 2, 3]
+    assert [call["limit"] for call in registry.calls] == [10, 10, 5]
+    assert result.tool_calls == 3
+    assert len(result.citations) == 25
+    assert [event.name for event in result.trace if event.kind == "tool"] == [
+        "search_openalex_works"
+    ] * 3
+
+
+def test_discovery_page_failure_keeps_partial_results_incomplete():
+    class PartialModel:
+        output_schema = None
+
+        def complete(self, **kwargs):
+            return ModelTurn(
+                [],
+                [],
+                json.dumps(
+                    {
+                        "intent": "discover",
+                        "objective": "Find 25 papers",
+                        "clarification": "",
+                        "external_request_quote": "OpenAlex",
+                        "result_count": 25,
+                        "steps": [{"scope": "openalex", "documents": [], "query": "TEST"}],
+                    }
+                ),
+                False,
+                10,
+                10,
+            )
+
+    class PartialRegistry:
+        def __init__(self):
+            self.calls = 0
+
+        def embedding_input_tokens_upper_bound(self, *args):
+            return 0
+
+        def execute(self, name, arguments, **kwargs):
+            self.calls += 1
+            args = json.loads(arguments)
+            if args["page"] == 2:
+                return {"status": "error", "code": "openalex_unavailable"}
+            start = (args["page"] - 1) * 10
+            return {
+                "status": "ok",
+                "items": [
+                    {
+                        "openalex_id": f"W{i}",
+                        "title": f"TEST paper {i}",
+                        "source_url": f"https://openalex.org/W{i}",
+                    }
+                    for i in range(start + 1, start + args["limit"] + 1)
+                ],
+            }
+
+    registry = PartialRegistry()
+    result = ResearchRuntime(Settings(_env_file=None), PartialModel(), registry).run(
+        "OpenAlex find 25 papers", [], [], {}
+    )
+    assert result.status == "insufficient_evidence"
+    assert registry.calls == 3
+    assert len(result.citations) == 15
+    assert result.warnings == ["requested_source_unavailable"]
+
+
+def test_arxiv_discovery_uses_bounded_offsets_and_marks_empty_page_partial():
+    class ArxivModel:
+        output_schema = None
+
+        def complete(self, **kwargs):
+            return ModelTurn(
+                [],
+                [],
+                json.dumps(
+                    {
+                        "intent": "discover",
+                        "objective": "Find 12 papers",
+                        "clarification": "",
+                        "external_request_quote": "arXiv",
+                        "result_count": 12,
+                        "steps": [{"scope": "arxiv", "documents": [], "query": "TEST"}],
+                    }
+                ),
+                False,
+                10,
+                10,
+            )
+
+    class ArxivRegistry:
+        def __init__(self):
+            self.calls = []
+
+        def embedding_input_tokens_upper_bound(self, *args):
+            return 0
+
+        def execute(self, name, arguments, **kwargs):
+            args = json.loads(arguments)
+            self.calls.append(args)
+            if args["start"] == 10:
+                return {"status": "no_results", "items": []}
+            return {
+                "status": "ok",
+                "items": [
+                    {
+                        "arxiv_id": f"2601.{i:05}",
+                        "title": f"TEST paper {i}",
+                        "source_url": f"https://arxiv.org/abs/2601.{i:05}",
+                    }
+                    for i in range(10)
+                ],
+            }
+
+    registry = ArxivRegistry()
+    result = ResearchRuntime(Settings(_env_file=None), ArxivModel(), registry).run(
+        "Search arXiv for 12 papers", [], [], {}
+    )
+    assert result.status == "insufficient_evidence"
+    assert [call["start"] for call in registry.calls] == [0, 10]
+    assert [call["limit"] for call in registry.calls] == [10, 2]
+    assert len(result.citations) == 10
+    assert result.warnings == []
+
+
+def test_discovery_tool_budget_preserves_results_already_retrieved():
+    class BudgetModel:
+        output_schema = None
+
+        def complete(self, **kwargs):
+            return ModelTurn(
+                [],
+                [],
+                json.dumps(
+                    {
+                        "intent": "discover",
+                        "objective": "Find 25 papers",
+                        "clarification": "",
+                        "external_request_quote": "OpenAlex",
+                        "result_count": 25,
+                        "steps": [{"scope": "openalex", "documents": [], "query": "TEST"}],
+                    }
+                ),
+                False,
+                10,
+                10,
+            )
+
+    class BudgetRegistry:
+        def __init__(self):
+            self.calls = []
+
+        def embedding_input_tokens_upper_bound(self, *args):
+            return 0
+
+        def execute(self, name, arguments, **kwargs):
+            args = json.loads(arguments)
+            self.calls.append(args)
+            start = (args["page"] - 1) * 10
+            return {
+                "status": "ok",
+                "items": [
+                    {
+                        "openalex_id": f"W{i}",
+                        "title": f"TEST paper {i}",
+                        "source_url": f"https://openalex.org/W{i}",
+                    }
+                    for i in range(start + 1, start + args["limit"] + 1)
+                ],
+            }
+
+    registry = BudgetRegistry()
+    settings = Settings(_env_file=None, agent_max_tool_calls=2)
+    result = ResearchRuntime(settings, BudgetModel(), registry).run(
+        "OpenAlex find 25 papers", [], [], {}
+    )
+    assert result.status == "insufficient_evidence"
+    assert len(registry.calls) == result.tool_calls == 2
+    assert len(result.citations) == 20
+    assert result.warnings == ["discovery_tool_budget_exhausted"]
+    assert "已保留当前取得的结果" in result.answer
+
+
+def test_discovery_request_above_limit_is_not_reported_complete():
+    assert _explicit_discovery_count("请搜索30篇论文") == 30
+    assert _explicit_discovery_count("请搜索三十篇论文") == 30
+    assert _explicit_discovery_count("compare 2 papers") == 2
+
+    class LimitedModel:
+        output_schema = None
+
+        def complete(self, **kwargs):
+            return ModelTurn(
+                [],
+                [],
+                json.dumps(
+                    {
+                        "intent": "discover",
+                        "objective": "Find 25 papers",
+                        "clarification": "",
+                        "external_request_quote": "OpenAlex",
+                        "result_count": 25,
+                        "steps": [{"scope": "openalex", "documents": [], "query": "TEST"}],
+                    }
+                ),
+                False,
+                10,
+                10,
+            )
+
+    class LimitedRegistry:
+        def embedding_input_tokens_upper_bound(self, *args):
+            return 0
+
+        def execute(self, name, arguments, **kwargs):
+            args = json.loads(arguments)
+            start = (args["page"] - 1) * 10
+            return {
+                "status": "ok",
+                "items": [
+                    {
+                        "openalex_id": f"W{i}",
+                        "title": f"TEST paper {i}",
+                        "source_url": f"https://openalex.org/W{i}",
+                    }
+                    for i in range(start + 1, start + args["limit"] + 1)
+                ],
+            }
+
+    result = ResearchRuntime(Settings(_env_file=None), LimitedModel(), LimitedRegistry()).run(
+        "请使用 OpenAlex 搜索三十篇论文", [], [], {}
+    )
+    assert result.status == "insufficient_evidence"
+    assert len(result.citations) == 25
+    assert result.warnings == ["discovery_result_limit_reached"]
+    assert "单轮最多支持 25 条" in result.answer
 
 
 @pytest.mark.parametrize(

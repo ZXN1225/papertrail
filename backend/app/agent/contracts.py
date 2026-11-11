@@ -54,6 +54,7 @@ class RelatedPapersArgs(StrictModel):
 class OpenAlexSearchArgs(StrictModel):
     query: str = Field(min_length=1, max_length=256)
     limit: int = Field(ge=1, le=10)
+    page: int = Field(default=1, ge=1, le=1_000)
 
 
 class OpenAlexAuthorSearchArgs(StrictModel):
@@ -72,6 +73,7 @@ class AuthorWorksArgs(GetAuthorArgs):
 class SearchArxivArgs(StrictModel):
     query: str = Field(min_length=1, max_length=256)
     limit: int = Field(ge=1, le=10)
+    start: int = Field(default=0, ge=0, le=9_975)
 
 
 class GetArxivArgs(StrictModel):

@@ -1,9 +1,14 @@
 # 任务台账
 
-## 2026-11-12 PR #27 同题检索方法比较（进行中）
+## 2026-11-12 PR #28 公开发现有界分页（进行中）
+
+- OpenAlex/arXiv 发现支持每次最多 25 条结果，按不超过 10 条的页大小执行；每页消耗独立工具预算和 trace，精确 arXiv ID 不做无效分页。
+- 已验证 OpenAlex 多页合并、arXiv 空页、中页失败及工具预算耗尽；预算耗尽保留已检索记录并返回 `insufficient_evidence`。全后端、远端 Draft PR CI 和其它来源故障边界仍待完成。基于 PR #27 分支，不合并 main。
+
+## 2026-11-12 PR #27 同题检索方法比较（完成，Draft）
 
 - 扩展 AI 标注评测 CLI，同一题集支持 BM25/Dense/Hybrid；BM25 默认保持零 Provider 调用，Dense/Hybrid 必须显式确认查询数据外传并设置题数与费用预算，生成包含各方法指标及 embedding 用量的对比报告。
-- 先完成独立复核、全量检查，再提交基于 PR #26 的 Draft PR；不得合并 main。标签仍非人工金标，查询 embedding 会传给配置的 OpenAI 服务，实际检索质量/泛化能力未由本项证明。
+- 独立复核无 blocker；后端 521 passed，Ruff/OpenAPI/pip-audit 通过；GitHub backend/web Browser E2E/container CI 全绿。PR #27 基于 PR #26 分支，保持 Draft 且未合并 main。标签仍非人工金标，查询 embedding 会传给配置的 OpenAI 服务，实际检索质量/泛化能力未由本项证明。
 
 ## 2026-11-12 PR #26 检索评测更正
 

@@ -1,10 +1,16 @@
 # 进度
 
-## 2026-11-12 PR #27 同题 BM25/Dense/Hybrid 诊断（实现与验证中）
+## 2026-11-12 PR #28 公开发现有界分页（实现与验证中）
 
-- AI 标注任务评测 CLI 可选择 BM25、Dense、Hybrid 并对同一固定任务集逐方法运行；BM25 默认零 Provider 调用。Dense/Hybrid 在发送查询前要求 `--confirm-data-transfer`、覆盖全题集的 `--max-query-embeddings`、正数 `--max-cost-usd` 和已配置的 OpenAI embedding 价格；先用 UTF-8 字节数作 token 上界估算并在预计超预算时拒绝发送，报告记录实际 provider tokens/calls 与按配置单价计算的费用。
-- 结果通用化为检索候选指标，不把 Dense/Hybrid 候选称为词法候选；对比 envelope 与各方法报告仍显式标记 AI 标注、非金标、`quality_claim_allowed=false`。向量只在内存中用于当次评测，不写报告。
-- 当前全后端回归 521 passed；Ruff check/format、OpenAPI 导出、pip-audit 与 diff check 通过。独立只读复核无阻断项。若 embedding 批次在中途失败，提供方可能已处理失败批次但没有返回 usage；已成功批次的 usage 不会写入完整评测报告，CLI 会中止并提示失败，故费用上限是调用前上界门控而非对提供方账单的独立核验。人工复核中的跨论文多跳与真实检索质量仍未覆盖；Web 未改动，浏览器 E2E 与 PR CI 待完成。
+- 公开论文发现任务支持 OpenAlex 与 arXiv 有界分页，计划最多请求 25 条，每页至多 10 条；每页是独立白名单工具调用，按现有工具预算、trace、取消与超时策略执行。arXiv 精确 ID 查询不做无效翻页；若用户明确要求超过 25 条，返回上限内已取得结果但标为不完整并提示分批检索。
+- 用户要求数量未达到、任一页来源失败或仅部分来源可用时保留已取得的可追溯记录，但任务标为 `insufficient_evidence` 并提示部分结果；成功条件仍要求达到计划数且没有来源失败。
+- 新增 OpenAlex 完整三页、arXiv 空页、来源中页失败、工具预算耗尽后保留已取结果及超过最大结果数时不误报完成的 runtime 回归；后端 526 passed，Ruff/OpenAPI/pip-audit 与 diff check 通过。独立复核发现并修复了预算耗尽时早期结果被丢弃的问题；PR CI 待完成。
+
+## 2026-11-12 PR #27 同题 BM25/Dense/Hybrid 诊断
+
+- AI 标注任务评测 CLI 支持同题 BM25/Dense/Hybrid；BM25 默认零 Provider 调用。Dense/Hybrid 要求显式确认查询外传、完整题集 embedding 数预算与正费用上限，并在请求前以 UTF-8 字节数预估；报告区分 retrieval 与 embedding provider calls 和按配置单价计算的费用。
+- 对比及单方法报告保留 AI 标签、非金标和 `quality_claim_allowed=false` 限制，向量仅存内存。后端 521 passed，Ruff/OpenAPI/pip-audit 通过，独立复核无 blocker；PR #27 backend/web Browser E2E/container 均通过，Draft 堆叠于 PR #26、未合并。
+- 限制：批次中途 provider 失败时不一定返回已计费用量；费用上限是调用前估算门控，不是提供方账单核验。跨论文多跳仍未建模。
 
 ## 2026-11-12 检索评测指标与多证据覆盖
 

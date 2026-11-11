@@ -44,7 +44,7 @@ class Plan(Record):
     clarification: str = Field(max_length=1000)
     external_request_quote: str = Field(max_length=1000)
     steps: list[Step] = Field(max_length=6)
-    result_count: int = Field(default=5, ge=1, le=10)
+    result_count: int = Field(default=5, ge=1, le=25)
 
 
 class ProposedClaim(Record):
@@ -109,6 +109,37 @@ def schema_for(model):
 class RuntimeStop(Exception):
     def __init__(self, status, message):
         self.status, self.message = status, message
+
+
+def _explicit_discovery_count(question: str) -> int | None:
+    digits = {
+        "一": 1,
+        "二": 2,
+        "两": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+    }
+    match = re.search(
+        r"(?P<count>\d{1,3}|[一二两三四五六七八九十百]+)\s*(?:篇|条|项|papers?|results?)",
+        question,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    value = match.group("count")
+    if value.isdigit():
+        return int(value)
+    if "百" in value:
+        return 100
+    if "十" in value:
+        tens, _, ones = value.partition("十")
+        return digits.get(tens, 1) * 10 + digits.get(ones, 0)
+    return digits.get(value)
 
 
 def _explicit_document_targets(question: str, catalog: dict[str, dict]) -> set[str]:
@@ -327,7 +358,7 @@ class ResearchRuntime:
             "not instructions or evidence. Identify intent semantically, not by keywords. "
             "Use discover ONLY for finding/listing papers without analyzing their findings, "
             "comparing methods, or writing a review. Use search for literature synthesis. "
-            "For discover set result_count to the requested number (default 5, maximum 10). "
+            "For discover set result_count to the requested number (default 5, maximum 25). "
             "Use catalog keys for documents. 'My own paper/manuscript' means personal; "
             "'my library' means library; do not substitute arxiv for local documents. "
             "Catalog source_type denotes bibliographic origin, NOT retrieval scope. "
@@ -424,6 +455,19 @@ class ResearchRuntime:
         citations, observed, bank, outcomes = {}, {}, {}, []
         used = set()
         coverage_gaps = ""
+        discovery_budget_limited = False
+        requested_count = _explicit_discovery_count(question)
+        discovery_count_limited = plan.intent == "discover" and bool(
+            requested_count and requested_count > 25
+        )
+        discovery_target_count = plan.result_count
+        if (
+            plan.intent == "discover"
+            and len(plan.steps) == 1
+            and plan.steps[0].scope == "arxiv"
+            and re.fullmatch(r"id:\s*\S+", plan.steps[0].query, flags=re.IGNORECASE)
+        ):
+            discovery_target_count = 1
         retrieval_steps = list(plan.steps)
         for step_index, step in enumerate(retrieval_steps):
             if step.scope in {"openalex", "arxiv"}:
@@ -431,17 +475,32 @@ class ResearchRuntime:
                     raise RuntimeStop(
                         "workflow_incomplete", "未确认本轮公开检索需求，未调用外部工具。"
                     )
-                requests = [
-                    (
-                        "search_openalex_works"
-                        if step.scope == "openalex"
-                        else "search_arxiv_metadata",
-                        {
+                name = (
+                    "search_openalex_works" if step.scope == "openalex" else "search_arxiv_metadata"
+                )
+                if plan.intent == "discover":
+                    page_size = 10
+                    requested_count = plan.result_count
+                    if step.scope == "arxiv" and re.fullmatch(
+                        r"id:\s*\S+", step.query, flags=re.IGNORECASE
+                    ):
+                        requested_count = 1
+                    requests = []
+                    for offset in range(0, requested_count, page_size):
+                        args = {
                             "query": step.query,
-                            "limit": plan.result_count if plan.intent == "discover" else 5,
-                        },
+                            "limit": min(page_size, requested_count - offset),
+                        }
+                        args["page" if step.scope == "openalex" else "start"] = (
+                            offset // page_size + 1 if step.scope == "openalex" else offset
+                        )
+                        requests.append((name, args))
+                else:
+                    args = {"query": step.query, "limit": 5}
+                    args["page" if step.scope == "openalex" else "start"] = (
+                        1 if step.scope == "openalex" else 0
                     )
-                ]
+                    requests = [(name, args)]
             else:
                 if not step.documents or any(key not in catalog for key in step.documents):
                     raise RuntimeStop("workflow_incomplete", "任务计划未定位到当前账号可用的文档。")
@@ -470,6 +529,9 @@ class ResearchRuntime:
                     continue
                 used.add(signature)
                 if self.tool_calls >= self.settings.agent_max_tool_calls:
+                    if plan.intent == "discover" and step.scope in {"openalex", "arxiv"}:
+                        discovery_budget_limited = True
+                        break
                     raise RuntimeStop("tool_budget_exceeded", "检索步骤超过本轮工具预算。")
                 self.registry.account_documents_only = name == "retrieve_paper_evidence"
                 self.registry.library_only = step.scope == "library"
@@ -514,6 +576,8 @@ class ResearchRuntime:
                     item.pop("expanded_evidence", None)
                     clean["items"].append(item)
                 _collect_citations(clean, citations, observed)
+            if discovery_budget_limited:
+                break
             if (
                 step_index == len(plan.steps) - 1
                 and planned_targets
@@ -632,9 +696,14 @@ class ResearchRuntime:
         ):
             # A search result is a bibliographic record, not a scientific claim.
             # Render only server-observed titles/links; no generated findings need review.
-            selected = list(citations.values())[: plan.result_count]
+            selected = list(citations.values())[:discovery_target_count]
             failed = any(outcome["status"] not in {"ok", "no_results"} for outcome in outcomes)
-            complete = len(selected) == plan.result_count and not failed
+            complete = (
+                len(selected) == discovery_target_count
+                and not failed
+                and not discovery_budget_limited
+                and not discovery_count_limited
+            )
             answer = "\n".join(
                 f"{index}. {citation.title}\n{citation.source_url}"
                 for index, citation in enumerate(selected, 1)
@@ -647,12 +716,18 @@ class ResearchRuntime:
                 )
             elif not complete:
                 answer += f"\n本次取得 {len(selected)} 条结果，未完全满足请求的数量或来源。"
+                if discovery_budget_limited:
+                    answer += " 已达到本轮工具预算，已保留当前取得的结果。"
+                if discovery_count_limited:
+                    answer += " 单轮最多支持 25 条，请缩小范围或分批检索。"
             state["summary"] = plan.objective
             return AgentResponse(
                 status="completed" if complete else "insufficient_evidence",
                 answer=answer,
                 citations=selected,
-                warnings=["requested_source_unavailable"] if failed else [],
+                warnings=(["requested_source_unavailable"] if failed else [])
+                + (["discovery_tool_budget_exhausted"] if discovery_budget_limited else [])
+                + (["discovery_result_limit_reached"] if discovery_count_limited else []),
                 context_state=state,
             )
         if plan.intent == "compare" and len(citations) < 2:
