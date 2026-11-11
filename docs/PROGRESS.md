@@ -1,5 +1,13 @@
 # 进度
 
+## 2026-11-11 PR #23 CI 修复与弱监督评测加固
+
+- GitHub Actions 原失败来自锁定依赖漏洞审计：后端 certifi/filelock/Pillow 与 Web Next.js 已更新；提交 `f2a856d` 的后端、Web 和容器 job 均成功，CI 安全审计无已知漏洞。Node 20 弃用提示属于 runner/action 警告，不影响该次通过。
+- 评测候选改为从只读 PaperStore 当前已批准全文生成，并拒绝非公开来源、未知许可或缺少内容哈希；任务采用单词遮蔽伪查询，显式记录答案词、来源、许可、解析器/切块器版本和快照哈希。训练/dev/test 按来源稳定分组，缺少任一 split 时报告不完整。
+- 新增构建和离线 BM25 回放 CLI；评测前验证当前全文库与冻结来源快照一致，并验证每条弱相关 chunk 的来源和版本，报告 Hit/Precision/Recall/MRR/nDCG@k、分桶、延迟和 provider-call 数。
+- 明确区分固定分母 Precision@k 与已返回结果 precision；MRR 只看 top-k。拒绝非法 k/重复排序及越界来源 qrel；哈希和内置 Skill 校验对 Windows CRLF/LF 归一，修复 Windows 检出文件造成的 Skill 哈希及评测清单误失败。
+- 验收：后端 **354 passed**；Ruff check/format、OpenAPI 导出、pip-audit 通过。Windows 系统临时目录权限不足，测试改用仓库 `.local` 临时目录。弱监督题目仍非真实用户问法或金标；LLM-as-judge 与人工锚点校准未完成。用法和边界见 [评测说明](research/weak-supervision-evaluation-2026-11-11.md)。
+
 ## 2026-10-15 AI 标注真实语料评测（R01/R03）与简历材料刷新
 
 用户要求尽快产出可写进简历的整块成果。本轮做 A1（真实语料评测）+ A3（简历材料刷新），A2（R04 账单硬上限/重启续跑）**因优先级调整暂缓**——它是开放式工程且简历价值低于评测结果。

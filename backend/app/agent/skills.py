@@ -187,7 +187,9 @@ def load_skill(selection: SkillSelection) -> LoadedSkill:
     try:
         if _SKILL_DIRECTORY.is_symlink() or path.is_symlink():
             raise SkillLoadError("skill spec path is not a regular built-in file")
-        raw = path.read_bytes()
+        # Git's core.autocrlf may rewrite built-in Markdown checkouts on Windows.
+        # Pins cover canonical UTF-8/LF bytes so identical skills load cross-platform.
+        raw = path.read_bytes().replace(b"\r\n", b"\n")
     except OSError as error:
         raise SkillLoadError("built-in skill spec could not be read") from error
     if hashlib.sha256(raw).hexdigest() != definition.content_sha256:

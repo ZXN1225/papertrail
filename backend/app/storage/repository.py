@@ -1174,9 +1174,10 @@ class PaperStore:
         with self._connection() as connection:
             self._ensure_schema(connection)
             rows = connection.execute(
-                f"""SELECT d.source_type, d.source_id, d.status,
+                f"""SELECT d.source_type, d.source_id, d.title, d.source_url, d.status,
                 d.current_sha256 AS content_sha256, v.source_document_sha256,
-                v.license_id, v.license_url, v.parser_version,
+                v.license_id, v.license_url, v.license_evidence_url, v.text_source_url,
+                v.attribution, v.parser_version, v.chunker_version,
                 COUNT(c.chunk_id) AS chunk_count
                 FROM fulltext_documents d JOIN fulltext_versions v
                 ON v.source_type=d.source_type AND v.source_id=d.source_id
@@ -1184,8 +1185,10 @@ class PaperStore:
                 LEFT JOIN fulltext_chunks c ON c.source_type=v.source_type
                 AND c.source_id=v.source_id AND c.content_sha256=v.content_sha256
                 WHERE {" AND ".join(clauses)}
-                GROUP BY d.source_type, d.source_id, d.status, d.current_sha256,
-                v.source_document_sha256, v.license_id, v.license_url, v.parser_version
+                GROUP BY d.source_type, d.source_id, d.title, d.source_url, d.status,
+                d.current_sha256, v.source_document_sha256, v.license_id, v.license_url,
+                v.license_evidence_url, v.text_source_url, v.attribution, v.parser_version,
+                v.chunker_version
                 ORDER BY d.source_type, d.source_id""",
                 params,
             ).fetchall()

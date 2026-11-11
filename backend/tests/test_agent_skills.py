@@ -100,6 +100,19 @@ def test_loader_rejects_unreviewed_content_drift(tmp_path, monkeypatch) -> None:
         load_skill(selected)
 
 
+def test_loader_accepts_windows_checkout_line_endings(tmp_path, monkeypatch) -> None:
+    import app.agent.skills as skills_module
+
+    selected = select_skill("question")
+    definition = SKILL_REGISTRY[selected.skill_id]
+    source = _read_builtin_file(definition.filename)
+    (tmp_path / definition.filename).write_bytes(source.replace("\n", "\r\n").encode("utf-8"))
+    monkeypatch.setattr(skills_module, "_SKILL_DIRECTORY", tmp_path)
+
+    loaded = load_skill(selected)
+    assert loaded.instructions_sha256 == hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
 def _read_builtin_file(filename: str) -> str:
     # The filename comes from the statically tested registry, never from user input.
     from pathlib import Path

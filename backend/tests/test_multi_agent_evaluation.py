@@ -129,6 +129,12 @@ def test_cli_binds_input_to_exact_synthetic_manifest_tasks() -> None:
     assert report["quality_claim_allowed"] is False
 
 
+def test_frozen_json_digest_is_independent_of_checkout_line_endings() -> None:
+    from app.evaluation.multi_agent import sha256_bytes
+
+    assert sha256_bytes(b'{\n"x": 1\n}') == sha256_bytes(b'{\r\n"x": 1\r\n}')
+
+
 def test_cli_rejects_manifest_digest_mismatch(tmp_path: Path) -> None:
     backend = Path(__file__).parents[1]
     data_dir = backend / "data" / "evaluation"

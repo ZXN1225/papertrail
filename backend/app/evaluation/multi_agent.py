@@ -231,5 +231,5 @@ def evaluate_paired_runs(
 
 
 def sha256_bytes(content: bytes) -> str:
-    """Expose one canonical digest helper for frozen task and review files."""
-    return hashlib.sha256(content).hexdigest()
+    """Hash canonical UTF-8 text bytes consistently across Windows and Unix checkouts."""
+    return hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()

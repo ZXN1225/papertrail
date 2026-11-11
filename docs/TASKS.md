@@ -1,5 +1,13 @@
 # 任务台账
 
+## 2026-11-11 PR #23 CI 修复与弱监督评测加固
+
+- GitHub Actions 安全审计失败已定位并修复，`f2a856d` 的 backend、web、container jobs 全部通过；PR #23 保持 draft，未合并。
+- 弱监督候选现仅从只读库中已批准、CC0/CC-BY 的全文生成，记录来源/许可/内容与解析 lineage；题目遮蔽一个源词，按 source ID 分组拆分，报告空 split；metrics 拒绝重复排名、修正 top-k MRR，并分别报告固定分母 Precision@k 和返回集 precision。
+- 增加安全的本地候选集生成与 BM25 replay CLI：校验当前全库与冻结 lineage，并校验每个弱 qrel chunk 确为指定来源/内容版本。指标包括 Hit/Precision/Recall/MRR/nDCG@k、分桶和延迟；空 split 不允许误报测试通过。用法与限制记录在 `docs/research/weak-supervision-evaluation-2026-11-11.md`。
+- Windows 行尾归一修复技能完整性哈希与评测数据集哈希在 CRLF checkout 下不一致。完整后端测试 354 passed，Ruff、OpenAPI 导出及 pip-audit 通过。
+- 仍待：基于被评测系统之外的生成器构造真实用户风格任务；加入多意图、改写/多约束/不可回答分桶及 latency/source coverage；实现受预算限制的独立 LLM-as-judge，并用独立复核样本校准分歧。弱监督分数不得表述为金标准或用户任务质量。
+
 ## 2026-10-15 AI 标注真实语料评测（R01/R03）与简历材料刷新（追加）
 
 - **A1 评测集**：新增 `tools/export_labeling_candidates.py`（抽 108 候选）、`tools/build_ai_labeled_dataset.py`（组装 + 机械校验）、`app/evaluation/ai_labeled_tasks.py` + CLI（只读、0 provider 调用、强制拒绝人工/金标声明）、`tests/test_ai_labeled_tasks.py`（8 项）。
