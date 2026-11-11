@@ -215,6 +215,8 @@ class PrivateDocumentService:
     def pending_documents(self) -> list[tuple[str, str]]:
         with self.store._connection() as db:
             self.store._ensure_schema(db)
+            db.execute("BEGIN IMMEDIATE")
+            self._recover_delete_tombstones(db)
             db.execute(
                 "UPDATE user_documents SET state='failed',error_code='reindex_required',"
                 "updated_at=? WHERE state='indexed' AND "
@@ -232,6 +234,30 @@ class PrivateDocumentService:
             ).fetchall()
         return [(row["id"], row["user_id"]) for row in rows]
 
+    def _recover_delete_tombstones(self, db: Any) -> None:
+        if not self.root.is_dir():
+            return
+        for owner_dir in self.root.iterdir():
+            if not owner_dir.is_dir() or owner_dir.is_symlink():
+                continue
+            for tombstone in owner_dir.glob("*.pdf.deleting"):
+                if tombstone.is_symlink():
+                    tombstone.unlink(missing_ok=True)
+                    continue
+                storage_key = tombstone.name.removesuffix(".deleting")
+                try:
+                    original = self._path(owner_dir.name, storage_key)
+                except ValueError:
+                    continue
+                row = db.execute(
+                    "SELECT 1 FROM user_documents WHERE user_id=? AND storage_key=?",
+                    (owner_dir.name, storage_key),
+                ).fetchone()
+                if row is not None and not original.exists():
+                    tombstone.replace(original)
+                else:
+                    tombstone.unlink(missing_ok=True)
+
     def retry_document(self, user_id: str, document_id: str) -> bool:
         with self.store._connection() as db:
             cursor = db.execute(
@@ -242,23 +268,37 @@ class PrivateDocumentService:
         return cursor.rowcount == 1
 
     def delete_document(self, user_id: str, document_id: str) -> str:
-        with self.store._connection() as db:
-            row = db.execute(
-                "SELECT storage_key,state FROM user_documents WHERE id=? AND user_id=?",
-                (document_id, user_id),
-            ).fetchone()
-            if row is None:
-                raise LookupError("document_not_found")
-            if row["state"] in {"queued", "processing"}:
-                raise RuntimeError("document_processing")
-            path = self._path(user_id, row["storage_key"])
+        path: Path | None = None
+        tombstone: Path | None = None
+        try:
+            with self.store._connection() as db:
+                db.execute("BEGIN IMMEDIATE")
+                row = db.execute(
+                    "SELECT storage_key,state FROM user_documents WHERE id=? AND user_id=?",
+                    (document_id, user_id),
+                ).fetchone()
+                if row is None:
+                    raise LookupError("document_not_found")
+                if row["state"] in {"queued", "processing"}:
+                    raise RuntimeError("document_processing")
+                path = self._path(user_id, row["storage_key"])
+                tombstone = path.with_name(f"{path.name}.deleting")
+                if path.exists():
+                    path.replace(tombstone)
+                db.execute(
+                    "DELETE FROM user_documents WHERE id=? AND user_id=?",
+                    (document_id, user_id),
+                )
+        except Exception:
+            if tombstone is not None and tombstone.exists() and path is not None:
+                if not path.exists():
+                    tombstone.replace(path)
+            raise
+        if tombstone is not None:
             try:
-                path.unlink(missing_ok=True)
+                tombstone.unlink(missing_ok=True)
             except OSError as error:
                 raise OSError("document_file_cleanup_failed") from error
-            db.execute(
-                "DELETE FROM user_documents WHERE id=? AND user_id=?", (document_id, user_id)
-            )
         return document_id
 
     def process_document(self, user_id: str, document_id: str) -> None:

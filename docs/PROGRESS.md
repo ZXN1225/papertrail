@@ -5,7 +5,7 @@
 - PR #23 的 backend/web Browser E2E/container 检查全部通过；Playwright 改为仅安装 Chromium，避免 runner apt DNS 故障。PR 保持 draft、未合并。
 - PR #24 增加默认零调用的预算化盲评 CLI；后端 361 passed，Ruff/OpenAPI/pip-audit 通过，独立复核无阻断项；GitHub backend/web E2E/container 全部通过。PR 保持 draft、未合并。
 - Agent/个人研究工作区批次已分离至 PR #25 草稿分支，包含账号/会话/个人文档隔离、PDF 导入、任务分类与自适应 Harness、Coverage 缺口服务端披露及相应 Workspace UI。原工作区仍保留所有本地状态。
-- 本批次原工作区验收：后端 497 passed；Web format/typecheck/build、E2E 66/66（375/768/1440px）、audit 通过。Coverage 逻辑独立复核通过；PR 分支仍需处理冲突及审查发现的上传并发/文件事务风险。
+- 本批次原工作区验收：后端 497 passed；Web format/typecheck/build、E2E 66/66（375/768/1440px）、audit 通过。Coverage 逻辑独立复核通过。PR 分支复核确认上传配额已由 SQLite `BEGIN IMMEDIATE` 串行保护；新增并发回归，删除改为文件改名暂存、数据库失败时恢复，并在启动恢复中断删除。PR 分支后端 506 passed，Ruff/OpenAPI/pip-audit 通过；Web format/typecheck/build、E2E 66/66（375/768/1440px）和 audit 通过，待远程 CI 确认。
 
 ## 2026-11-11 Agent/RAG 架构改进启动
 

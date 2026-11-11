@@ -3,6 +3,7 @@ import json
 import sqlite3
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -161,6 +162,114 @@ def _library_entry(store: PaperStore, user_id: str, entry_id: str) -> None:
                 hashlib.sha256(metadata_json.encode()).hexdigest(),
             ),
         )
+
+
+def test_private_document_upload_quota_is_serialized_across_connections(
+    tmp_path, monkeypatch
+) -> None:
+    from app import private_documents
+
+    store = PaperStore(tmp_path / "papertrail.sqlite3")
+    store.migrate()
+    owner = create_account(store, "quota_owner", "correct horse battery staple")
+    assert owner is not None
+    service = PrivateDocumentService(store)
+    monkeypatch.setattr(private_documents, "MAX_USER_DOCUMENTS", 1)
+
+    def upload(filename: str) -> str:
+        try:
+            service.store_upload(
+                user_id=owner,
+                title="TEST concurrent upload",
+                filename=filename,
+                pdf_bytes=b"%PDF-TEST-concurrent",
+                rights_attested=True,
+            )
+            return "stored"
+        except OverflowError as error:
+            return str(error)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(upload, ("first.pdf", "second.pdf")))
+
+    assert results.count("stored") == 1
+    assert results.count("user_document_count_limit") == 1
+    assert len(service.list_documents(owner)) == 1
+
+
+def test_private_document_delete_restores_file_when_database_delete_fails(tmp_path) -> None:
+    store = PaperStore(tmp_path / "papertrail.sqlite3")
+    store.migrate()
+    owner = create_account(store, "delete_owner", "correct horse battery staple")
+    assert owner is not None
+    service = PrivateDocumentService(store)
+    uploaded = service.store_upload(
+        user_id=owner,
+        title="TEST delete rollback",
+        filename="delete.pdf",
+        pdf_bytes=b"%PDF-TEST-delete-rollback",
+        rights_attested=True,
+    )
+    with store._connection() as db:
+        db.execute("UPDATE user_documents SET state='failed' WHERE id=?", (uploaded["id"],))
+        db.execute(
+            "CREATE TRIGGER TEST_reject_document_delete BEFORE DELETE ON user_documents "
+            "BEGIN SELECT RAISE(ABORT, 'TEST delete rejected'); END"
+        )
+
+    path = service._path(owner, f"{uploaded['id']}.pdf")
+    try:
+        service.delete_document(owner, uploaded["id"])
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError("database delete trigger should reject deletion")
+
+    assert path.is_file()
+    assert not path.with_name(f"{path.name}.deleting").exists()
+    assert service.get_document(owner, uploaded["id"]) is not None
+
+    with store._connection() as db:
+        db.execute("DROP TRIGGER TEST_reject_document_delete")
+    assert service.delete_document(owner, uploaded["id"]) == uploaded["id"]
+    assert not path.exists()
+
+
+def test_pending_documents_recovers_delete_tombstones_after_restart(tmp_path) -> None:
+    store = PaperStore(tmp_path / "papertrail.sqlite3")
+    store.migrate()
+    owner = create_account(store, "delete_recovery_owner", "correct horse battery staple")
+    assert owner is not None
+    service = PrivateDocumentService(store)
+    restore = service.store_upload(
+        user_id=owner,
+        title="TEST interrupted delete",
+        filename="restore.pdf",
+        pdf_bytes=b"%PDF-TEST-restore",
+        rights_attested=True,
+    )
+    orphan = service.store_upload(
+        user_id=owner,
+        title="TEST completed delete",
+        filename="orphan.pdf",
+        pdf_bytes=b"%PDF-TEST-orphan",
+        rights_attested=True,
+    )
+    restore_path = service._path(owner, f"{restore['id']}.pdf")
+    orphan_path = service._path(owner, f"{orphan['id']}.pdf")
+    restore_tombstone = restore_path.with_name(f"{restore_path.name}.deleting")
+    orphan_tombstone = orphan_path.with_name(f"{orphan_path.name}.deleting")
+    restore_path.replace(restore_tombstone)
+    orphan_path.replace(orphan_tombstone)
+    with store._connection() as db:
+        db.execute("DELETE FROM user_documents WHERE id=?", (orphan["id"],))
+
+    service.pending_documents()
+
+    assert restore_path.is_file()
+    assert not restore_tombstone.exists()
+    assert not orphan_path.exists()
+    assert not orphan_tombstone.exists()
 
 
 def test_private_document_index_and_evidence_are_scoped_to_owner(tmp_path, monkeypatch) -> None:
