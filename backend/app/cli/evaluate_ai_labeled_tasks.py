@@ -62,10 +62,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "task_count": report["dataset"]["task_count"],
                     "answerable_count": report["dataset"]["answerable_count"],
                     "unanswerable_count": report["dataset"]["unanswerable_count"],
+                    "multi_hop_without_required_evidence": report["dataset"][
+                        "multi_hop_without_required_evidence"
+                    ],
                     "evidence_hit_at_1": report["summary"]["evidence_hit_at_1"],
                     f"evidence_hit_at_{report['retrieval']['top_k']}": report["summary"][
                         f"evidence_hit_at_{report['retrieval']['top_k']}"
                     ],
+                    "answerable_retrieval_metrics": report["summary"][
+                        "answerable_retrieval_metrics"
+                    ],
+                    "by_challenge_type": report["summary"]["by_challenge_type"],
                     "top1_score_separability": report["summary"]["top1_score_separability"],
                 },
             },

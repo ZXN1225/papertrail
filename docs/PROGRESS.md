@@ -3,8 +3,8 @@
 ## 2026-11-12 检索评测指标与多证据覆盖
 
 - 修正公共 `MRR@k` 截断语义，k 之后才命中的结果不再被计入；relevance grade/cutoff 限为有限的 0–3 整数与正整数，检索返回非有限分数时失败关闭。为 AI 标注任务报告加入 MRR、NDCG、precision/recall@k 与显式多证据完整覆盖率。unanswerable 结果字段改为“是否返回词法候选”，避免把检索候选误称为生成错误。
-- 数据可选携带 2–8 个唯一 `required_evidence` 锚点；缺少这些锚点的旧 multi-hop 任务在报告中标为完整覆盖率未测量，不推断缺失的 qrels。仍明确为 AI 标注诊断，非人工金标或通用检索质量证明。
-- 定向回归验证 MRR cutoff、无效数值拒绝、所有必要 evidence 漏失/覆盖与未测量分母。全后端 513 passed；Ruff/OpenAPI/pip-audit 通过，待 GitHub PR CI。
+- AI 标签集构建器可带 2–8 个唯一 `required_evidence` 锚点逐个核验来源、版本、位置和原文；缺少这些锚点的旧 multi-hop 任务在报告中标为完整覆盖率未测量，不推断缺失的 qrels。仍明确为 AI 标注诊断，非人工金标或通用检索质量证明。
+- 定向回归验证 MRR cutoff、无效数值拒绝、所有必要 evidence 漏失/覆盖与未测量分母；构建器和当前标签模型只表达单论文内多证据任务，跨论文多跳仍未覆盖。全后端 516 passed；Ruff/OpenAPI/pip-audit 通过，待 GitHub PR CI。
 
 ## 2026-11-12 PR #23/#24 与个人研究工作区
 
