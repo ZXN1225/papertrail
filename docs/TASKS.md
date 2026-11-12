@@ -4,8 +4,9 @@
 
 - rerank dry-run 已在本机隔离 schema-23 副本核对 9 篇 / 3,294 chunks：3294 缺向量，活动索引不完整；6 条查询仅需 404 UTF-8 bytes、估算 `$0.00000808`；生成全文向量需传输约 825,894 UTF-8 bytes，按配置价字节上限估算 `$0.01651788`。0 provider calls、0 报告写入，原 DB SHA 不变。
 - 全文索引 CLI 现在要求 `--max-chunks` 和 `--max-cost-usd`，真实执行再要求 `--confirm-data-transfer`；dry-run 不创建 provider，限定只补缺失向量，并拒绝超预算/超 chunk/过长 chunk。查询预览的维度未配置会显示未验证，真实 rerank 在请求前失败关闭。
+- 用户授权指定语料外传后，首批 embedding 请求返回 `authentication_failed`，未得到向量/usage，未写本地索引。原 DB 和隔离库 SHA 均未变化；需用户在本机更新 embedding key 后才可重试，凭据不得发到聊天。
 - 定向 26 passed、全后端 `579 passed`（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI（SHA 未变）、pip-audit、diff check 均通过。独立 reviewer 未发现阻断项；PR #40 基础提交及 PR #41 的 backend/web/Browser E2E/container CI 全绿，PR #41 保持 Draft、未合并。
-- 未获用户对论文全文 embedding 外传的明确确认；未执行索引或 rerank。评测策略收益仍待授权与足量 held-out 人审任务。
+- Rerank 质量效果仍待有效凭据、索引完成和足量 held-out 人审任务；尚不能据此评选策略。
 
 ## 2026-11-12 Chunk size/overlap 配置对照（PR #40 实现中）
 
