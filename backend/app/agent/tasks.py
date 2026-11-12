@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from app.agent.document_context import LOCAL_DOCUMENT_CUES
 from app.agent.skills import LoadedSkill, SkillLoadError, load_skill, select_skill
 
-TASK_REGISTRY_VERSION = "1.6.0"
+TASK_REGISTRY_VERSION = "1.7.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +108,16 @@ _EXTERNAL_CUES = re.compile(
     r"online|on arxiv|on openalex",
     re.IGNORECASE,
 )
+_EXTERNAL_NEGATION_CUES = re.compile(
+    r"不(?:要|需要|用|必|想|希望)|无需|无须|别|避免|禁止|拒绝|不联网|离线(?:模式|处理)?|"
+    r"\b(?:don't|do not|does not|without|no need to|no (?:online|web|internet)|offline only|"
+    r"not (?:use|using|search|searching|go|going|browse|access))\b",
+    re.IGNORECASE,
+)
+_INTENT_CLAUSE_BREAKS = re.compile(
+    r"[，,;；。.!?\n]+|但是|不过|而是|但|\bbut\b|\bhowever\b|\binstead\b",
+    re.IGNORECASE,
+)
 _FOLLOWUP_CUES = re.compile(
     r"这篇|该论文|这两篇|上述|刚才|上面|继续(?:总结|分析|比较|解释)|该文|那篇|"
     r"this paper|that paper|these papers|follow.?up",
@@ -145,9 +155,20 @@ def prepare_task(
 ) -> PreparedTask:
     """Select a pinned built-in skill and its fixed workflow contract."""
     selection = select_skill(task_text)
-    named_sources = tuple(source for source in ("openalex", "arxiv") if source in task_text.lower())
-    named_search = bool(named_sources and _SEARCH_CUES.search(task_text))
-    explicit_external = bool(_EXTERNAL_CUES.search(task_text) or named_search)
+    intent_clauses = _INTENT_CLAUSE_BREAKS.split(task_text)
+    affirmative_clauses = tuple(
+        clause
+        for clause in intent_clauses
+        if not _EXTERNAL_NEGATION_CUES.search(clause)
+        and (_EXTERNAL_CUES.search(clause) or _has_named_source_search(clause))
+    )
+    named_sources = tuple(
+        source
+        for source, cue in (("openalex", r"openalex"), ("arxiv", r"arxiv"))
+        if any(re.search(cue, clause, re.IGNORECASE) for clause in affirmative_clauses)
+    )
+    named_search = bool(named_sources)
+    explicit_external = bool(affirmative_clauses)
 
     def mentions_saved_id(text: str) -> bool:
         return any(
@@ -168,13 +189,13 @@ def prepare_task(
             _LIBRARY_CUES.search(prior_user_questions[-1])
             or mentions_saved_id(prior_user_questions[-1])
         )
-        and not _EXTERNAL_CUES.search(prior_user_questions[-1])
+        and not has_explicit_external_request(prior_user_questions[-1])
     )
     personal_followup = bool(
         prior_user_questions
         and _FOLLOWUP_CUES.search(task_text)
         and _PERSONAL_PAPER_CUES.search(prior_user_questions[-1])
-        and not _EXTERNAL_CUES.search(prior_user_questions[-1])
+        and not has_explicit_external_request(prior_user_questions[-1])
     )
     mixed_request = bool(
         _MANUSCRIPT_CUES.search(task_text)
@@ -214,4 +235,17 @@ def prepare_task(
             if task_id == "external-paper-search"
             else ()
         ),
+    )
+
+
+def _has_named_source_search(text: str) -> bool:
+    return bool(re.search(r"openalex|arxiv", text, re.IGNORECASE) and _SEARCH_CUES.search(text))
+
+
+def has_explicit_external_request(text: str) -> bool:
+    """Require an affirmative clause before enabling public-source tools."""
+    return any(
+        not _EXTERNAL_NEGATION_CUES.search(clause)
+        and (_EXTERNAL_CUES.search(clause) or _has_named_source_search(clause))
+        for clause in _INTENT_CLAUSE_BREAKS.split(text)
     )

@@ -448,6 +448,54 @@ def test_discovery_renders_records_without_review(count, expected):
     assert len(result.citations) == count
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "不要联网，只搜索我的论文库",
+        "Do not search OpenAlex; use my research library only",
+    ],
+)
+def test_runtime_rejects_external_plan_when_user_negates_online_search(question):
+    class ExternalPlanModel:
+        output_schema = None
+
+        def complete(self, **kwargs):
+            return ModelTurn(
+                [],
+                [],
+                json.dumps(
+                    {
+                        "intent": "discover",
+                        "objective": "TEST discover",
+                        "clarification": "",
+                        "external_request_quote": "不要联网",
+                        "result_count": 1,
+                        "steps": [{"scope": "openalex", "documents": [], "query": "TEST"}],
+                    }
+                ),
+                False,
+                10,
+                10,
+            )
+
+    class ExternalCallRecorder:
+        calls = []
+
+        def embedding_input_tokens_upper_bound(self, *args):
+            return 0
+
+        def execute(self, *args, **kwargs):
+            self.calls.append(args)
+            return {"status": "ok", "items": []}
+
+    registry = ExternalCallRecorder()
+    result = ResearchRuntime(Settings(_env_file=None), ExternalPlanModel(), registry).run(
+        question, [], [], {}
+    )
+    assert result.status == "workflow_incomplete"
+    assert registry.calls == []
+
+
 def test_discovery_paginates_requested_results_with_bounded_tool_calls():
     class PagedModel:
         output_schema = None

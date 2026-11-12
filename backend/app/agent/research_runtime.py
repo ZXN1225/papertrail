@@ -17,6 +17,7 @@ from app.agent.contracts import AgentResponse, AgentTraceEvent, Claim, ClaimEvid
 from app.agent.harness import _collect_citations
 from app.agent.model import ModelUnavailable, estimate_input_tokens_upper_bound
 from app.agent.skills import SkillLoadError, load_skill, select_skill
+from app.agent.tasks import has_explicit_external_request
 
 
 class Record(BaseModel):
@@ -471,7 +472,11 @@ class ResearchRuntime:
         retrieval_steps = list(plan.steps)
         for step_index, step in enumerate(retrieval_steps):
             if step.scope in {"openalex", "arxiv"}:
-                if not plan.external_request_quote or plan.external_request_quote not in question:
+                if (
+                    not has_explicit_external_request(question)
+                    or not plan.external_request_quote
+                    or plan.external_request_quote not in question
+                ):
                     raise RuntimeStop(
                         "workflow_incomplete", "未确认本轮公开检索需求，未调用外部工具。"
                     )

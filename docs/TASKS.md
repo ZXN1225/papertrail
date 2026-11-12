@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 Harness 否定联网意图门控（PR #34 准备中）
+
+- `prepare_task` 将联网否定短语当作正向检索指令；ResearchRuntime 也仅校验计划引用原句，存在“明确拒绝联网却调用公开检索”风险。两处现改为共享肯定意图规则，外部工具执行前二次校验。
+- 回归涵盖中文/英文否定、明确选择不同正向来源，以及否定时对 OpenAlex/arXiv 实际调用数为零。定向 69 passed、全后端 551 passed；Ruff、OpenAPI、pip-audit 通过。
+- 后续验证：推送 Draft PR 后等待 backend/web/container CI；无 UI 代码变更，web 页面路径由现有 CI 覆盖。
+
 ## 2026-11-12 Chunk 策略只读对照（PR #33 Draft，CI 通过）
 
 - 新增 900/1,800 UTF-8 bytes 的结构保留 chunk ablation；原生产 chunker 默认不变。只读 frozen approved corpus + manifest，经 page/element/type/char interval 投影旧 selected-span 锚点；报告 exact span coverage、Hit/MRR/NDCG/Precision/Recall、切块/索引构建/搜索时延。记录与 MinerU 图表生成文本隔离。

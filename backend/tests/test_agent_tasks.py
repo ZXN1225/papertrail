@@ -98,11 +98,35 @@ def test_named_online_sources_select_external_search(question, sources) -> None:
     assert task.external_requested
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "不要联网，只搜索我的论文库",
+        "我不需要在线搜索，请在我的论文库中查找",
+        "不需要在 OpenAlex 搜索，先总结本地文献",
+        "without online search, search only my paper library",
+        "Do not search OpenAlex; use my research library only",
+        "No online search, use my research library only",
+    ],
+)
+def test_negated_external_search_does_not_authorize_online_tools(question) -> None:
+    task = prepare_task(question)
+    assert not task.external_requested
+    assert task.requested_sources == ()
+    assert task.spec.task_id not in {"external-paper-search", "library-online-research"}
+
+
 def test_library_plus_online_search_requires_both_source_types() -> None:
     task = prepare_task("结合我的论文库并在OpenAlex搜索相关研究")
     assert task.spec.task_id == "library-online-research"
     assert task.requested_sources == ("openalex",)
     assert task.spec.required_tool_stages == (("retrieve_paper_evidence",),)
+
+
+def test_explicitly_selected_source_survives_a_different_negated_source() -> None:
+    task = prepare_task("不要搜索 OpenAlex，但请在 arXiv 搜索相关研究")
+    assert task.spec.task_id == "external-paper-search"
+    assert task.requested_sources == ("arxiv",)
 
 
 @pytest.mark.parametrize(
