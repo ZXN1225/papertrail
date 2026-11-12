@@ -129,6 +129,12 @@ single-reviewer tasks it is worse overall than BM25. Do not enable it as a produ
 this evidence. The labels are selected source spans, not independently judged relevance; the
 report retains `gold_standard=false` and `quality_claim_allowed=false`.
 
+A separate read-only input comparison found that the stored indexed `text` differs from the
+evaluator's candidate `text` for 2,946/3,294 chunks even in this zero-overlap arm; exact
+`evidence_text` agrees for all 3,294. The indexer embeds stored `text`, so the vector is a
+parent-input proxy even where the candidate and parent span match. This negative result does not
+measure the quality of embedding the candidate text itself.
+
 The other five chunk configurations reported `candidate_to_parent_embedding_mapping_failed`,
 not a retrieval score. A separate read-only span-mapping audit of the same frozen snapshot found
 child chunks crossing two current parent chunk boundaries: 62/3,575 (900/0), 132/3,605
@@ -142,3 +148,30 @@ this report provide neither a true child-vector nor a cross-encoder comparison.
 During the connectivity check, a transient `provider_unavailable` also exposed that the chunk
 evaluation CLI let `EmbeddingError` escape as a Python traceback. The CLI now reports only the safe
 error code and exits nonzero without writing a result file; a focused fake-provider test covers it.
+
+## True candidate-vector experiment: invalidated attempts (2026-11-12)
+
+The user separately authorized candidate-text embeddings for the same frozen nine-source,
+six-question snapshot. A first local script sent 1,098 deduplicated candidate texts (897,709
+UTF-8 bytes) and the six questions to `text-embedding-3-small` in 19 completed calls. The provider
+reported 214,826 input tokens, estimated `$0.00429652` at the configured price. Subsequent
+method review found that this script selected BM25 candidates across all nine papers while the
+frozen manifest and baseline evaluate each task within its specified paper. The resulting local
+report `backend/.local/true-candidate-rerank-v1.json` (SHA-256
+`DCF52B8036777FE1547624395E8F42201CD088E20D75F2CA36696635EFE9DC0A`) is **invalid for
+paired comparison**. A same-directory `.INVALID.txt` sidecar marks it without altering the
+original report. Its rerank numbers must not be interpreted or used to choose a strategy.
+
+A corrected, read-only source-scoped preview found 2,221 selected candidate IDs and 824 new
+deduplicated texts (690,259 UTF-8 bytes) across six arms. Together with the same six questions
+(404 bytes), the estimated upper bound was `$0.01381326` for at most 14 calls. The attempted
+corrected run stopped on an embedding timeout before a report was written. The one-off script did
+not persist per-batch vectors or usage, so completed work and cost from that interrupted run are
+unknown. No further provider retry is made under the previous estimate cap. The original user
+database SHA-256 remained unchanged.
+
+A reproducible runner needs to enforce the manifest's source scope, preserve batch progress and
+provider usage only in an ignored local cache, and stop when the remaining authorized estimate
+cannot cover another attempt. Until a correct run completes, there is **no valid true candidate
+vector rerank comparison**. The existing BM25 and parent-vector proxy results above remain
+separate exploratory diagnostics, not MinerU chart-quality evidence or an independent gold set.

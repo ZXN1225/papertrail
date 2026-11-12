@@ -1,9 +1,16 @@
 # 任务台账
 
+## 2026-11-12 真正候选向量 Rerank × Chunk 选型修正（PR #44 实施中）
+
+- 首次外传评测脚本错误地跨九篇建 BM25 池，与冻结 manifest 的每题单篇范围不一致；已发起 19 次调用、214,826 tokens（估算 `$0.00429652`），但报告中的 rerank 指标无效，不能用于选型。原 DB hash 不变，数据仍在 ignored `.local`。
+- 正确范围的只读预检为 2,221 个候选 ID / 824 段新文本 / 690,259 UTF-8 bytes；执行中 `timeout`，未写报告，旧脚本无法核算已完成批次费用。暂停额外外传，先实现逐批本地缓存、用量账本、来源范围一致性和续跑预算门；完成后再核对授权余额。当前没有有效真实候选向量 rerank 结果，不改变生产默认。
+- 报告是单 reviewer selected-span 探索诊断，不是独立人审 gold，也不证明 MinerU 图表解析质量。协作 Agent 复核因使用额度限制失败，尚未通过复核。
+
 ## 2026-11-12 实时 Rerank 效果诊断（PR #43 Draft，CI 通过）
 
 - 用户更新凭据后，已按授权在隔离库完成 9 篇 / 3,294 chunks 的 small 模型向量索引，212,879 tokens、估算 `$0.00425758`；6 条查询 92 tokens、估算 `$0.00000184`。原用户库 hash 保持不变，报告与向量只在 ignored `.local`。
 - 1800-byte 无重叠臂的父向量代理 rerank 在六个 single-reviewer selected-span 任务上低于 BM25（MRR@8 `.417` vs `.622`、span coverage `.5` vs `1.0`），不切换生产默认。其余五臂有跨父边界的 child chunk，按既有严格映射被正确标为 unavailable；下一步需真实 child 向量与独立人审任务，不能把本报告称为质量达标。
+- 只读输入审计发现同跨度候选中 2,946/3,294 个 `text` 与已建向量的父输入不同；本结果只评价父向量代理，不能代表真实候选 chunk embedding 的效果。
 - 更新评测说明与阶段状态；PR #42 的 backend/web/container CI 已通过。当前报告本地可复核，未提交任何全文、向量或密钥。
 - 修复 provider 临时错误在 chunk 评测 CLI 外泄 traceback 的问题：新增 fake-provider 失败测试，确认安全码、非零退出和无报告；定向 CLI 4 passed、全后端 583 passed，Ruff 与 OpenAPI 契约通过。跨父边界计数来自另一次只读映射审计，研究文档已明确。
 

@@ -1,10 +1,17 @@
 # 进度
 
+## 2026-11-12 真正候选向量 × Chunk 配对诊断修正（PR #44 实施中）
+
+- 用户另行授权同一 9 篇获准来源的 6 道冻结题候选向量评测。第一次本机脚本把九篇全库 BM25 top-128 与 manifest 规定的单篇任务范围混用；虽完成 19 次 provider 调用、214,826 input tokens（按配置价估算 `$0.00429652`），其报告的 rerank 数字**无效，不能与基线配对或选型**。原数据库 SHA-256 不变，报告和脚本仅在 ignored `.local`。
+- 修正后的单篇范围只读预检为 2,221 个候选 ID、824 段新增去重文本 / 690,259 UTF-8 bytes；连同六题 404 bytes 的费用估算上限 `$0.01381326`。真实请求中途 `timeout`，未写报告；旧脚本无分批向量/用量持久化，因此本次已调用批数和费用未知，不在旧上限下盲重试。尚无有效真实候选向量 rerank 分数。
+- 正在将本机流程整理为可复现、默认零外传、严格沿用来源范围且支持分批本地缓存/预算续跑的正式命令；独立 Agent 复核因账号使用额度限制未完成，不计为验证。生产默认不变。详见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+
 ## 2026-11-12 获准语料实时向量索引与 Rerank 诊断（PR #43 Draft，CI 通过）
 
 - 用户更新本机凭据后，受控问题探针确认 `text-embedding-3-small` 可用；同一已授权的 9 篇 / 3,294 chunks 在忽略目录隔离副本完成 1536 维索引。Provider 返回 212,879 input tokens；按配置价估算 `$0.00425758`，不是实际账单。原始用户 DB SHA-256 仍为 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`。
 - 六条已授权查询一次调用共 92 tokens，估算 `$0.00000184`；隔离报告 `backend/.local/chunk-rerank-live-v1.json`，不提交论文、向量或查询。1800-byte/0 overlap 的 BM25 MRR@8 `.622`、NDCG@5 `.712`、span coverage `1.0`；父 chunk 向量代理 rerank 分别 `.417`、`.439`、`.5`，在此六题退化，不能设为生产默认。报告仍是 single-reviewer selected-span 诊断，`quality_claim_allowed=false`。
 - 其余五个 chunk 臂未得到 rerank 分数：62–132 个候选跨越两个现有父 chunk，严格的一对一 span 映射拒绝把父向量冒充真实子向量。要作有效跨 chunk rerank 对照仍需子 chunk 向量及独立授权/评测；当前结果也不是 MinerU 质量结果。完整记录见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+- 追加只读输入核对：即使在 1800-byte/0 overlap 臂，活动索引 2,946/3,294 个 `text` 与评测候选 `text` 不同，尽管 `evidence_text` 3,294/3,294 相同。当前向量代表被索引的父输入，负面结果不能外推为对真实子 chunk embedding 或 cross-encoder 的否定。
 - 连通性检查时短暂的 `provider_unavailable` 暴露出 chunk 评测 CLI 未捕获 `EmbeddingError`，会输出 traceback；新增先红后绿的 fake-provider 回归，现只输出安全错误码、非零退出且不写报告。定向 CLI 4 passed、全后端 583 passed（1 条既有 Starlette warning），Ruff check/format 与 OpenAPI hash（未变）通过；PR #43 backend/web（含 Browser E2E）/container CI 全绿。独立复核确认报告数字与口径一致，并建议将跨父边界计数标为单独只读审计，已更新说明。
 
 ## 2026-11-12 MinerU 图表定位评测（PR #42 Draft，CI 通过）
