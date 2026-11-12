@@ -4,7 +4,7 @@
 
 - 为人审后的 MinerU chart-task 集新增独立预算化 judge：只对 document-held-out test 的已裁决题运行，限制 judge model 与 candidate model 不同，结构化匹配预测事实与人审 reference IDs，并评价语义相关/事实忠实和 abstention；schema 校验每条预测/参考恰好归类一次。1/3/5 分有明确跨题锚点，Judge 不能改写参考标签，报告永不允许质量声明。
 - `--execute` 默认关闭；实跑另需 `--confirm-data-transfer`、不同模型、调用数和本地预估费用上限。只发送问题、候选事实和人工参考，不送页面图像、PDF 或解析报告；Judge 被要求把 JSON 中所有字段值视作不可信数据。先估计全量运行费用，超过 cap 则 provider 建立前拒绝；执行期间仍逐请求预留预算，cap 不是服务商硬限额。synthetic live 调用失败关闭。
-- 增加预算保护器的明确 halt reason 到 partial 报告，避免只显示泛化 `ModelUnavailable`；7 项定向测试通过（含费用预检触顶且 0 provider calls）；全后端 `576 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format 通过。OpenAPI SHA 与依赖审计此前已通过，本次改动不触及契约/依赖。PR #39 上一 commit backend、web（含 Browser E2E）、container CI 全绿；当前提交待 CI。
+- 增加预算保护器的明确 halt reason 到 partial 报告，避免只显示泛化 `ModelUnavailable`；7 项定向测试通过（含费用预检触顶且 0 provider calls）；全后端 `576 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format 通过。OpenAPI SHA 与依赖审计此前已通过，本次改动不触及契约/依赖。PR #39 最新 commit backend、web（含 Browser E2E）、container CI 全绿。
 
 ## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
 
@@ -12,6 +12,7 @@
 - 新增严格的人审 pack export/import/evaluate CLI；必须完整审核、显式 `--confirm-human-review`、新文件写入，数据集/报告始终声明 `gold_standard=false`、`quality_claim_allowed=false`。评测校验导入时记录的源 dataset/review pack/评分内容 hash，阻止复核后静默改预测或标签。`rights_attested` 与源 PDF/parser report hash 是 operator 声明，CLI 只校验本地图像 hash，不独立验证原 PDF/许可。synthetic tests 验证指标/容差/不确定样本、论文级隔离、来源和页面 hash；不产生实际 MinerU 质量结果。
 - 定向 8 passed、全后端 569 passed（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI export（hash 未变）、pip-audit 与 `git diff --check` 通过。独立 reviewer 复核 digest / split 保护后无 blocker；page count 指标不评价图框 localization。
 - 真实图表 qrels 仍未人审；当前 4 个本机 AI-assisted 候选不是金标。本协议当前不做 LLM-as-judge 或外部 provider 调用；后续 judge 必须沿用数据外传确认与费用预算，并且不得替代人工参考标签。
+- 独立复核 Agent 对本机 4 个 AI-assisted 图表候选做了二次审阅：图表关联 4/4 合理、候选事实 2 项支持 / 1 项部分支持 / 1 项仅宜定性估读；未发现无法回答题。该结果仅为 AI-assisted 未核验诊断，未比对像素级 bbox，不能导入成人工标签或宣称图表解析准确率。报告留在 ignored `.local`。
 
 ## 2026-11-12 Chunk × Rerank 配对评测（PR #36 Draft，CI 通过）
 

@@ -4,7 +4,7 @@
 
 - 新增只读 judge runner/CLI：仅 human-reviewed held-out test 的 adjudicated tasks；candidate/judge 必须不同；结果 schema 校验 fact matching 完整性并保留 prompt/dataset/review-pack lineage、token/cost estimates。
 - 必须显式 `--execute` 与 `--confirm-data-transfer`；dry-run 0 provider calls，展示整批保守预算估计，执行前若超过费用 cap 则拒绝。逐请求预留仍作为执行保护；成本预算是估计值而不是服务端硬上限。仅传 chart question、candidate facts、human reference facts，不传图像/PDF。Judge 将任务 JSON 视为不可信数据，并使用统一的 1/3/5 评分锚点；AI judge 不得写回或替换人审参考，质量声明恒为 false。
-- 7 个 TEST fake-model/CLI smoke 通过（实际 provider 故障模拟确认 partial 写盘、非零退出，且预算触顶保留具体原因与 0 provider calls）；全后端 `576 passed`，Ruff check/format 通过，OpenAPI/pip-audit 在上一版本通过且此次未改契约/依赖。真实题集尚未做人审，无法声称 chart judge 得分或 MinerU 质量达标；当前更改待 CI。
+- 7 个 TEST fake-model/CLI smoke 通过（实际 provider 故障模拟确认 partial 写盘、非零退出，且预算触顶保留具体原因与 0 provider calls）；全后端 `576 passed`，Ruff check/format 通过，OpenAPI/pip-audit 在上一版本通过且此次未改契约/依赖。PR #39 最新 commit backend、web/Browser E2E 与 container CI 全绿。真实题集尚未做人审，无法声称 chart judge 得分或 MinerU 质量达标。
 
 ## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
 
