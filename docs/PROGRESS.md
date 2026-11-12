@@ -1,11 +1,18 @@
 # 进度
 
-## 2026-11-12 检索 rerank 实验臂（实现与验证中）
+## 2026-11-12 Chunk 策略只读对照（PR #33 实现与验证中）
+
+- PDF chunker 增加只读候选参数，默认生产版本仍固定 1,800 UTF-8 bytes；评测在内存比较 900/1,800 两档，不写入数据库、不换当前线上 chunker。引用锚点按来源 hash、page、element/type、bbox 与 element-local 半开字符区间校验，候选 qrel 以同一元素中与选定 span 重叠映射；报告 Hit/MRR/NDCG/Recall、完整 span 覆盖、chunk/index build 和 BM25 search 时延。
+- `list_current_fulltext_elements` 仅允许只读 store，限制单篇 25 MB、50,000 元素；评测限制总元素 50 MB、总候选 50,000，并校验许可和冻结 parser/hash 清单。MinerU generated visual description 不进入原文切块，精确图注保留；表格仍结构化按行/表头切分。
+- 新增 TEST 合成分块、表格 locator、视觉描述隔离、锚点 span 覆盖和只读 DB hash 不变测试。全后端 540 passed、Ruff check/format、OpenAPI export、pip-audit 通过。格式检查初次发现并修复新模块排版后再次通过。
+- 当前没有可用本地授权全文数据库，不能运行真实对照、选出生产 chunker 或宣称质量收益；任务集仍是单 reviewer selected span，不是 gold。Chunk/Rerank 联合臂和人工复核集仍未完成。设计限制见 [Chunk 策略对照说明](research/chunk-strategy-evaluation.md)。
+
+## 2026-11-12 检索 rerank 实验臂（PR #32 Draft，CI 通过）
 
 - 冻结索引的只读 AI 标注评测现在提供 `bm25_dense_rerank`：BM25 前 128 候选再以已索引 embedding cosine 排序；不新增模型依赖或第二次 provider 调用，候选外证据无法被恢复。它是 dense-vector rerank，不是 cross-encoder，也未改变线上 Agent 的工具协议或默认方法。
 - 报告记录 reranker 类型/候选上限、embedding 模型与不含 query embedding provider 时间的检索时延；AI 标签和 synthetic 测试仍声明 `quality_claim_allowed=false`。真实许可语料尚未在当前 worktree 可用，因此没有真实四臂结果或策略胜者。
 - 本轮定向 37 项、全后端 534 项通过；Ruff check/format、OpenAPI 导出、pip-audit 通过。pytest 必须显式指定仓库忽略的 `backend/.local/pytest-rerank-full-20261112-01` basetemp，Windows 系统 temp ACL 会导致默认路径 setup errors。
-- 实验协议与限制见 [检索 rerank 对照说明](research/retrieval-rerank-experiment.md)。Chunk 策略仍只有活动索引版本，后续工作需实现带原文位置映射的 side-by-side chunking 对照；图表解析准确率仍缺获准且人工核对的样本集。
+- 实验协议与限制见 [检索 rerank 对照说明](research/retrieval-rerank-experiment.md)。PR #32 backend/web/container GitHub CI 全通过且保持 Draft；Chunk 策略对照现由 PR #33 在只读内存中实现，真实四臂 rerank 对照仍待获准语料。图表解析准确率仍缺获准且人工核对的样本集。
 
 ## 2026-11-12 MinerU 视觉证据接入（PR #31 Draft，CI 通过）
 

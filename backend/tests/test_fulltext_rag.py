@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import tempfile
@@ -268,6 +269,84 @@ def test_arxiv_content_can_be_separately_approved_and_deleted_with_tombstone() -
                 connection.execute("SELECT COUNT(*) FROM fulltext_deletion_events").fetchone()[0]
                 == 1
             )
+    finally:
+        temporary.cleanup()
+
+
+def test_readonly_chunk_ablation_snapshot_returns_current_parser_elements_without_writes() -> None:
+    temporary, store = _seed_store()
+    try:
+        store.import_arxiv_page(
+            ArxivPage(
+                total_results=1,
+                start=0,
+                items_per_page=1,
+                works=[
+                    ArxivWork(
+                        arxiv_id="2402.12345",
+                        title="Papertrail TEST parser snapshot",
+                        abstract="TEST abstract",
+                        authors=["TEST Author"],
+                        categories=["cs.IR"],
+                        primary_category="cs.IR",
+                        published_at=datetime(2024, 1, 1, tzinfo=UTC),
+                        updated_at=datetime(2024, 2, 1, tzinfo=UTC),
+                        source_url="https://arxiv.org/abs/2402.12345",
+                    )
+                ],
+                fetched_at=datetime(2026, 9, 23, tzinfo=UTC),
+            ),
+            query="TEST parser snapshot",
+            start=0,
+        )
+        source_text = "TEST parser source paragraph for chunk strategy diagnostics."
+        _ingest(
+            store,
+            source_text,
+            source_type="arxiv",
+            source_id="2402.12345",
+            license_id="CC0-1.0",
+            license_url=CC0_URL,
+            parser_version="pdfplumber-layout-v27",
+            source_document_sha256="a" * 64,
+            parsed_elements=[
+                {
+                    "element_id": "TEST-element-1",
+                    "order_index": 0,
+                    "page_number": 3,
+                    "element_type": "paragraph",
+                    "section_path": ["TEST Results"],
+                    "bbox": [10.0, 20.0, 30.0, 40.0],
+                    "text": source_text,
+                }
+            ],
+        )
+        readonly = PaperStore(store.database_path, readonly=True)
+        before = hashlib.sha256(store.database_path.read_bytes()).hexdigest()
+
+        chunks = readonly.list_current_fulltext_chunks(source_type="arxiv", source_id="2402.12345")
+        elements = readonly.list_current_fulltext_elements(
+            source_type="arxiv", source_id="2402.12345"
+        )
+
+        after = hashlib.sha256(store.database_path.read_bytes()).hexdigest()
+        assert before == after
+        assert len(chunks) == 1
+        assert chunks[0]["element_id"] == "TEST-element-1"
+        assert chunks[0]["page_number"] == 3
+        assert chunks[0]["char_start"] == 0
+        assert chunks[0]["char_end"] == len(source_text)
+        assert elements == [
+            {
+                "element_id": "TEST-element-1",
+                "order_index": 0,
+                "page_number": 3,
+                "element_type": "paragraph",
+                "section_path": ["TEST Results"],
+                "bbox": [10.0, 20.0, 30.0, 40.0],
+                "text": source_text,
+            }
+        ]
     finally:
         temporary.cleanup()
 

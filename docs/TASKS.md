@@ -1,10 +1,16 @@
 # 任务台账
 
-## 2026-11-12 检索 rerank 实验臂（PR #32 实现中）
+## 2026-11-12 Chunk 策略只读对照（PR #33 实现中）
+
+- 新增 900/1,800 UTF-8 bytes 的结构保留 chunk ablation；原生产 chunker 默认不变。只读 frozen approved corpus + manifest，经 page/element/type/char interval 投影旧 selected-span 锚点；报告 exact span coverage、Hit/MRR/NDCG/Recall、切块/索引构建/搜索时延。记录与 MinerU 图表生成文本隔离。
+- TEST 合成回归和只读 DB 快照验证；全后端 540 passed、Ruff check/format、OpenAPI、pip-audit 通过。
+- 未完成：真实获准全文库不可用，尚未执行真实 A/B，chunk/Rerank 联合选型、人工 gold/人工复核图表集和质量门仍待完成。报告保留 `quality_claim_allowed=false`。
+
+## 2026-11-12 检索 rerank 实验臂（PR #32 Draft，CI 通过）
 
 - 新增只读 `bm25_dense_rerank` 评测臂：BM25 前 128 候选由现有 embedding cosine 重排；Agent 线上默认及 function-call schema 不变，不冒称 cross-encoder，不新增 provider 调用。报告加入 reranker 配置和本地 retrieval latency（不含 query embedding 请求时间）。
 - 定向回归 37 passed；全后端 534 passed（需指定 `--basetemp=.local/pytest-rerank-full-20261112-01` 绕过系统 temp ACL），Ruff check/format、OpenAPI、pip-audit 通过。
-- 未完成：当前 worktree 无本地授权全文数据库，不能对真实 licensed taskset 报策略收益；chunker 仍不可选；真实 MinerU 图表准确率和 MinerU/pdfplumber 对照仍需许可样本与逐项核验。synthetic regression 只验证方法实现，不代表检索质量。
+- 未完成：当前 worktree 无本地授权全文数据库，不能对真实 licensed taskset 报策略收益；chunker side-by-side 现由 PR #33 实现；真实 MinerU 图表准确率和 MinerU/pdfplumber 对照仍需许可样本与逐项核验。synthetic regression 只验证方法实现，不代表检索质量。
 
 ## 2026-11-12 MinerU 视觉证据接入（PR #31 Draft，CI 通过）
 

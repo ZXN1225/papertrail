@@ -38,6 +38,7 @@ ALLOWED_FULLTEXT_LICENSES = {
 MAX_ABSTRACT_POSITIONS = 50_000
 MAX_ABSTRACT_CHARS = 250_000
 MAX_ACTIVE_FULLTEXT_CHUNKS = 50_000
+MAX_CHUNK_ABLATION_SOURCE_BYTES = 25_000_000
 RERANK_CANDIDATE_LIMIT = 128
 
 
@@ -1398,7 +1399,8 @@ class PaperStore:
             rows = connection.execute(
                 f"""SELECT c.chunk_id, c.source_type, c.source_id, c.content_sha256,
                 c.ordinal, c.title, c.retrieval_text AS text, c.evidence_text,
-                c.parent_element_id FROM fulltext_documents d
+                c.parent_element_id, c.char_start, c.char_end, c.page_number, c.element_type,
+                c.element_id, c.bbox_json, c.section_path FROM fulltext_documents d
                 JOIN fulltext_versions v ON v.source_type=d.source_type
                 AND v.source_id=d.source_id AND v.content_sha256=d.current_sha256
                 JOIN fulltext_chunks c ON c.source_type=v.source_type
@@ -1413,6 +1415,55 @@ class PaperStore:
                 "select a source or increase MAX_ACTIVE_FULLTEXT_CHUNKS"
             )
         return [dict(row) for row in rows]
+
+    def list_current_fulltext_elements(
+        self, *, source_type: str, source_id: str
+    ) -> list[dict[str, Any]]:
+        """Load bounded parser elements from one current approved source for offline evaluation."""
+        if self.readonly is not True:
+            raise ValueError("chunk ablation requires a read-only PaperStore")
+        if source_type not in {"openalex", "arxiv"}:
+            raise ValueError("source_type must be openalex or arxiv")
+        if source_type == "openalex" and not re.fullmatch(r"W\d+", source_id):
+            raise ValueError("invalid OpenAlex work ID")
+        if source_type == "arxiv":
+            from app.sources.arxiv import normalize_arxiv_id
+
+            source_id = normalize_arxiv_id(source_id)
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            active_source = connection.execute(
+                """SELECT d.current_sha256 FROM fulltext_documents d
+                WHERE d.source_type=? AND d.source_id=? AND d.status='approved'""",
+                (source_type, source_id),
+            ).fetchone()
+            if active_source is None:
+                return []
+            total_bytes = connection.execute(
+                """SELECT COALESCE(SUM(length(CAST(e.element_json AS BLOB))),0)
+                FROM fulltext_elements e
+                WHERE e.source_type=? AND e.source_id=? AND e.content_sha256=?""",
+                (source_type, source_id, active_source["current_sha256"]),
+            ).fetchone()[0]
+            if total_bytes > MAX_CHUNK_ABLATION_SOURCE_BYTES:
+                raise ValueError("source exceeds the chunk ablation element-size limit")
+            rows = connection.execute(
+                """SELECT e.element_json FROM fulltext_elements e
+                WHERE e.source_type=? AND e.source_id=? AND e.content_sha256=?
+                ORDER BY e.order_index LIMIT ?""",
+                (
+                    source_type,
+                    source_id,
+                    active_source["current_sha256"],
+                    MAX_ACTIVE_FULLTEXT_CHUNKS + 1,
+                ),
+            ).fetchall()
+        if len(rows) > MAX_ACTIVE_FULLTEXT_CHUNKS:
+            raise ValueError("source exceeds the chunk ablation element-count limit")
+        elements = [json.loads(row["element_json"]) for row in rows]
+        if any(not isinstance(element, dict) for element in elements):
+            raise ValueError("stored parser element is malformed")
+        return elements
 
     def list_current_fulltext_metadata(
         self, *, source_type: str | None = None
