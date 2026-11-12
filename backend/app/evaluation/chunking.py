@@ -30,6 +30,8 @@ from app.storage.repository import (
 STRATEGIES = {
     "pdf_structure_900_bytes_v1": (900, 0),
     "pdf_structure_900_bytes_10pct_overlap_v1": (900, 90),
+    "pdf_structure_1200_bytes_v1": (1_200, 0),
+    "pdf_structure_1200_bytes_10pct_overlap_v1": (1_200, 120),
     "pdf_structure_1800_bytes_v1": (MAX_CHUNK_TOKEN_UPPER_BOUND, 0),
     "pdf_structure_1800_bytes_10pct_overlap_v1": (MAX_CHUNK_TOKEN_UPPER_BOUND, 180),
 }

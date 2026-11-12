@@ -323,6 +323,10 @@ def test_strategy_evaluation_runs_both_arms_against_a_read_only_synthetic_snapsh
         report["strategies"]["pdf_structure_900_bytes_10pct_overlap_v1"]["max_overlap_bytes"] == 90
     )
     assert (
+        report["strategies"]["pdf_structure_1200_bytes_10pct_overlap_v1"]["max_overlap_bytes"]
+        == 120
+    )
+    assert (
         report["strategies"]["pdf_structure_1800_bytes_10pct_overlap_v1"]["max_overlap_bytes"]
         == 180
     )
