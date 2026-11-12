@@ -155,18 +155,8 @@ def prepare_task(
 ) -> PreparedTask:
     """Select a pinned built-in skill and its fixed workflow contract."""
     selection = select_skill(task_text)
-    intent_clauses = _INTENT_CLAUSE_BREAKS.split(task_text)
-    affirmative_clauses = tuple(
-        clause
-        for clause in intent_clauses
-        if not _EXTERNAL_NEGATION_CUES.search(clause)
-        and (_EXTERNAL_CUES.search(clause) or _has_named_source_search(clause))
-    )
-    named_sources = tuple(
-        source
-        for source, cue in (("openalex", r"openalex"), ("arxiv", r"arxiv"))
-        if any(re.search(cue, clause, re.IGNORECASE) for clause in affirmative_clauses)
-    )
+    affirmative_clauses = _affirmative_external_clauses(task_text)
+    named_sources = explicit_external_sources(task_text)
     named_search = bool(named_sources)
     explicit_external = bool(affirmative_clauses)
 
@@ -244,8 +234,23 @@ def _has_named_source_search(text: str) -> bool:
 
 def has_explicit_external_request(text: str) -> bool:
     """Require an affirmative clause before enabling public-source tools."""
-    return any(
-        not _EXTERNAL_NEGATION_CUES.search(clause)
-        and (_EXTERNAL_CUES.search(clause) or _has_named_source_search(clause))
+    return bool(_affirmative_external_clauses(text))
+
+
+def explicit_external_sources(text: str) -> tuple[str, ...]:
+    """Return only explicitly requested public providers from affirmative clauses."""
+    clauses = _affirmative_external_clauses(text)
+    return tuple(
+        source
+        for source, cue in (("openalex", r"openalex"), ("arxiv", r"arxiv"))
+        if any(re.search(cue, clause, re.IGNORECASE) for clause in clauses)
+    )
+
+
+def _affirmative_external_clauses(text: str) -> tuple[str, ...]:
+    return tuple(
+        clause
         for clause in _INTENT_CLAUSE_BREAKS.split(text)
+        if not _EXTERNAL_NEGATION_CUES.search(clause)
+        and (_EXTERNAL_CUES.search(clause) or _has_named_source_search(clause))
     )

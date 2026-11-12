@@ -449,15 +449,19 @@ def test_discovery_renders_records_without_review(count, expected):
 
 
 @pytest.mark.parametrize(
-    "question",
+    ("question", "quote"),
     [
-        "不要联网，只搜索我的论文库",
-        "Do not search OpenAlex; use my research library only",
+        ("不要联网，只搜索我的论文库", "不要联网"),
+        ("Do not search OpenAlex; use my research library only", "OpenAlex"),
+        ("不要搜索 OpenAlex，但请在 arXiv 搜索相关研究", "arXiv"),
     ],
 )
-def test_runtime_rejects_external_plan_when_user_negates_online_search(question):
+def test_runtime_rejects_external_plan_outside_user_authorized_scope(question, quote):
     class ExternalPlanModel:
         output_schema = None
+
+        def __init__(self):
+            self.quote = quote
 
         def complete(self, **kwargs):
             return ModelTurn(
@@ -468,7 +472,7 @@ def test_runtime_rejects_external_plan_when_user_negates_online_search(question)
                         "intent": "discover",
                         "objective": "TEST discover",
                         "clarification": "",
-                        "external_request_quote": "不要联网",
+                        "external_request_quote": self.quote,
                         "result_count": 1,
                         "steps": [{"scope": "openalex", "documents": [], "query": "TEST"}],
                     }

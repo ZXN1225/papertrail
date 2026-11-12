@@ -1,9 +1,9 @@
 # 进度
 
-## 2026-11-12 Harness 外部检索否定意图校验（PR #34 准备中）
+## 2026-11-12 Harness 外部检索授权边界（PR #34 Draft，CI 待复核）
 
-- 独立复核发现任务分类将“不要联网 / without online search”仍视作联网请求，且 runtime 只要求模型引用问题原句，否定原句也能满足该条件。现共享同一肯定意图解析器，并在 Harness 分类与 runtime 真正执行 OpenAlex/arXiv 前双重校验；正向指定的其他来源仍可正常执行。
-- 覆盖中英文否定、单一拒绝来源与另一来源明确授权、以及恶意/错误 Plan 在用户拒绝时不得调用外部 Registry。先行回归 5/5 复现失败，修复后定向 69 passed、全后端 551 passed；Ruff、OpenAPI 与 pip-audit 通过，1 条 Starlette 弃用警告为既有项。当前尚未推送 PR #34，待检查改动并提交。
+- 独立复核发现任务分类将“不要联网 / without online search”仍视作联网请求，且 runtime 只要求模型引用问题原句，否定原句也能满足该条件。现共享同一肯定意图解析器，并在 Harness 分类与 runtime 真正执行 OpenAlex/arXiv 前双重校验；模型计划还必须匹配用户明确授权的来源。
+- 覆盖中英文否定、单一拒绝来源与另一来源明确授权，以及拒绝联网/跨来源计划时不调用外部 Registry。先行回归 5/5 复现失败，修复后全后端 552 passed；Ruff check/format、OpenAPI 与 pip-audit 通过，1 条 Starlette 弃用警告为既有项。PR #34 已创建 Draft，最新来源范围补丁推送后需等待 CI。
 - Harness 只读复核另确认 function tool schema 和 Pydantic 双重拒绝额外字段、工具名称白名单、文档范围约束整体成立；否定外部意图是已确认的可执行范围缺口。
 
 ## 2026-11-12 Chunk 策略只读对照（PR #33 Draft，CI 通过）
