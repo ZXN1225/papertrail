@@ -1,6 +1,6 @@
 # 任务台账
 
-## 2026-11-12 Rerank 预检与全文向量索引预算门（PR #41 准备中）
+## 2026-11-12 Rerank 预检与全文向量索引预算门（PR #41 Draft，CI 通过）
 
 - rerank dry-run 已在本机隔离 schema-23 副本核对 9 篇 / 3,294 chunks：3294 缺向量，活动索引不完整；6 条查询仅需 404 UTF-8 bytes、估算 `$0.00000808`；生成全文向量需传输约 825,894 UTF-8 bytes，按配置价字节上限估算 `$0.01651788`。0 provider calls、0 报告写入，原 DB SHA 不变。
 - 全文索引 CLI 现在要求 `--max-chunks` 和 `--max-cost-usd`，真实执行再要求 `--confirm-data-transfer`；dry-run 不创建 provider，限定只补缺失向量，并拒绝超预算/超 chunk/过长 chunk。查询预览的维度未配置会显示未验证，真实 rerank 在请求前失败关闭。

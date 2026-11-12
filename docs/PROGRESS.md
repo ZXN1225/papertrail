@@ -1,6 +1,6 @@
 # 进度
 
-## 2026-11-12 Rerank 索引预算预览与外传门（PR #41 准备中）
+## 2026-11-12 Rerank 索引预算预览与外传门（PR #41 Draft，CI 通过）
 
 - 增加 parent-embedding rerank dry-run：只读核对当前批准语料向量覆盖、维度和查询数/费用；不建 provider、不写报告、不传数据。隔离副本的 9 篇/3,294 chunks 实测全部缺向量；6 条查询上限为 404 UTF-8 bytes、`$0.00000808`，补索引全文的字节费用估算上限约 `$0.01651788`。两项都未调用 provider；本地原 DB SHA 不变。
 - 给全文向量索引 CLI 加 dry-run、`--confirm-data-transfer`、必填 `--max-chunks` 和 `--max-cost-usd`，只处理缺失向量；UTF-8 字节估算超上限、输入过长或预算/题数未提供时在 provider 前拒绝。dry-run 即使 provider disabled 也可用。无维度配置时预览标为未验证且索引不可执行。
