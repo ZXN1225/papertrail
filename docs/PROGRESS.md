@@ -6,6 +6,7 @@
 - 给全文向量索引 CLI 加 dry-run、`--confirm-data-transfer`、必填 `--max-chunks` 和 `--max-cost-usd`，只处理缺失向量；UTF-8 字节估算超上限、输入过长或预算/题数未提供时在 provider 前拒绝。dry-run 即使 provider disabled 也可用。无维度配置时预览标为未验证且索引不可执行。
 - 用户授权本次只针对 9 篇获准来源执行外传。初次和用户更新本机 `.env` 后的重试均在首批收到 `authentication_failed` 后停止；服务端未返回 embedding/usage，本地未写入向量。原数据库 SHA 仍为 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`，隔离副本 hash 也未变化。当前 key 对 embeddings endpoint 仍无效或无权限；需在本机配置有效的 embedding API 凭据后继续，不能在聊天中发送。
 - 诊断修复：embedding 客户端先前把 HTTP 401/403 合并成同一错误码；现在分别报告 `authentication_failed` / `permission_denied`，并已将 403 安全码接通 Harness warning，便于确认凭据与项目权限问题，不在本轮额外发请求。
+- 用户再次配置后，隔离库预览仍为 3,294 chunks / 825,894 UTF-8 bytes；本次进程明确使用此前授权的 `text-embedding-3-small`、1536 维及 `$0.02`/百万 tokens，未采用 `.env` 中已改为 `text-embedding-3-large` 的模型。真实首批请求由新错误分类明确返回 HTTP 401 `authentication_failed`；仍无向量或 usage。当前 `.env` 的 key 无法用于 `https://api.openai.com/v1/embeddings`，需用户在本机更换有效的该 endpoint 凭据。
 - 401/403 映射与 Harness 传播回归共 95 项通过；全后端 `580 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format、OpenAPI hash（未变）、pip-audit 与 diff check 通过。PR #40 基础提交及 PR #41 最新错误分类修复提交的 backend/web/Browser E2E/container CI 全绿；PR #41 保持 Draft，未合并。
 - 当前索引及 rerank 臂仍未跑，不能比较 rerank 效果。PR #40 的 overlap 六臂与本次 dry-run 均为探索诊断，不改变线上默认。
 
