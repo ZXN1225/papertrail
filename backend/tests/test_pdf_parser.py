@@ -344,6 +344,7 @@ def test_mineru_adapter_maps_structured_blocks_and_normalizes_page_bbox(monkeypa
 
     def fake_parse(*args, **kwargs):
         assert kwargs["ocr_mode"] == "txt"
+        assert kwargs["image_analysis"] is False
         return SimpleNamespace(middle_json=middle)
 
     parser_module.parse = fake_parse
@@ -356,10 +357,57 @@ def test_mineru_adapter_maps_structured_blocks_and_normalizes_page_bbox(monkeypa
 
     assert result["parser_version"] == "mineru-4.1.test-papertrail-v11"
     assert result["ocr_mode"] == "txt"
+    assert result["image_analysis_enabled"] is False
     assert result["page_count"] == 1
     assert result["elements"][0]["text"] == "TEST MinerU paragraph"
     assert result["elements"][0]["bbox"] == [61.2, 79.2, 306.0, 158.4]
     assert result["elements"][0]["structured"]["type"] == "text"
+
+
+def test_mineru_advanced_keeps_visual_analysis_out_of_source_exact_text(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "chart"
+        content = [
+            {"type": "chart_caption", "content": "Figure 1: TEST chart"},
+            {"type": "chart_body", "content": "MODEL DESCRIPTION: TEST line rises"},
+        ]
+        bbox = [0.1, 0.1, 0.5, 0.5]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.7")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+
+    def fake_parse(*args, **kwargs):
+        assert kwargs["tier"] == "advanced"
+        assert kwargs["image_analysis"] is True
+        return SimpleNamespace(middle_json=middle)
+
+    parser_module.parse = fake_parse
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table(), tier="advanced")
+
+    figure = result["elements"][0]
+    assert result["image_analysis_enabled"] is True
+    assert figure["text"] == "Figure 1: TEST chart"
+    assert "MODEL DESCRIPTION" in str(figure["structured"])
+    assert figure["structured"]["papertrail_visual_analysis"] == {
+        "status": "model_generated_unverified",
+        "source": "mineru_advanced",
+    }
+    assert "mineru_visual_analysis_unverified" in figure["warnings"]
+    chunks = chunk_pdf_elements(result["elements"])
+    assert [chunk.text for chunk in chunks] == ["Figure 1: TEST chart"]
 
 
 def test_mineru_adapter_reclassifies_prose_misidentified_as_equation(monkeypatch) -> None:

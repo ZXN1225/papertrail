@@ -232,7 +232,7 @@ uv run --locked mineru-kit models download --tier standard --small-backend onnx 
 uv run --locked mineru-kit models verify --tier standard --small-backend onnx --vlm-engine llama-cpp
 ```
 
-首次模型下载需要网络并占用数 GB 磁盘；解析本身在本机执行。Docker 使用持久化 `papertrail-models` 卷，需在首次解析前将相同标准档模型下载到该卷；服务不会在请求时自动联网下载模型。`PAPERTRAIL_MINERU_TIER` 支持 `basic`、`standard`、`advanced`，仓库默认 standard。私有 PDF 解析在本机子进程执行，30 分钟超时，远程 VLM 配置会被拒绝；该子进程尚无操作系统级网络/内存隔离。MinerU 输出经过页数、字符数、bbox 与结构转换边界校验；跨布局人工盲审尚未完成，因此这次接入不代表解析质量已经全面证明。
+首次模型下载需要网络并占用数 GB 磁盘；解析本身在本机执行。Docker 使用持久化 `papertrail-models` 卷，需在首次解析前将对应 tier 所需模型下载到该卷；服务不会在请求时自动联网下载模型。`PAPERTRAIL_MINERU_TIER` 支持 `basic`、`standard`、`advanced`，仓库默认 standard；只有 advanced 开启 image/chart analysis，解析器返回中的生成描述带未核验标记且不作为 Agent 的逐字引用证据。私有 PDF 索引当前不保存/检索这些结构化视觉描述。私有 PDF 解析在本机子进程执行，30 分钟超时，远程 VLM 配置会被拒绝；该子进程尚无操作系统级网络/内存隔离。MinerU 输出经过页数、字符数、bbox 与结构转换边界校验；跨布局人工盲审尚未完成，因此这次接入不代表解析质量已经全面证明。
 
 本机检查单篇 PDF 可运行 `uv run --locked python -m tools.evaluate_mineru_sample ../paper_test/<文件名>.pdf --tier standard`；命令只打印结构与耗时指标。加 `--save-review` 会将原文解析元素写入已忽略的 `backend/reports/live_eval/mineru/`，仅用于本机复核。五篇样本的探索性记录见 [MinerU 试验](research/mineru-five-paper-pilot-2026-11-06.md)。若 Hugging Face 大模型下载停滞，可用同一 `MINERU_HOME` 运行 `uv run --locked mineru-kit models download MinerU2.5-Pro-2605-1.2B-GGUF --source modelscope` 后重新执行 `models verify`。
 

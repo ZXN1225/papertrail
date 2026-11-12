@@ -2028,6 +2028,7 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
         raise ValueError("MinerU input must be a valid PDF no larger than 40 MB")
     if tier not in {"basic", "standard", "advanced"}:
         raise ValueError("MinerU tier must be basic, standard, or advanced")
+    image_analysis_enabled = tier == "advanced"
     import tempfile
 
     try:
@@ -2064,7 +2065,12 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
         with tempfile.TemporaryDirectory(prefix="papertrail-mineru-") as temporary_dir:
             source_path = Path(temporary_dir) / "source.pdf"
             source_path.write_bytes(pdf_bytes)
-            result = parse(source_path, tier=tier, ocr_mode=ocr_mode, image_analysis=False)
+            result = parse(
+                source_path,
+                tier=tier,
+                ocr_mode=ocr_mode,
+                image_analysis=image_analysis_enabled,
+            )
     finally:
         if previous_source is None:
             os.environ.pop("MINERU_MODEL_SOURCE", None)
@@ -2395,6 +2401,10 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                 else:
                     body_text = text
                 text = f"{captions}\n{body_text}".strip() if captions else body_text.strip()
+            if image_analysis_enabled and block.type in {"image", "chart"}:
+                # Keep advanced-tier VLM output out of source-exact text. Preserve its
+                # payload in structured data for a future typed visual-evidence path.
+                text = "\n".join(dict.fromkeys(assigned_figure_captions.get(block_index, [])))
             if not text and block.type not in {"image", "chart"}:
                 continue
             raw_bbox = list(block.bbox) if block.bbox is not None else [0.0, 0.0, 1.0, 1.0]
@@ -2431,6 +2441,8 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                 element_warnings.append("mineru_table_cells_unverified")
             elif element_type == "figure":
                 element_warnings.append("mineru_figure_caption_unverified")
+                if image_analysis_enabled and block.type in {"image", "chart"}:
+                    element_warnings.append("mineru_visual_analysis_unverified")
             if block.bbox is None:
                 element_warnings.append("mineru_bbox_missing_page_fallback")
             if element_type in {"table", "figure"}:
@@ -2445,7 +2457,19 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                 "element_type": element_type,
                 "section_path": section_path.copy(),
                 "text": text,
-                "structured": block_data[block_index],
+                "structured": {
+                    **block_data[block_index],
+                    **(
+                        {
+                            "papertrail_visual_analysis": {
+                                "status": "model_generated_unverified",
+                                "source": "mineru_advanced",
+                            }
+                        }
+                        if image_analysis_enabled and block.type in {"image", "chart"}
+                        else {}
+                    ),
+                },
                 "warnings": element_warnings,
             }
             elements.append(element)
@@ -2629,6 +2653,7 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
     return {
         "parser_version": f"mineru-{middle.metadata.producer.version}-{MINERU_ADAPTER_VERSION}",
         "ocr_mode": ocr_mode,
+        "image_analysis_enabled": image_analysis_enabled,
         "page_count": len(middle.pages),
         "elements": elements,
         "table_regions": table_count,

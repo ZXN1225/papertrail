@@ -43,7 +43,7 @@
 - 只有能解析到明确许可且许可允许本项目拟定处理方式的全文，才可进入全文索引。
 - 许可未知、仅有开放访问标识、或只有可读网页，不自动视为允许保存和重展示。
 - 保留原始来源 URL、许可名称/URL、许可检查时间、内容哈希、抓取时间和处理版本；权限不明确时仅保留元数据与外链。
-- 本地全文导入采用人工核对确认，仅白名单 `CC0-1.0` 与 `CC-BY-4.0`；支持 UTF-8 `.txt` 与显式提供的本地 PDF，不自动下载或抓取。PDF parser 由 `PAPERTRAIL_PDF_PARSER` 选择 MinerU 或 pdfplumber，Compose 默认 MinerU；保存精确解析器/adapter 版本、源文件哈希、页码、元素类型及页面区域。MinerU 路径保留表格结构与图/图注区域关系，但关闭图像语义分析，因此图表中的数值、坐标轴和趋势尚不能作为已解析证据；图注可用于定位检索，不能代表图表理解。pdfplumber 双栏分段使用几何启发式，并保留阅读顺序不确定/旋转文字排除等 warning。两种 parser 的 warning 或通过合成测试都不构成真实语料质量保证。具体文件版权仍由导入者逐篇确认；系统白名单不是法律意见。
+- 本地全文导入采用人工核对确认，仅白名单 `CC0-1.0` 与 `CC-BY-4.0`；支持 UTF-8 `.txt` 与显式提供的本地 PDF，不自动下载或抓取。PDF parser 由 `PAPERTRAIL_PDF_PARSER` 选择 MinerU 或 pdfplumber，Compose 默认 MinerU；保存精确解析器/adapter 版本、源文件哈希、页码、元素类型及页面区域。MinerU 可通过 `PAPERTRAIL_MINERU_TIER=advanced` 显式开启图像/图表分析；解析器返回中的生成描述带 `model_generated_unverified` 标记，不进入 source-exact 证据文本，私有索引当前也不保存/检索它们。标准档保留表格结构与图/图注区域关系；图注可用于定位检索，不能代表图表理解。pdfplumber 双栏分段使用几何启发式，并保留阅读顺序不确定/旋转文字排除等 warning。两种 parser 的 warning 或通过合成测试都不构成真实语料质量保证。具体文件版权仍由导入者逐篇确认；系统白名单不是法律意见。
 
 ## 3. 用户流程
 
