@@ -568,7 +568,7 @@ class PrivateDocumentService:
             "c.user_id=?",
             "d.user_id=c.user_id",
             "d.state='indexed'",
-            "c.element_type NOT IN ('table','figure')",
+            "c.element_type!='table'",
         ]
         params: list[Any] = [user_id]
         if library_only:

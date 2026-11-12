@@ -7,7 +7,13 @@
 - 全后端 561 passed（1 条既有 Starlette 弃用 warning；Windows 系统临时目录 ACL 不允许 pytest 枚举，使用忽略目录 `.local` 作为 basetemp 通过）；Ruff check/format、OpenAPI 导出（SHA-256 `79ae0865e3c382e1f20dfe04b7f1a5573c1d77ac19b45bc439fdbb9d46a585c3`）、pip-audit、`git diff --check` 通过。PR #35 最新 f23a0a7 的 backend/web/container CI 通过。
 - 本轮 BM25 复跑冻结 v27 9 篇许可源 / 6 条 single-reviewer selected-span 任务，排序指标与 PR #35 一致；全候选排序时延本次 mean/p95：1,800-byte 1.03/2.69 ms、900-byte 1.46/4.52 ms，仅作机器诊断。仅在 ignored `.local` 副本迁移 schema 22→23，原库 SHA-256 保持 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`。报告 `quality_claim_allowed=false`、query embedding provider calls 0；来源为 pdfplumber，不是 MinerU。
 - 独立 reviewer agent 在本地视觉抽查 3 篇已权利确认的 MinerU v11 私有 PDF：9 个有图页、16 个 figure chunk 的图注、页码、bbox 均可对应，未发现明显漏识别或错页。此项是 `ai_assisted_unverified` spot check；现有条目无图表轴/图例/数值/趋势独立标签，不能称人工金标或 MinerU 图表理解准确率。
-- PR #36 backend/web/container CI 在 `5935b9b` 全部通过，保持 Draft、未合并 main；图表事实候选集仍在本地复核，不进入 PR。
+- 独立代码复核对 PR #36 未发现阻断项；最新 `4665b68` backend/web/container CI 全部通过，保持 Draft、未合并 main。图表事实候选集仍仅在本地 ignored 路径，不进入 PR。
+
+## 2026-11-12 私有论文图注检索修复（PR #37 Draft 前验证完成）
+
+- 真实私有语料回放发现：MinerU v11 的 16 个 figure caption chunk 已入库，但 `PrivateDocumentService.search_evidence` 与表格一起排除 figure；该数据库又无 advanced visual evidence，caption 精确查询只有 0/16 自身 figure 命中。
+- 最小修复是把私有 figure 原文图注重新加入只读 BM25 候选，同时继续排除未经结构化许可的 table。TEST 回归覆盖图注检索、工具观测保持原文图注、其他账号不可见、table 仍不可检索；定向 private document 测试 8 passed。全后端 561 passed；Ruff check/format、OpenAPI SHA、pip-audit、diff check 通过。
+- 同一 ignored schema-23 只读副本，3 篇 rights-attested MinerU v11 来源、16 个图注自查询在 limit 5 与 8 下均 16/16 命中；这是检索链路 smoke diagnostic，不是独立相关性金标，也没有图表数值/趋势准确率结论。原始数据库 SHA-256 未变化，未发生 Provider calls。新增高级 MinerU caption-only 回归分别验证 source-exact caption 与 `model_generated_unverified` 视觉解释的类型/ID，及跨账号隔离；独立代码 reviewer 未发现 blocker，并确认两种证据是有意区分展示。PR #37 提交与 CI 待完成。
 
 ## 2026-11-12 真实获准语料 Chunk 对照（PR #35 Draft，CI 通过）
 

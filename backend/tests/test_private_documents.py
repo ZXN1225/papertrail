@@ -323,18 +323,47 @@ def test_private_document_index_and_evidence_are_scoped_to_owner(tmp_path, monke
         )["status"]
         == "no_results"
     )
-    assert (
-        service.search_evidence(
-            "figureonlycaptionvalue",
-            user_id=owner,
-            source_type="arxiv",
-            source_id="2401.12345",
-            limit=5,
-        )["status"]
-        == "no_results"
+    figure_caption = service.search_evidence(
+        "figureonlycaptionvalue",
+        user_id=owner,
+        source_type="arxiv",
+        source_id="2401.12345",
+        limit=5,
     )
+    assert figure_caption["status"] == "ok"
+    figure_item = next(
+        item for item in figure_caption["items"] if item["element_id"] == "TEST-private-figure"
+    )
+    assert figure_item["element_type"] == "figure"
+    assert figure_item["excerpt"] == "TEST figureonlycaptionvalue"
+    assert "visual_analysis" not in figure_item
+    hidden_figure = service.search_evidence(
+        "figureonlycaptionvalue",
+        user_id=other,
+        source_type="arxiv",
+        source_id="2401.12345",
+        limit=5,
+    )
+    assert hidden_figure == {"status": "no_results", "items": [], "scanned_chunks": 0}
 
     registry = PaperToolRegistry(store, user_id=owner)
+    figure_observation = registry.execute(
+        "retrieve_paper_evidence",
+        json.dumps(
+            {
+                "query": "figureonlycaptionvalue",
+                "limit": 5,
+                "source_type": "arxiv",
+                "source_id": "2401.12345",
+                "retrieval_method": "bm25",
+            }
+        ),
+    )
+    assert figure_observation["status"] == "ok"
+    assert figure_observation["items"][0]["element_type"] == "figure"
+    assert figure_observation["items"][0]["excerpt"] == "TEST figureonlycaptionvalue"
+    assert "visual_analysis" not in figure_observation["items"][0]
+
     observation = registry.execute(
         "retrieve_paper_evidence",
         json.dumps(
@@ -731,6 +760,33 @@ def test_mineru_visual_analysis_is_separately_retrievable_and_scoped(tmp_path, m
         "parser_version": "mineru-4.1.7-papertrail-v11",
     }
     assert "TEST must not be indexed" not in str(visual)
+    caption_only = service.search_evidence(
+        "TEST caption",
+        user_id=owner,
+        source_type="personal",
+        source_id=document["id"],
+        limit=5,
+    )
+    exact_caption = next(
+        item
+        for item in caption_only["items"]
+        if item["element_type"] == "figure" and "visual_analysis" not in item
+    )
+    caption_visual = next(item for item in caption_only["items"] if "visual_analysis" in item)
+    assert exact_caption["excerpt"] == "Figure 2. TEST caption"
+    assert caption_visual["excerpt"] == exact_caption["excerpt"]
+    assert caption_visual["visual_analysis"]["status"] == "model_generated_unverified"
+    assert exact_caption["chunk_id"] != caption_visual["chunk_id"]
+    assert (
+        service.search_evidence(
+            "TEST caption",
+            user_id=other,
+            source_type="personal",
+            source_id=document["id"],
+            limit=5,
+        )["items"]
+        == []
+    )
     assert (
         PaperToolRegistry(store, user_id=other).execute(
             "retrieve_paper_evidence",

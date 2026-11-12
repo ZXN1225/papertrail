@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 私有论文图注检索修复（PR #37 实现中）
+
+- 真实回放发现私有检索同时排除 table 与 figure；16 个 MinerU v11 图注 chunk 已解析入库但无 advanced visual evidence，exact-caption query 原路径为 0/16 命中。
+- 修复只开放 figure caption source-exact chunks 进入 BM25；table 继续排除，账号过滤和 rights attestation 沿用原边界。定向 TEST 覆盖 caption 原文检索、table 拒绝及跨账号隔离；全后端 561 passed，Ruff/OpenAPI/pip-audit/diff check 通过。
+- 同 ignored 只读 schema-23 副本 16/16 caption self-query 在 top-5/top-8 命中，0 provider calls；原 DB SHA 未变。仅证明图注链路恢复，不证明一般相关性或图表事实解析质量。新增高级 MinerU caption-only 回归验证 exact caption 与未核验视觉解读作为不同记录返回，且跨账号隔离；独立 reviewer 未发现阻断项。PR #36 最新 `4665b68` CI 全绿；PR #37 待提交并运行 CI。
+
 ## 2026-11-12 Chunk × Parent Embedding Proxy Rerank 配对评测（PR #36 Draft，CI 通过）
 
 - 增加 900/1,800-byte × BM25/父 chunk embedding proxy rerank 四臂只读评测；子 chunk 到当前向量父项必须按来源 hash、page、element/type 和半开 span 唯一严格映射，按唯一父 chunk 计算候选预算，缺向量时整臂显式不可用。
