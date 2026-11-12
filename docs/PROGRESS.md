@@ -1,5 +1,10 @@
 # 进度
 
+## 2026-11-12 MinerU 图表定位评测（PR #42 准备中）
+
+- 图表 page audit 增加可选的同页归一化预测/人工框，严格校验 0–1 坐标、非零面积与框数等于对应 chart count；review pack 保留预测框来源并导入人工框，现有 reviewed-content hash 检测导入后改动。报告在 IoU ≥ 0.5 下做一对一最大匹配，独立于原 count metrics 给出定位 precision/recall/F1、已评/未评页数和评测覆盖率；缺框时返回 null，不冒称测过定位。
+- TEST 合成数据覆盖同页计数正确但位置错、重复预测只能匹配一个人工框、漏框、越界/无效框；定向 10 passed、全后端 582 passed。独立代码复核未发现 blocker；审阅包哈希只检测内容漂移，不认证人工身份。真实 MinerU 人工框集和图表事实金标尚未建立，不能宣称解析定位准确率。
+
 ## 2026-11-12 Rerank 索引预算预览与外传门（PR #41 Draft，CI 通过）
 
 - 增加 parent-embedding rerank dry-run：只读核对当前批准语料向量覆盖、维度和查询数/费用；不建 provider、不写报告、不传数据。隔离副本的 9 篇/3,294 chunks 实测全部缺向量；6 条查询上限为 404 UTF-8 bytes、`$0.00000808`，补索引全文的字节费用估算上限约 `$0.01651788`。两项都未调用 provider；本地原 DB SHA 不变。

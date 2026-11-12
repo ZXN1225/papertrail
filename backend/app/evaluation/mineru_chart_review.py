@@ -35,6 +35,17 @@ def _identifier(value: Any, field: str) -> None:
         raise MineruChartReviewError(f"{field} is invalid")
 
 
+def _valid_bbox(value: Any, *, normalized: bool = False) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == 4
+        and all(type(number) in {int, float} and math.isfinite(number) for number in value)
+        and value[2] > value[0]
+        and value[3] > value[1]
+        and (not normalized or (0 <= value[0] < value[2] <= 1 and 0 <= value[1] < value[3] <= 1))
+    )
+
+
 def _reviewed_content_sha256(dataset: dict[str, Any]) -> str:
     content = {
         key: value
@@ -201,13 +212,7 @@ def validate_dataset(dataset: Any) -> None:
                 "chart task source lineage differs from its source manifest"
             )
         bbox = task.get("bbox")
-        if (
-            not isinstance(bbox, list)
-            or len(bbox) != 4
-            or any(type(value) not in {int, float} or not math.isfinite(value) for value in bbox)
-            or bbox[2] <= bbox[0]
-            or bbox[3] <= bbox[1]
-        ):
+        if not _valid_bbox(bbox):
             raise MineruChartReviewError("chart task bbox is invalid")
         facts = task.get("predicted_facts")
         if not isinstance(facts, list) or len(facts) > 100:
@@ -231,8 +236,10 @@ def validate_dataset(dataset: Any) -> None:
             "page_image_sha256",
             "parse_report_sha256",
             "predicted_chart_count",
+            "predicted_chart_bboxes",
             "review_status",
             "reference_chart_count",
+            "reference_chart_bboxes",
             "reviewed",
             "review_note",
         }:
@@ -275,6 +282,13 @@ def validate_dataset(dataset: Any) -> None:
         ):
             raise MineruChartReviewError("page image reference must stay inside the local dataset")
         _sha(audit.get("page_image_sha256"), "page_image_sha256")
+        predicted_boxes = audit.get("predicted_chart_bboxes")
+        if "predicted_chart_bboxes" in audit and (
+            not isinstance(predicted_boxes, list)
+            or len(predicted_boxes) != audit["predicted_chart_count"]
+            or any(not _valid_bbox(box, normalized=True) for box in predicted_boxes)
+        ):
+            raise MineruChartReviewError("predicted chart boxes must match the predicted count")
         if audit.get("review_status") == "reviewed":
             if (
                 audit.get("reviewed") is not True
@@ -282,12 +296,27 @@ def validate_dataset(dataset: Any) -> None:
                 or not 0 <= audit["reference_chart_count"] <= 100
             ):
                 raise MineruChartReviewError("reviewed page audit needs a reference chart count")
+            reference_boxes = audit.get("reference_chart_bboxes")
+            if "reference_chart_bboxes" in audit and (
+                not isinstance(reference_boxes, list)
+                or len(reference_boxes) != audit["reference_chart_count"]
+                or any(not _valid_bbox(box, normalized=True) for box in reference_boxes)
+            ):
+                raise MineruChartReviewError("reference chart boxes must match the reviewed count")
         elif audit.get("review_status") == "uncertain":
-            if audit.get("reviewed") is not True or audit.get("reference_chart_count") is not None:
+            if (
+                audit.get("reviewed") is not True
+                or audit.get("reference_chart_count") is not None
+                or "reference_chart_bboxes" in audit
+            ):
                 raise MineruChartReviewError(
                     "uncertain page audit must not carry a reference count"
                 )
-        elif audit.get("review_status") is not None or audit.get("reviewed") is not None:
+        elif (
+            audit.get("review_status") is not None
+            or audit.get("reviewed") is not None
+            or "reference_chart_bboxes" in audit
+        ):
             raise MineruChartReviewError("page audit review status is invalid")
     if any((task["source_id"], task["page_number"]) not in source_page_splits for task in tasks):
         raise MineruChartReviewError("every chart QA task page must have a page-presence audit")
@@ -387,6 +416,11 @@ def build_review_pack(dataset: dict[str, Any], dataset_sha256: str) -> dict[str,
                 "page_image_sha256": audit["page_image_sha256"],
                 "parse_report_sha256": audit["parse_report_sha256"],
                 "predicted_chart_count": audit["predicted_chart_count"],
+                **(
+                    {"predicted_chart_bboxes": audit["predicted_chart_bboxes"]}
+                    if "predicted_chart_bboxes" in audit
+                    else {}
+                ),
                 "review_status": None,
                 "reference_chart_count": None,
                 "reviewed": False,
@@ -471,6 +505,11 @@ def apply_review_pack(
         reviewed_audits[audit_id] = {
             "review_status": status,
             "reference_chart_count": expected_count,
+            **(
+                {"reference_chart_bboxes": row["reference_chart_bboxes"]}
+                if "reference_chart_bboxes" in row
+                else {}
+            ),
             "reviewed": True,
             "review_note": note,
         }
@@ -600,6 +639,39 @@ def _match_fact_indices(
     )
 
 
+def _box_iou(first: list[float], second: list[float]) -> float:
+    width = max(0, min(first[2], second[2]) - max(first[0], second[0]))
+    height = max(0, min(first[3], second[3]) - max(first[1], second[1]))
+    intersection = width * height
+    first_area = (first[2] - first[0]) * (first[3] - first[1])
+    second_area = (second[2] - second[0]) * (second[3] - second[1])
+    return intersection / (first_area + second_area - intersection)
+
+
+def _matched_chart_boxes(predicted: list[list[float]], reference: list[list[float]]) -> int:
+    edges = [
+        [index for index, box in enumerate(reference) if _box_iou(prediction, box) >= 0.5]
+        for prediction in predicted
+    ]
+    matched_reference: dict[int, int] = {}
+
+    def match(prediction_index: int, seen: set[int]) -> bool:
+        for reference_index in edges[prediction_index]:
+            if reference_index in seen:
+                continue
+            seen.add(reference_index)
+            if reference_index not in matched_reference or match(
+                matched_reference[reference_index], seen
+            ):
+                matched_reference[reference_index] = prediction_index
+                return True
+        return False
+
+    for prediction_index in range(len(predicted)):
+        match(prediction_index, set())
+    return len(matched_reference)
+
+
 def evaluate_reviewed_dataset(dataset: dict[str, Any], dataset_sha256: str) -> dict[str, Any]:
     validate_dataset(dataset)
     _sha(dataset_sha256, "dataset_sha256")
@@ -666,6 +738,20 @@ def evaluate_reviewed_dataset(dataset: dict[str, Any], dataset_sha256: str) -> d
         row["predicted_chart_count"] == 0 and row["reference_chart_count"] > 0
         for row in scored_audits
     )
+    localized_pages = [
+        row
+        for row in scored_audits
+        if row.get("predicted_chart_bboxes") is not None
+        and row.get("reference_chart_bboxes") is not None
+    ]
+    localization_counts = [
+        sum(
+            _matched_chart_boxes(row["predicted_chart_bboxes"], row["reference_chart_bboxes"])
+            for row in localized_pages
+        ),
+        sum(len(row["predicted_chart_bboxes"]) for row in localized_pages),
+        sum(len(row["reference_chart_bboxes"]) for row in localized_pages),
+    ]
     return {
         "schema": "papertrail.mineru-chart-evaluation.v1",
         "dataset_id": dataset.get("dataset_id"),
@@ -696,6 +782,13 @@ def evaluate_reviewed_dataset(dataset: dict[str, Any], dataset_sha256: str) -> d
             "missed_figure_page_count": missed_figure_pages,
             "missed_figure_page_rate": missed_figure_pages / len(scored_audits),
             "count_metrics": _prf([detection_true_positive, detected_count, reference_count]),
+            "localization": {
+                "iou_threshold": 0.5,
+                "evaluated_page_count": len(localized_pages),
+                "not_evaluated_page_count": len(scored_audits) - len(localized_pages),
+                "evaluated_page_rate": len(localized_pages) / len(scored_audits),
+                "metrics": _prf(localization_counts) if localized_pages else None,
+            },
         },
         "tasks": task_rows,
     }

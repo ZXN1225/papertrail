@@ -185,6 +185,65 @@ def test_chart_review_pack_scores_fact_types_tolerance_and_abstention() -> None:
     assert report["chart_detection"]["exact_chart_count_page_accuracy"] == 0.5
     assert report["chart_detection"]["missed_figure_page_count"] == 1
     assert report["chart_detection"]["count_metrics"]["recall"] == 0.5
+    assert report["chart_detection"]["localization"]["metrics"] is None
+    assert report["chart_detection"]["localization"]["not_evaluated_page_count"] == 2
+    assert report["chart_detection"]["localization"]["evaluated_page_rate"] == 0.0
+
+
+def test_chart_localization_requires_spatial_overlap_and_one_to_one_matches() -> None:
+    dataset = _dataset()
+    dataset["page_audits"][0]["predicted_chart_bboxes"] = [[0, 0, 0.3, 0.3], [0, 0, 0.3, 0.3]]
+    dataset["page_audits"][0]["predicted_chart_count"] = 2
+    dataset["page_audits"][1]["predicted_chart_bboxes"] = []
+    dataset["page_audits"][2]["predicted_chart_bboxes"] = []
+    digest = _hash("dataset-with-boxes")
+    pack = _complete_pack(dataset, digest)
+    pack["page_audits"][0]["reference_chart_bboxes"] = [[0, 0, 0.3, 0.3]]
+    pack["page_audits"][1]["reference_chart_bboxes"] = [[0, 0, 0.3, 0.3]]
+    pack["page_audits"][2]["reference_chart_bboxes"] = []
+    reviewed = apply_review_pack(dataset, digest, pack, reviewer="TEST reviewer")
+
+    report = evaluate_reviewed_dataset(reviewed, _hash("reviewed-with-boxes"))
+    localization = report["chart_detection"]["localization"]
+    assert localization["iou_threshold"] == 0.5
+    assert localization["evaluated_page_count"] == 2
+    assert localization["not_evaluated_page_count"] == 0
+    assert localization["evaluated_page_rate"] == 1.0
+    assert localization["metrics"]["true_positive"] == 1
+    assert localization["metrics"]["predicted"] == 2
+    assert localization["metrics"]["reference"] == 2
+
+    misplaced = copy.deepcopy(dataset)
+    misplaced["page_audits"][0]["predicted_chart_bboxes"] = [[0.7, 0.7, 1, 1]]
+    misplaced["page_audits"][0]["predicted_chart_count"] = 1
+    misplaced_pack = _complete_pack(misplaced, digest)
+    for row, reference_boxes in zip(
+        misplaced_pack["page_audits"], ([[0, 0, 0.3, 0.3]], [[0, 0, 0.3, 0.3]], []), strict=True
+    ):
+        row["reference_chart_bboxes"] = reference_boxes
+    reviewed = apply_review_pack(misplaced, digest, misplaced_pack, reviewer="TEST reviewer")
+    report = evaluate_reviewed_dataset(reviewed, _hash("misplaced-reviewed"))
+    assert report["chart_detection"]["count_metrics"]["true_positive"] == 1
+    assert report["chart_detection"]["localization"]["metrics"]["true_positive"] == 0
+
+
+def test_chart_localization_rejects_mismatched_or_invalid_review_boxes() -> None:
+    dataset = _dataset()
+    dataset["page_audits"][0]["predicted_chart_bboxes"] = []
+    with pytest.raises(MineruChartReviewError, match="predicted chart boxes"):
+        validate_dataset(dataset)
+
+    dataset["page_audits"][0]["predicted_chart_bboxes"] = [[0, 0, 0.3, 0.3]]
+    dataset["page_audits"][0]["predicted_chart_bboxes"] = [[0, 0, 1.2, 0.3]]
+    with pytest.raises(MineruChartReviewError, match="predicted chart boxes"):
+        validate_dataset(dataset)
+
+    dataset["page_audits"][0]["predicted_chart_bboxes"] = [[0, 0, 0.3, 0.3]]
+    digest = _hash("dataset-with-boxes")
+    pack = _complete_pack(dataset, digest)
+    pack["page_audits"][0]["reference_chart_bboxes"] = [[0, 0, float("nan"), 0.3]]
+    with pytest.raises(MineruChartReviewError, match="reference chart boxes"):
+        apply_review_pack(dataset, digest, pack, reviewer="TEST reviewer")
 
 
 def test_chart_review_requires_complete_reviewed_rows() -> None:
