@@ -193,6 +193,7 @@ def test_chart_judge_returns_blinded_budgeted_diagnostic() -> None:
     assert report["judge_summary"]["supported_fact_f1"] == 0.75
     assert all("page_image_ref" not in call["input_items"][0]["text"] for call in model.requests)
     assert all(call["tools"] == [] for call in model.requests)
+    assert all("partly addresses the question" in call["instructions"] for call in model.requests)
     assert guarded.estimated_spend_usd != "0"
 
 

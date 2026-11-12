@@ -31,7 +31,11 @@ JUDGE_INSTRUCTIONS = (
     "Match semantic equivalents conservatively; preserve units and numeric values. "
     "Never infer facts absent from the reference. Classify each predicted and reference fact "
     "exactly once. Judge abstention against reference_status. The reference labels are the "
-    "adjudication target; do not rewrite them."
+    "adjudication target; do not rewrite them. Use the same anchored 1-to-5 scales for every "
+    "task: semantic_relevance 1=unrelated, 3=partly addresses the question, 5=directly answers "
+    "it; fact_faithfulness 1=most claims unsupported or contradicted, 3=mixed support, "
+    "5=all claims supported by the references with numeric values and units preserved. "
+    "Use 2 or 4 only for intermediate cases."
 )
 
 JUDGE_OUTPUT_SCHEMA: dict[str, Any] = {
