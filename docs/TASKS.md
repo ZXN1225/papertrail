@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 检索 rerank 实验臂（PR #32 实现中）
+
+- 新增只读 `bm25_dense_rerank` 评测臂：BM25 前 128 候选由现有 embedding cosine 重排；Agent 线上默认及 function-call schema 不变，不冒称 cross-encoder，不新增 provider 调用。报告加入 reranker 配置和本地 retrieval latency（不含 query embedding 请求时间）。
+- 定向回归 37 passed；全后端 534 passed（需指定 `--basetemp=.local/pytest-rerank-full-20261112-01` 绕过系统 temp ACL），Ruff check/format、OpenAPI、pip-audit 通过。
+- 未完成：当前 worktree 无本地授权全文数据库，不能对真实 licensed taskset 报策略收益；chunker 仍不可选；真实 MinerU 图表准确率和 MinerU/pdfplumber 对照仍需许可样本与逐项核验。synthetic regression 只验证方法实现，不代表检索质量。
+
 ## 2026-11-12 MinerU 视觉证据接入（PR #31 Draft，CI 通过）
 
 - 将 advanced 图像/图表模型描述独立于逐字全文切片存储，并限制来源为 adapter 明确标注的 MinerU generated description 字段；私有 BM25 可检索，Harness 与引用 UI 必须显式标“未核验”，精确图注仍单独展示。账号/文档权限和删除级联沿用现有私有文档边界；每份文档最多 128 项、账号最多 2,560 项；表格仍保持排除。解析器元素和文档级 warning 均保留未核验标记。

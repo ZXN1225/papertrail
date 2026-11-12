@@ -35,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--retrieval-method",
-        choices=("bm25", "dense", "hybrid"),
+        choices=("bm25", "dense", "hybrid", "bm25_dense_rerank"),
         action="append",
         help="repeat to compare methods; BM25 alone is the zero-provider default",
     )
@@ -65,16 +65,16 @@ def embed_task_queries(
     client_factory=OpenAIEmbeddingClient,
 ) -> tuple[dict[str, list[float]], dict[str, Any]]:
     if not confirm_data_transfer:
-        raise ValueError("dense or hybrid retrieval requires --confirm-data-transfer")
+        raise ValueError("embedding-based retrieval requires --confirm-data-transfer")
     tasks = dataset["tasks"]
     if max_query_embeddings is None or max_query_embeddings < len(tasks):
         raise ValueError("--max-query-embeddings must cover the complete task set")
     if settings.embedding_provider != "openai" or settings.embedding_price_per_million_usd is None:
         raise ValueError(
-            "priced OpenAI embeddings must be configured for dense or hybrid retrieval"
+            "priced OpenAI embeddings must be configured for embedding-based retrieval"
         )
     if max_cost_usd is None:
-        raise ValueError("dense or hybrid retrieval requires --max-cost-usd")
+        raise ValueError("embedding-based retrieval requires --max-cost-usd")
     cost_limit = _decimal_cost(max_cost_usd)
     queries = [task["question"] for task in tasks]
     if any(not query.strip() or len(query) > MAX_INPUT_CHARS for query in queries):
@@ -135,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "estimated_upper_bound_cost_usd": "0",
             "calculated_cost_usd": "0",
         }
-        if any(method in {"dense", "hybrid"} for method in methods):
+        if any(method != "bm25" for method in methods):
             embeddings, embedding_usage = embed_task_queries(
                 dataset,
                 settings,

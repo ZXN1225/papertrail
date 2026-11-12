@@ -1,5 +1,12 @@
 # 进度
 
+## 2026-11-12 检索 rerank 实验臂（实现与验证中）
+
+- 冻结索引的只读 AI 标注评测现在提供 `bm25_dense_rerank`：BM25 前 128 候选再以已索引 embedding cosine 排序；不新增模型依赖或第二次 provider 调用，候选外证据无法被恢复。它是 dense-vector rerank，不是 cross-encoder，也未改变线上 Agent 的工具协议或默认方法。
+- 报告记录 reranker 类型/候选上限、embedding 模型与不含 query embedding provider 时间的检索时延；AI 标签和 synthetic 测试仍声明 `quality_claim_allowed=false`。真实许可语料尚未在当前 worktree 可用，因此没有真实四臂结果或策略胜者。
+- 本轮定向 37 项、全后端 534 项通过；Ruff check/format、OpenAPI 导出、pip-audit 通过。pytest 必须显式指定仓库忽略的 `backend/.local/pytest-rerank-full-20261112-01` basetemp，Windows 系统 temp ACL 会导致默认路径 setup errors。
+- 实验协议与限制见 [检索 rerank 对照说明](research/retrieval-rerank-experiment.md)。Chunk 策略仍只有活动索引版本，后续工作需实现带原文位置映射的 side-by-side chunking 对照；图表解析准确率仍缺获准且人工核对的样本集。
+
 ## 2026-11-12 MinerU 视觉证据接入（PR #31 Draft，CI 通过）
 
 - MinerU advanced 的图表/图片生成描述现通过新的独立 SQLite 表按账号、文档、解析器版本、PDF hash、页码和 bbox 保存；仅接受 adapter 添加的 `model_generated_unverified` 标记及 `chart_body`/`image_body` 字段，不把生成结果拼进 source-exact chunk 或 embeddings。每份文档最多保存 128 项，每项描述最多 2,000 字符；检索预算按账号最多 20 篇文件计算为 2,560 项。

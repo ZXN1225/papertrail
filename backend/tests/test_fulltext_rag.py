@@ -494,7 +494,8 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         _ingest(
             store,
             "# Lexical\n\nExact lexical phrase matches this passage.\n\n"
-            "# Semantic\n\nMeaning based retrieval can find this second passage.",
+            "# Semantic\n\nLexical phrase appears here, while meaning based retrieval "
+            "can find this passage.",
         )
         chunks = store.list_current_fulltext_chunks(source_type="openalex", source_id="W900")
         assert len(chunks) == 2
@@ -530,6 +531,14 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
             query_embedding=[0.0, 1.0],
             embedding_model="fake-test-encoder-v1",
         )
+        reranked = store.search_fulltext_evidence(
+            "exact lexical phrase",
+            source_type="openalex",
+            source_id="W900",
+            retrieval_method="bm25_dense_rerank",
+            query_embedding=[0.0, 1.0],
+            embedding_model="fake-test-encoder-v1",
+        )
         assert dense["retrieval_method"] == "dense_cosine_v1"
         assert dense["items"][0]["chunk_id"] == chunks[1]["chunk_id"]
         assert dense["items"][0]["license_id"] == "CC-BY-4.0"
@@ -538,6 +547,8 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         assert all(
             item["content_sha256"] == chunks[0]["content_sha256"] for item in hybrid["items"]
         )
+        assert reranked["retrieval_method"] == "bm25_dense_rerank_v1"
+        assert reranked["items"][0]["chunk_id"] == chunks[1]["chunk_id"]
         store.delete_fulltext("openalex", "W900", reason="acceptance deletion test")
         after_delete = store.search_fulltext_evidence(
             "semantic neighbor query",
@@ -597,6 +608,13 @@ def test_dense_retrieval_reports_incomplete_index_and_refuses_stale_embedding_wr
             embedding_model="new-model-v1",
         )
         assert missing["status"] == "embeddings_missing"
+        missing_reranker = store.search_fulltext_evidence(
+            "replacement",
+            retrieval_method="bm25_dense_rerank",
+            query_embedding=[1.0, 0.0],
+            embedding_model="new-model-v1",
+        )
+        assert missing_reranker["status"] == "embeddings_missing"
         with pytest.raises(ValueError, match="current approved"):
             store.store_fulltext_embeddings(
                 model="fake-test-encoder-v1",

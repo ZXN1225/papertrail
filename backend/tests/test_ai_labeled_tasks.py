@@ -119,6 +119,7 @@ class _ReadOnlyStore:
                 "bm25": "bm25_fulltext_v3",
                 "dense": "dense_cosine_v1",
                 "hybrid": "hybrid_rrf_v3",
+                "bm25_dense_rerank": "bm25_dense_rerank_v1",
             }[kwargs["retrieval_method"]],
             "scanned_chunks": 3,
             "truncated": False,
@@ -327,6 +328,36 @@ def test_dense_retrieval_uses_frozen_query_vectors() -> None:
     assert store.search_calls[0]["retrieval_method"] == "dense"
     assert store.search_calls[0]["query_embedding"] == [0.5, 0.5]
     assert store.search_calls[0]["embedding_model"] == "TEST-embedding-model"
+
+
+def test_dense_rerank_uses_frozen_query_vectors_and_keeps_quality_claim_disabled() -> None:
+    store = _ReadOnlyStore()
+    task_ids = [task["task_id"] for task in _dataset()["tasks"]]
+    vectors = {task_id: [0.5, 0.5] for task_id in task_ids}
+
+    report = run_evaluation(
+        store,
+        _dataset(),
+        DATASET_SHA,
+        retrieval_method="bm25_dense_rerank",
+        query_embeddings=vectors,
+        embedding_model="TEST-embedding-model",
+    )
+
+    assert report["retrieval"]["method"] == "bm25_dense_rerank_v1"
+    assert report["retrieval"]["reranker"] == {
+        "type": "dense_embedding_cosine",
+        "candidate_generator": "bm25",
+        "candidate_limit": 128,
+    }
+    assert report["retrieval"]["retrieval_latency_ms"]["mean"] >= 0
+    assert (
+        report["retrieval"]["retrieval_latency_ms"]["includes_query_embedding_provider_latency"]
+        is False
+    )
+    assert report["quality_claim_allowed"] is False
+    assert store.search_calls[0]["retrieval_method"] == "bm25_dense_rerank"
+    assert store.search_calls[0]["query_embedding"] == [0.5, 0.5]
 
 
 def test_dense_retrieval_requires_complete_finite_vectors() -> None:

@@ -38,6 +38,7 @@ ALLOWED_FULLTEXT_LICENSES = {
 MAX_ABSTRACT_POSITIONS = 50_000
 MAX_ABSTRACT_CHARS = 250_000
 MAX_ACTIVE_FULLTEXT_CHUNKS = 50_000
+RERANK_CANDIDATE_LIMIT = 128
 
 
 class StoreError(RuntimeError):
@@ -1104,8 +1105,8 @@ class PaperStore:
             raise ValueError("query must contain 1 to 256 non-whitespace characters")
         if not 1 <= limit <= 8:
             raise ValueError("limit must be 1-8")
-        if retrieval_method not in {"bm25", "dense", "hybrid"}:
-            raise ValueError("retrieval_method must be bm25, dense or hybrid")
+        if retrieval_method not in {"bm25", "dense", "hybrid", "bm25_dense_rerank"}:
+            raise ValueError("unsupported retrieval method")
         if retrieval_method != "bm25" and (query_embedding is None or not embedding_model):
             raise ValueError("dense and hybrid retrieval require an embedding and model")
         if source_type is None and source_id is not None:
@@ -1167,6 +1168,7 @@ class PaperStore:
                     "bm25": "bm25_fulltext_v3",
                     "dense": "dense_cosine_v1",
                     "hybrid": "hybrid_rrf_v3",
+                    "bm25_dense_rerank": "bm25_dense_rerank_v1",
                 }[retrieval_method],
             }
         if not rows:
@@ -1179,6 +1181,7 @@ class PaperStore:
                     "bm25": "bm25_fulltext_v3",
                     "dense": "dense_cosine_v1",
                     "hybrid": "hybrid_rrf_v3",
+                    "bm25_dense_rerank": "bm25_dense_rerank_v1",
                 }[retrieval_method],
             }
         docs = [
@@ -1220,7 +1223,11 @@ class PaperStore:
             ranked_ids = [(hit.openalex_id, hit.score) for hit in lexical_hits[:limit]]
             method_name = "bm25_fulltext_v3"
         else:
-            method_name = "dense_cosine_v1" if retrieval_method == "dense" else "hybrid_rrf_v3"
+            method_name = {
+                "dense": "dense_cosine_v1",
+                "hybrid": "hybrid_rrf_v3",
+                "bm25_dense_rerank": "bm25_dense_rerank_v1",
+            }[retrieval_method]
             missing_embeddings = sum(row["vector_json"] is None for row in rows)
             if not rows:
                 ranked_ids = []
@@ -1239,6 +1246,16 @@ class PaperStore:
                 if retrieval_method == "dense":
                     ranked_ids = dense_hits[:limit]
                     method_name = "dense_cosine_v1"
+                elif retrieval_method == "bm25_dense_rerank":
+                    candidate_ids = {
+                        hit.openalex_id for hit in lexical_hits[:RERANK_CANDIDATE_LIMIT]
+                    }
+                    candidate_vectors = {
+                        chunk_id: vectors[chunk_id]
+                        for chunk_id in candidate_ids
+                        if chunk_id in vectors
+                    }
+                    ranked_ids = dense_rank(query_embedding or [], candidate_vectors)[:limit]
                 else:
                     ranked_ids = reciprocal_rank_fusion(
                         [

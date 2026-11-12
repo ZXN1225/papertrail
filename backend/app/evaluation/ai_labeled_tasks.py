@@ -6,8 +6,9 @@ standing, so an AI-labeled set can never be reported as human-verified quality.
 
 It measures retrieval deterministically, with optional precomputed query embeddings:
 
-* **evidence grounding** — for an answerable task, does BM25 over the whole approved
-  corpus retrieve its evidence anchors? Multi-hop tasks can declare all required chunks;
+* **evidence grounding** — does the selected BM25, dense, hybrid or reranked retriever
+  over the whole approved corpus retrieve the evidence anchors? Multi-hop tasks can declare
+  all required chunks;
   older tasks without them are explicitly reported as unmeasured for complete coverage.
 * **negative-task behaviour** — for a task the corpus cannot answer, how much lexical
   material does the retriever still surface? Reported as diagnostics, never as a
@@ -22,19 +23,20 @@ import math
 import platform
 import re
 import statistics
+import time
 from pathlib import Path
 from typing import Any
 
 from app.evaluation.metrics import score_query
 from app.retrieval.parser_versions import is_supported_pdf_parser_version
 from app.retrieval.tokenizer import TOKENIZER_VERSION
-from app.storage.repository import PaperStore
+from app.storage.repository import RERANK_CANDIDATE_LIMIT, PaperStore
 
-REPORT_SCHEMA = "papertrail.ai-labeled-tasks-report.v3"
+REPORT_SCHEMA = "papertrail.ai-labeled-tasks-report.v4"
 DATASET_SCHEMA = "papertrail.ai-labeled-tasks.v1"
 LABEL_SOURCE = "ai_agent_review"
 TEST_LABEL_SOURCE = "test_fixture"
-SCORING_VERSION = "bm25-fulltext-evidence-top-k-v2-multi-anchor"
+SCORING_VERSION = "fulltext-evidence-top-k-v3-multi-anchor-rerank"
 
 
 class AiLabeledTaskError(ValueError):
@@ -178,8 +180,8 @@ def run_evaluation(
     validate_dataset(dataset)
     if not _is_sha256(dataset_sha256):
         raise AiLabeledTaskError("dataset_sha256 must be a lowercase SHA-256 digest")
-    if retrieval_method not in {"bm25", "dense", "hybrid"}:
-        raise AiLabeledTaskError("retrieval_method must be bm25, dense or hybrid")
+    if retrieval_method not in {"bm25", "dense", "hybrid", "bm25_dense_rerank"}:
+        raise AiLabeledTaskError("unsupported retrieval method")
     if retrieval_method == "bm25":
         if query_embeddings is not None or embedding_model is not None:
             raise AiLabeledTaskError("BM25 evaluation does not accept query embeddings")
@@ -189,7 +191,7 @@ def run_evaluation(
         or not isinstance(embedding_model, str)
         or not embedding_model.strip()
     ):
-        raise AiLabeledTaskError("dense and hybrid evaluation require one embedding per task")
+        raise AiLabeledTaskError("embedding-based evaluation requires one embedding per task")
     if query_embeddings is not None and any(
         not isinstance(vector, list)
         or not vector
@@ -224,7 +226,9 @@ def run_evaluation(
 
     top_k = dataset["top_k"]
     task_rows: list[dict[str, Any]] = []
+    retrieval_latencies_ms: list[float] = []
     for task in dataset["tasks"]:
+        started = time.perf_counter_ns()
         result = store.search_fulltext_evidence(
             task["question"],
             limit=top_k,
@@ -234,6 +238,7 @@ def run_evaluation(
             query_embedding=(query_embeddings or {}).get(task["task_id"]),
             embedding_model=embedding_model,
         )
+        retrieval_latencies_ms.append((time.perf_counter_ns() - started) / 1_000_000)
         if result.get("status") not in {"ok", "no_results"}:
             raise AiLabeledTaskError(f"retrieval returned {result.get('status')}")
         if result.get("truncated") or result.get("scanned_chunks") != expected_total:
@@ -257,6 +262,7 @@ def run_evaluation(
             "retrieved_source_ids": [item.get("source_id") for item in items],
             "top1_score": scores[0] if scores else None,
             "retrieved_candidate_count": len(items),
+            "retrieval_latency_ms": retrieval_latencies_ms[-1],
         }
         if task["expected_answerable"]:
             reference_chunk_id = task["evidence"]["chunk_id"]
@@ -368,6 +374,7 @@ def run_evaluation(
         for row in answerable
         if row["complete_evidence_coverage"] is not None
     ]
+    ordered_latencies = sorted(retrieval_latencies_ms)
 
     return {
         "report_schema": REPORT_SCHEMA,
@@ -402,6 +409,21 @@ def run_evaluation(
             "scanned_chunks_per_query": expected_total,
             "query_embedding_model": embedding_model,
             "query_embedding_count": len(query_embeddings) if query_embeddings is not None else 0,
+            "reranker": (
+                {
+                    "type": "dense_embedding_cosine",
+                    "candidate_generator": "bm25",
+                    "candidate_limit": RERANK_CANDIDATE_LIMIT,
+                }
+                if retrieval_method == "bm25_dense_rerank"
+                else None
+            ),
+            "retrieval_latency_ms": {
+                "mean": statistics.fmean(retrieval_latencies_ms),
+                "p50": ordered_latencies[max(0, (len(ordered_latencies) - 1) // 2)],
+                "p95": ordered_latencies[max(0, math.ceil(0.95 * len(ordered_latencies)) - 1)],
+                "includes_query_embedding_provider_latency": False,
+            },
         },
         "runner_config": {
             "scoring": SCORING_VERSION,
