@@ -1,10 +1,11 @@
 # 任务台账
 
-## 2026-11-12 MinerU advanced 图表分析开关（PR #30 进行中）
+## 2026-11-12 MinerU advanced 图表分析开关（PR #30 草稿，CI 通过）
 
 - 修复 `image_analysis=False` 硬编码；仅 `PAPERTRAIL_MINERU_TIER=advanced` 向本地 MinerU 开启 image/chart analysis，standard 默认保持关闭。私有 PDF worker 现在读取该 tier 配置。
 - 解析器返回将视觉模型输出保留在结构化内容并标为 `model_generated_unverified`；advanced 的 figure/chart chunk 文本限定为来源 caption，模型生成内容不会变成逐字原文证据。私有索引尚不持久化或检索这些视觉描述。
 - 定向 81 项通过，Ruff check/format 通过。未完成：Agent 尚未检索这些结构化视觉输出；缺真实获准 MinerU 图表评测集；解析性能/内存/耗时和图表数值准确率未测，因此不可称图表问答已实现或质量达标。
+- 全后端 532 passed；OpenAPI、pip-audit 和 diff check 通过；PR #30 backend/web Browser E2E/container 全绿，Draft 堆叠 PR #29、未合并。
 
 ## 2026-11-12 MinerU 评测解析器版本解锁（PR #29 草稿，CI 通过）
 
