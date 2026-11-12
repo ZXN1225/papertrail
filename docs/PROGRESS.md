@@ -1,9 +1,9 @@
 # 进度
 
-## 2026-11-12 MinerU 评测解析器版本解锁（PR #29 准备中）
+## 2026-11-12 MinerU 评测解析器版本解锁（PR #29 草稿，CI 通过）
 
 - 两套只读全文评测原先仅接受 `pdfplumber-layout-vN`，与 MinerU 实际产生的 `mineru-<version>-papertrail-vN` 不兼容，导致 MinerU 索引无法进入已建的检索评测链路。现统一接受这两类明确版本化的 PaperTrail PDF parser 标识；未知 parser 仍拒绝，且运行时仍逐字比对 manifest 与活动索引版本、许可及内容哈希。
-- 新增 MinerU v4.1.7 / PaperTrail adapter v11 的全文检索与 AI 标注任务回归，并验证未知版本失败关闭。全后端 530 passed，Ruff check/format、OpenAPI 导出、pip-audit 与 diff check 通过。首次全量 pytest 受系统临时目录 ACL 阻断；改用忽略目录 `backend/.local` 后重跑全绿。既有 Starlette 弃用警告仍存在。
+- 新增 MinerU v4.1.7 / PaperTrail adapter v11 的全文检索与 AI 标注任务回归，并验证未知版本失败关闭。全后端 530 passed，Ruff check/format、OpenAPI 导出、pip-audit 与 diff check 通过；PR #29 backend、web Browser E2E、container 检查全绿，Draft 堆叠于 PR #28、未合并。首次全量 pytest 受系统临时目录 ACL 阻断；改用忽略目录 `backend/.local` 后重跑全绿。既有 Starlette 弃用警告仍存在。
 - 这只是评测兼容性修复，不能证明 MinerU 解析、图表语义或 RAG 检索质量。当前分支未发现可复跑的真实获准 MinerU 语料；真实 R01-R03 manifest 仍固定于 pdfplumber v27。现有 MinerU 图表路径保存图注/区域关系，不等于已读取图表数值。下一步需建立解析器/图表分桶的同源对照集，再比较 chunk 与 rerank；质量门槛之前不部署。
 
 ## 2026-11-12 PR #28 公开发现有界分页（实现与验证中）
