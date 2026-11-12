@@ -91,6 +91,7 @@ def test_openai_embedding_client_rejects_invalid_provider_response(payload, code
 def test_openai_embedding_client_classifies_auth_rate_limit_and_timeout() -> None:
     for status, expected in (
         (401, "authentication_failed"),
+        (403, "permission_denied"),
         (429, "rate_limited"),
         (503, "provider_unavailable"),
     ):

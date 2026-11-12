@@ -5,6 +5,7 @@
 - 增加 parent-embedding rerank dry-run：只读核对当前批准语料向量覆盖、维度和查询数/费用；不建 provider、不写报告、不传数据。隔离副本的 9 篇/3,294 chunks 实测全部缺向量；6 条查询上限为 404 UTF-8 bytes、`$0.00000808`，补索引全文的字节费用估算上限约 `$0.01651788`。两项都未调用 provider；本地原 DB SHA 不变。
 - 给全文向量索引 CLI 加 dry-run、`--confirm-data-transfer`、必填 `--max-chunks` 和 `--max-cost-usd`，只处理缺失向量；UTF-8 字节估算超上限、输入过长或预算/题数未提供时在 provider 前拒绝。dry-run 即使 provider disabled 也可用。无维度配置时预览标为未验证且索引不可执行。
 - 用户授权本次只针对 9 篇获准来源执行外传。初次和用户更新本机 `.env` 后的重试均在首批收到 `authentication_failed` 后停止；服务端未返回 embedding/usage，本地未写入向量。原数据库 SHA 仍为 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`，隔离副本 hash 也未变化。当前 key 对 embeddings endpoint 仍无效或无权限；需在本机配置有效的 embedding API 凭据后继续，不能在聊天中发送。
+- 诊断修复：embedding 客户端先前把 HTTP 401/403 合并成同一错误码；现在分别报告 `authentication_failed` / `permission_denied`，便于确认凭据与项目权限问题，不在本轮额外发请求。
 - 26 项定向回归、全后端 `579 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format、OpenAPI hash（未变）、pip-audit 与 diff check 通过。PR #40 基础提交及 PR #41 最新提交的 backend/web/Browser E2E/container CI 全绿；PR #41 保持 Draft，未合并。
 - 当前索引及 rerank 臂仍未跑，不能比较 rerank 效果。PR #40 的 overlap 六臂与本次 dry-run 均为探索诊断，不改变线上默认。
 

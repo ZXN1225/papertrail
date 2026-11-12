@@ -84,8 +84,10 @@ class OpenAIEmbeddingClient:
             raise EmbeddingError("timeout") from error
         except httpx.HTTPError as error:
             raise EmbeddingError("provider_unavailable") from error
-        if response.status_code in {401, 403}:
+        if response.status_code == 401:
             raise EmbeddingError("authentication_failed")
+        if response.status_code == 403:
+            raise EmbeddingError("permission_denied")
         if response.status_code == 429:
             raise EmbeddingError("rate_limited")
         if response.status_code >= 500:
