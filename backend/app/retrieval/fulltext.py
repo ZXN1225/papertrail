@@ -33,6 +33,10 @@ class TextChunk:
     evidence_text: str | None = None
 
 
+class ChunkSizeInfeasibleError(ValueError):
+    """A structured table cannot fit the selected chunk size without losing its headers."""
+
+
 def _trimmed_span(text: str, start: int, stop: int) -> tuple[int, int, str]:
     left = len(text[start:stop]) - len(text[start:stop].lstrip())
     right = len(text[start:stop].rstrip())
@@ -219,7 +223,7 @@ def _chunk_mineru_html_table(
     prefix = f"{header}\n" if header else ""
     available = max_chunk_bytes - len(prefix.encode("utf-8"))
     if available < 1:
-        raise ValueError("MinerU table header exceeds the configured chunk size")
+        raise ChunkSizeInfeasibleError("MinerU table header exceeds the configured chunk size")
     chunks: list[TextChunk] = []
     spans = [(0, rows[0].start(), "标题")]
     spans.extend(
@@ -235,7 +239,7 @@ def _chunk_mineru_html_table(
         while position < span_end:
             stop = min(span_end, _choose_stop(text, position, available))
             if stop <= position:
-                raise ValueError("MinerU table fragment cannot fit in a chunk")
+                raise ChunkSizeInfeasibleError("MinerU table fragment cannot fit in a chunk")
             excerpt = text[position:stop]
             body = readable(excerpt)
             if body:
@@ -358,7 +362,9 @@ def _chunk_table(
     if not header and len(lines) > 1:
         header, header_start, header_end = lines[1]
     if len(header.encode("utf-8")) > max_chunk_bytes:
-        raise ValueError("PDF table header exceeds the configured UTF-8 byte chunk limit")
+        raise ChunkSizeInfeasibleError(
+            "PDF table header exceeds the configured UTF-8 byte chunk limit"
+        )
 
     # Some PDF table extractors split a hyphenated word across two physical rows,
     # leaving the continuation in an otherwise empty row. Join only that unambiguous
@@ -400,7 +406,9 @@ def _chunk_table(
             return
         content = _table_chunk_text(title, header, [row[0] for row in pending])
         if len(content.encode("utf-8")) > max_chunk_bytes:
-            raise ValueError("PDF table row exceeds the configured UTF-8 byte chunk limit")
+            raise ChunkSizeInfeasibleError(
+                "PDF table row exceeds the configured UTF-8 byte chunk limit"
+            )
         source_start = pending[0][1] if pending else header_start
         source_end = pending[-1][2] if pending else header_end
         source_row_label = _format_source_rows(
@@ -437,15 +445,15 @@ def _chunk_table(
             prefix = _table_chunk_text(title, header, []) + "\n"
             available = max_chunk_bytes - len(prefix.encode("utf-8"))
             if available < 1:
-                raise ValueError(
-                    "PDF table title and header exceed the 1,800 UTF-8 byte chunk limit"
+                raise ChunkSizeInfeasibleError(
+                    "PDF table title and header exceed the configured chunk size"
                 )
             part_start = 0
             part_index = 1
             while part_start < len(row[0]):
                 part_stop = _choose_stop(row[0], part_start, available)
                 if part_stop <= part_start:
-                    raise ValueError(
+                    raise ChunkSizeInfeasibleError(
                         "PDF table row contains a character that cannot fit "
                         "with its repeated header"
                     )

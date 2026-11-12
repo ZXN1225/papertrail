@@ -54,7 +54,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "provider_calls": 0,
                 "quality_claim_allowed": report["dataset"]["quality_claim_allowed"],
                 "strategies": {
-                    name: strategy["metrics_macro_average"]
+                    name: strategy.get("metrics_macro_average", strategy["status"])
                     for name, strategy in report["strategies"].items()
                 },
             },

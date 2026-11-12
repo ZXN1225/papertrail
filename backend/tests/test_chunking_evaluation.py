@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.evaluation.chunking import ChunkStrategyEvaluationError, _span_is_covered, run_evaluation
-from app.retrieval.fulltext import chunk_pdf_elements
+from app.evaluation.chunking import (
+    ChunkStrategyEvaluationError,
+    _retrieval_metrics,
+    _span_is_covered,
+    run_evaluation,
+)
+from app.retrieval.fulltext import ChunkSizeInfeasibleError, chunk_pdf_elements
 
 
 def _element(
@@ -83,6 +88,29 @@ def test_small_table_chunks_repeat_header_and_retain_row_spans():
         assert len(chunk.text.encode("utf-8")) <= 900
 
 
+def test_smaller_strategy_marks_a_wide_table_header_infeasible_without_changing_baseline():
+    header = "TEST-wide-header-" + "x" * 950
+    source = f"Table 3\n{header}\nTEST-row | 42"
+    element = _element(
+        "TEST-wide-table",
+        "table",
+        source,
+        structured={
+            "rows": [
+                {"cells": [{"text": header}]},
+                {"row_index": 0, "cells": [{"text": "TEST-row"}, {"text": "42"}]},
+            ]
+        },
+    )
+
+    with pytest.raises(ChunkSizeInfeasibleError):
+        chunk_pdf_elements([element], max_chunk_bytes=900)
+    baseline = chunk_pdf_elements([element], max_chunk_bytes=1800)
+
+    assert baseline
+    assert all(chunk.element_id == "TEST-wide-table" for chunk in baseline)
+
+
 def test_span_coverage_accepts_only_whitespace_gaps_between_retrieved_chunks():
     anchor = {
         "source_id": "TEST-doc",
@@ -104,6 +132,22 @@ def test_span_coverage_accepts_only_whitespace_gaps_between_retrieved_chunks():
         ],
         anchor,
     )
+
+
+def test_chunk_strategy_metrics_report_precision_recall_and_ranking_at_each_cutoff():
+    metrics = _retrieval_metrics(
+        ["TEST-irrelevant", "TEST-relevant-a", "TEST-relevant-b"],
+        {"TEST-relevant-a": 1, "TEST-relevant-b": 1},
+        (1, 3),
+    )
+
+    assert metrics["hit@1"] == 0.0
+    assert metrics["hit@3"] == 1.0
+    assert metrics["precision@1"] == 0.0
+    assert metrics["recall@1"] == 0.0
+    assert metrics["precision@3"] == pytest.approx(2 / 3)
+    assert metrics["recall@3"] == 1.0
+    assert metrics["mrr@3"] == 0.5
 
 
 def test_chunk_size_rejects_out_of_range_or_boolean_values():

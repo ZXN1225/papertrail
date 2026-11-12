@@ -2,8 +2,8 @@
 
 ## 2026-11-12 Chunk 策略只读对照（PR #33 实现中）
 
-- 新增 900/1,800 UTF-8 bytes 的结构保留 chunk ablation；原生产 chunker 默认不变。只读 frozen approved corpus + manifest，经 page/element/type/char interval 投影旧 selected-span 锚点；报告 exact span coverage、Hit/MRR/NDCG/Recall、切块/索引构建/搜索时延。记录与 MinerU 图表生成文本隔离。
-- TEST 合成回归和只读 DB 快照验证；全后端 540 passed、Ruff check/format、OpenAPI、pip-audit 通过。
+- 新增 900/1,800 UTF-8 bytes 的结构保留 chunk ablation；原生产 chunker 默认不变。只读 frozen approved corpus + manifest，经 page/element/type/char interval 投影旧 selected-span 锚点；报告 exact span coverage、Hit/MRR/NDCG/Precision/Recall、切块/索引构建/搜索时延。记录与 MinerU 图表生成文本隔离。
+- TEST 合成回归和只读 DB 快照验证；全后端 542 passed、Ruff check/format、OpenAPI、pip-audit 通过。
 - 未完成：真实获准全文库不可用，尚未执行真实 A/B，chunk/Rerank 联合选型、人工 gold/人工复核图表集和质量门仍待完成。报告保留 `quality_claim_allowed=false`。
 
 ## 2026-11-12 检索 rerank 实验臂（PR #32 Draft，CI 通过）

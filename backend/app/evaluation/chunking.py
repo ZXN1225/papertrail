@@ -14,7 +14,11 @@ from app.evaluation.fulltext_retrieval import (
 )
 from app.evaluation.metrics import score_query
 from app.retrieval.bm25 import BM25Index
-from app.retrieval.fulltext import MAX_CHUNK_TOKEN_UPPER_BOUND, chunk_pdf_elements
+from app.retrieval.fulltext import (
+    MAX_CHUNK_TOKEN_UPPER_BOUND,
+    ChunkSizeInfeasibleError,
+    chunk_pdf_elements,
+)
 from app.sources.arxiv import normalize_arxiv_id
 from app.storage.repository import MAX_ACTIVE_FULLTEXT_CHUNKS, PaperStore
 
@@ -108,36 +112,50 @@ def run_evaluation(
 
     candidates_by_strategy: dict[str, list[dict[str, Any]]] = {}
     build_time_ms: dict[str, float] = {}
+    infeasible_strategies: set[str] = set()
     for strategy, max_chunk_bytes in STRATEGIES.items():
         started = time.perf_counter_ns()
         candidates: list[dict[str, Any]] = []
-        for source_id, elements in source_elements.items():
-            for chunk in chunk_pdf_elements(elements, max_chunk_bytes=max_chunk_bytes):
-                if not chunk.element_id:
-                    raise ChunkStrategyEvaluationError(
-                        f"candidate chunk has no element locator: {source_id}"
+        try:
+            for source_id, elements in source_elements.items():
+                for chunk in chunk_pdf_elements(elements, max_chunk_bytes=max_chunk_bytes):
+                    if not chunk.element_id:
+                        raise ChunkStrategyEvaluationError(
+                            f"candidate chunk has no element locator: {source_id}"
+                        )
+                    metadata = source_metadata[source_id]
+                    candidates.append(
+                        {
+                            "chunk_id": (
+                                f"{strategy}:{source_id}:{chunk.element_id}:{chunk.ordinal}"
+                            ),
+                            "source_id": source_id,
+                            "content_sha256": metadata["content_sha256"],
+                            "title": metadata["title"],
+                            "text": chunk.text,
+                            "evidence_text": chunk.evidence_text or chunk.text,
+                            "element_id": chunk.element_id,
+                            "page_number": chunk.page_number,
+                            "element_type": chunk.element_type,
+                            "char_start": chunk.char_start,
+                            "char_end": chunk.char_end,
+                            "bbox": chunk.bbox,
+                            "locator": chunk.locator,
+                            "section_path": chunk.section_path,
+                        }
                     )
-                metadata = source_metadata[source_id]
-                candidates.append(
-                    {
-                        "chunk_id": f"{strategy}:{source_id}:{chunk.element_id}:{chunk.ordinal}",
-                        "source_id": source_id,
-                        "content_sha256": metadata["content_sha256"],
-                        "title": metadata["title"],
-                        "text": chunk.text,
-                        "evidence_text": chunk.evidence_text or chunk.text,
-                        "element_id": chunk.element_id,
-                        "page_number": chunk.page_number,
-                        "element_type": chunk.element_type,
-                        "char_start": chunk.char_start,
-                        "char_end": chunk.char_end,
-                        "bbox": chunk.bbox,
-                        "locator": chunk.locator,
-                        "section_path": chunk.section_path,
-                    }
-                )
-                if len(candidates) > MAX_ACTIVE_FULLTEXT_CHUNKS:
-                    raise ChunkStrategyEvaluationError("candidate corpus exceeds the chunk limit")
+                    if len(candidates) > MAX_ACTIVE_FULLTEXT_CHUNKS:
+                        raise ChunkStrategyEvaluationError(
+                            "candidate corpus exceeds the chunk limit"
+                        )
+        except ChunkSizeInfeasibleError as error:
+            if max_chunk_bytes == MAX_CHUNK_TOKEN_UPPER_BOUND:
+                raise ChunkStrategyEvaluationError(
+                    "current-size chunk strategy cannot represent the approved parser data"
+                ) from error
+            infeasible_strategies.add(strategy)
+            build_time_ms[strategy] = (time.perf_counter_ns() - started) / 1_000_000
+            continue
         candidates_by_strategy[strategy] = candidates
         build_time_ms[strategy] = (time.perf_counter_ns() - started) / 1_000_000
 
@@ -160,6 +178,7 @@ def run_evaluation(
     task_results: dict[str, list[dict[str, Any]]] = {name: [] for name in STRATEGIES}
     latency_by_strategy: dict[str, list[float]] = {name: [] for name in STRATEGIES}
     top_k = dataset["top_k"]
+    metric_cutoffs = tuple(sorted({1, min(3, top_k), min(5, top_k), top_k}))
     for task in dataset["tasks"]:
         source_id = task["source_id"]
         anchor = source_chunks[source_id].get(task["reference_chunk_id"])
@@ -225,7 +244,7 @@ def run_evaluation(
                 raise ChunkStrategyEvaluationError(
                     f"reference span is not represented by {strategy}: {task['task_id']}"
                 )
-            metrics = score_query(ranking, relevant, cutoffs=(top_k,))
+            metrics = _retrieval_metrics(ranking, relevant, metric_cutoffs)
             task_results[strategy].append(
                 {
                     "task_id": task["task_id"],
@@ -244,17 +263,27 @@ def run_evaluation(
                     ),
                     "metrics": {
                         **metrics,
-                        f"recall@{top_k}": len(set(ranking) & set(relevant)) / len(relevant),
                     },
                 }
             )
 
     strategy_reports: dict[str, dict[str, Any]] = {}
-    for strategy, rows in task_results.items():
+    for strategy in STRATEGIES:
+        if strategy in infeasible_strategies:
+            strategy_reports[strategy] = {
+                "status": "unavailable",
+                "failure_reason": "table_structure_exceeds_candidate_chunk_size",
+                "max_chunk_bytes": STRATEGIES[strategy],
+                "chunk_build_latency_ms": build_time_ms[strategy],
+                "tasks": [],
+            }
+            continue
+        rows = task_results[strategy]
         latencies = latency_by_strategy[strategy]
         ordered = sorted(latencies)
         metrics = [row["metrics"] for row in rows]
         strategy_reports[strategy] = {
+            "status": "completed",
             "max_chunk_bytes": STRATEGIES[strategy],
             "chunk_count": len(candidates_by_strategy[strategy]),
             "chunk_build_latency_ms": build_time_ms[strategy],
@@ -265,10 +294,9 @@ def run_evaluation(
                 "p95": ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)],
             },
             "metrics_macro_average": {
-                f"hit@{top_k}": statistics.fmean(item[f"hit@{top_k}"] for item in metrics),
-                f"mrr@{top_k}": statistics.fmean(item[f"mrr@{top_k}"] for item in metrics),
-                f"ndcg@{top_k}": statistics.fmean(item[f"ndcg@{top_k}"] for item in metrics),
-                f"recall@{top_k}": statistics.fmean(item[f"recall@{top_k}"] for item in metrics),
+                metric: statistics.fmean(item[metric] for item in metrics) for metric in metrics[0]
+            }
+            | {
                 "evidence_span_coverage": statistics.fmean(
                     float(row["evidence_span_covered"]) for row in rows
                 ),
@@ -334,6 +362,17 @@ def _bm25_documents(candidates: list[dict[str, Any]]) -> list[dict[str, str]]:
         }
         for item in candidates
     ]
+
+
+def _retrieval_metrics(
+    ranking: list[str], relevant: dict[str, int], cutoffs: tuple[int, ...]
+) -> dict[str, float]:
+    metrics = score_query(ranking, relevant, cutoffs=cutoffs)
+    for cutoff in cutoffs:
+        retrieved_relevant = len(set(ranking[:cutoff]) & set(relevant))
+        metrics[f"precision@{cutoff}"] = retrieved_relevant / cutoff
+        metrics[f"recall@{cutoff}"] = retrieved_relevant / len(relevant)
+    return metrics
 
 
 def _is_sha256(value: Any) -> bool:
