@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 MinerU 评测解析器版本解锁（PR #29 准备中）
+
+- 已移除全文检索诊断和 AI 标注评测只接受 pdfplumber 的阻断：现在仅接受 `pdfplumber-layout-vN` 与 `mineru-<version>-papertrail-vN` 两类明确版本化解析器，并继续要求 manifest 和活动索引的版本/来源/许可/hash 完全一致；未知 parser 测试为拒绝。
+- 后端全量 530 passed；Ruff check/format、OpenAPI 导出、pip-audit、diff check 通过。pytest 使用忽略目录 `backend/.local`，绕过 Windows 系统临时目录 ACL。
+- 未完成：无真实获准 MinerU 语料可在当前 worktree 复跑；图表视觉内容抽取与评测缺少真实复核集；MinerU 与 pdfplumber 解析对照、检索 reranker ablation、chunk 策略对照均未完成。现有 BM25/Dense/RRF 和单 reviewer anchor 任务不可替代上述评测，也不构成通用质量声明。
+
 ## 2026-11-12 PR #28 公开发现有界分页（进行中）
 
 - OpenAlex/arXiv 发现支持每次最多 25 条结果，按不超过 10 条的页大小执行；每页消耗独立工具预算和 trace，精确 arXiv ID 不做无效分页。

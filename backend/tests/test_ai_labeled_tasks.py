@@ -261,6 +261,26 @@ def test_active_lineage_must_match_the_dataset() -> None:
         run_evaluation(store, _dataset(), DATASET_SHA)
 
 
+def test_ai_labeled_evaluation_accepts_pinned_mineru_lineage() -> None:
+    store = _ReadOnlyStore()
+    dataset = _dataset()
+    mineru_version = "mineru-4.1.7-papertrail-v11"
+    dataset["sources"]["2608.20519"]["parser_version"] = mineru_version
+    store.metadata = {**store.metadata, "parser_version": mineru_version}
+
+    report = run_evaluation(store, dataset, DATASET_SHA)
+
+    assert report["sources"]["2608.20519"]["parser_version"] == mineru_version
+
+
+def test_ai_labeled_evaluation_rejects_unrecognized_parser_lineage() -> None:
+    dataset = _dataset()
+    dataset["sources"]["2608.20519"]["parser_version"] = "custom-parser-v1"
+
+    with pytest.raises(AiLabeledTaskError, match="lineage or license"):
+        validate_dataset(dataset)
+
+
 def test_partial_corpus_scan_is_rejected() -> None:
     store = _ReadOnlyStore()
 

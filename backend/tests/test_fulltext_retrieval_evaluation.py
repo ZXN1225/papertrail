@@ -155,6 +155,27 @@ def test_runner_pins_lineage_and_reports_selected_reference_rank_only() -> None:
     ]
 
 
+def test_mineru_lineage_is_supported_and_pinned_through_retrieval_evaluation() -> None:
+    store = _ReadOnlyStore()
+    dataset = _dataset()
+    mineru_version = "mineru-4.1.7-papertrail-v11"
+    dataset["sources"]["2608.20519"]["parser_version"] = mineru_version
+    store.metadata = {**store.metadata, "parser_version": mineru_version}
+    store.metadata_by_source["2608.20519"] = store.metadata
+
+    report = run_evaluation(store, dataset, "c" * 64)
+
+    assert report["sources"]["2608.20519"]["parser_version"] == mineru_version
+
+
+def test_retrieval_evaluation_rejects_unrecognized_parser_lineage() -> None:
+    dataset = _dataset()
+    dataset["sources"]["2608.20519"]["parser_version"] = "custom-parser-v1"
+
+    with pytest.raises(FullTextRetrievalEvaluationError, match="lineage or license"):
+        validate_dataset(dataset)
+
+
 def test_full_corpus_scope_checks_every_source_and_ranks_across_sources() -> None:
     store = _ReadOnlyStore()
     dataset = _dataset()

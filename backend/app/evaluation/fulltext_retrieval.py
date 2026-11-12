@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from app.retrieval.parser_versions import is_supported_pdf_parser_version
 from app.sources.arxiv import normalize_arxiv_id
 from app.storage.repository import PaperStore
 
@@ -72,7 +73,7 @@ def validate_dataset(dataset: Any) -> None:
             or source.get("license_id") != "CC-BY-4.0"
             or source.get("license_url") != "https://creativecommons.org/licenses/by/4.0/"
             or not isinstance(source.get("parser_version"), str)
-            or re.fullmatch(r"pdfplumber-layout-v\d+", source["parser_version"]) is None
+            or not is_supported_pdf_parser_version(source["parser_version"])
             or not _is_sha256(source.get("source_document_sha256"))
             or not _is_sha256(source.get("content_sha256"))
         ):
