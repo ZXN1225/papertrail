@@ -1,9 +1,16 @@
 # 进度
 
-## 2026-11-12 MinerU 图表定位评测（PR #42 准备中）
+## 2026-11-12 获准语料实时向量索引与 Rerank 诊断（PR #43 Draft，CI 待运行）
+
+- 用户更新本机凭据后，受控问题探针确认 `text-embedding-3-small` 可用；同一已授权的 9 篇 / 3,294 chunks 在忽略目录隔离副本完成 1536 维索引。Provider 返回 212,879 input tokens；按配置价估算 `$0.00425758`，不是实际账单。原始用户 DB SHA-256 仍为 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`。
+- 六条已授权查询一次调用共 92 tokens，估算 `$0.00000184`；隔离报告 `backend/.local/chunk-rerank-live-v1.json`，不提交论文、向量或查询。1800-byte/0 overlap 的 BM25 MRR@8 `.622`、NDCG@5 `.712`、span coverage `1.0`；父 chunk 向量代理 rerank 分别 `.417`、`.439`、`.5`，在此六题退化，不能设为生产默认。报告仍是 single-reviewer selected-span 诊断，`quality_claim_allowed=false`。
+- 其余五个 chunk 臂未得到 rerank 分数：62–132 个候选跨越两个现有父 chunk，严格的一对一 span 映射拒绝把父向量冒充真实子向量。要作有效跨 chunk rerank 对照仍需子 chunk 向量及独立授权/评测；当前结果也不是 MinerU 质量结果。完整记录见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+- 连通性检查时短暂的 `provider_unavailable` 暴露出 chunk 评测 CLI 未捕获 `EmbeddingError`，会输出 traceback；新增先红后绿的 fake-provider 回归，现只输出安全错误码、非零退出且不写报告。定向 CLI 4 passed、全后端 583 passed（1 条既有 Starlette warning），Ruff check/format 与 OpenAPI hash（未变）通过；独立复核确认报告数字与口径一致，并建议将跨父边界计数标为单独只读审计，已更新说明。
+
+## 2026-11-12 MinerU 图表定位评测（PR #42 Draft，CI 通过）
 
 - 图表 page audit 增加可选的同页归一化预测/人工框，严格校验 0–1 坐标、非零面积与框数等于对应 chart count；review pack 保留预测框来源并导入人工框，现有 reviewed-content hash 检测导入后改动。报告在 IoU ≥ 0.5 下做一对一最大匹配，独立于原 count metrics 给出定位 precision/recall/F1、已评/未评页数和评测覆盖率；缺框时返回 null，不冒称测过定位。
-- TEST 合成数据覆盖同页计数正确但位置错、重复预测只能匹配一个人工框、漏框、越界/无效框；定向 10 passed、全后端 582 passed。独立代码复核未发现 blocker；审阅包哈希只检测内容漂移，不认证人工身份。真实 MinerU 人工框集和图表事实金标尚未建立，不能宣称解析定位准确率。
+- TEST 合成数据覆盖同页计数正确但位置错、重复预测只能匹配一个人工框、漏框、越界/无效框；定向 10 passed、全后端 582 passed，PR #42 backend/web/container CI 全绿。独立代码复核未发现 blocker；审阅包哈希只检测内容漂移，不认证人工身份。真实 MinerU 人工框集和图表事实金标尚未建立，不能宣称解析定位准确率。
 
 ## 2026-11-12 Rerank 索引预算预览与外传门（PR #41 Draft，CI 通过）
 

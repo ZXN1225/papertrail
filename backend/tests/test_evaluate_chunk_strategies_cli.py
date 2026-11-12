@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 from app.cli import evaluate_chunk_strategies
+from app.embeddings.client import EmbeddingError
 
 
 def _dataset():
@@ -86,6 +87,37 @@ def test_incomplete_embedding_index_is_rejected_before_provider_call(tmp_path, m
     monkeypatch.setattr(evaluate_chunk_strategies, "embed_task_queries", unexpected_provider)
 
     assert evaluate_chunk_strategies.main(_args(output)) == 2
+    assert not output.exists()
+
+
+def test_embedding_provider_failure_is_reported_without_traceback(tmp_path, monkeypatch, capsys):
+    output = tmp_path / "report.json"
+    monkeypatch.setattr(
+        evaluate_chunk_strategies, "load_dataset", lambda _path: (_dataset(), "a" * 64)
+    )
+    monkeypatch.setattr(
+        evaluate_chunk_strategies,
+        "get_settings",
+        lambda: SimpleNamespace(
+            resolved_data_storage_path=tmp_path / "papers.sqlite3",
+            embedding_model="TEST-model",
+            embedding_dimensions=2,
+        ),
+    )
+    monkeypatch.setattr(evaluate_chunk_strategies, "PaperStore", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        evaluate_chunk_strategies,
+        "_rerank_index_status",
+        lambda *_args, **_kwargs: {"rerank_index_complete": True},
+    )
+
+    def unavailable(*_args, **_kwargs):
+        raise EmbeddingError("provider_unavailable")
+
+    monkeypatch.setattr(evaluate_chunk_strategies, "embed_task_queries", unavailable)
+
+    assert evaluate_chunk_strategies.main(_args(output)) == 2
+    assert capsys.readouterr().err == "Chunk strategy evaluation failed: provider_unavailable\n"
     assert not output.exists()
 
 

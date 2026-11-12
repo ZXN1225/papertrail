@@ -1,9 +1,16 @@
 # 任务台账
 
-## 2026-11-12 MinerU 图表区域定位指标（PR #42 准备中）
+## 2026-11-12 实时 Rerank 效果诊断（PR #43 Draft，CI 待运行）
+
+- 用户更新凭据后，已按授权在隔离库完成 9 篇 / 3,294 chunks 的 small 模型向量索引，212,879 tokens、估算 `$0.00425758`；6 条查询 92 tokens、估算 `$0.00000184`。原用户库 hash 保持不变，报告与向量只在 ignored `.local`。
+- 1800-byte 无重叠臂的父向量代理 rerank 在六个 single-reviewer selected-span 任务上低于 BM25（MRR@8 `.417` vs `.622`、span coverage `.5` vs `1.0`），不切换生产默认。其余五臂有跨父边界的 child chunk，按既有严格映射被正确标为 unavailable；下一步需真实 child 向量与独立人审任务，不能把本报告称为质量达标。
+- 更新评测说明与阶段状态；PR #42 的 backend/web/container CI 已通过。当前报告本地可复核，未提交任何全文、向量或密钥。
+- 修复 provider 临时错误在 chunk 评测 CLI 外泄 traceback 的问题：新增 fake-provider 失败测试，确认安全码、非零退出和无报告；定向 CLI 4 passed、全后端 583 passed，Ruff 与 OpenAPI 契约通过。跨父边界计数来自另一次只读映射审计，研究文档已明确。
+
+## 2026-11-12 MinerU 图表区域定位指标（PR #42 Draft，CI 通过）
 
 - 允许 page audit 提供归一化预测框，并由人工复核包提交同坐标系参考框；长度必须与图表数量一致。held-out test 页按 IoU 0.5 一对一匹配，新增定位 PRF/覆盖页数与覆盖率，旧 count-only 数据集明确返回未评估。图表事实评分与许可/来源 hash 约束保持原边界。
-- 定向 10 passed、全后端 582 passed；独立代码复核无 blocker，CI 待 PR 创建后运行。真实人工框标签不存在，目前仅验证计算及审阅契约，不代表 MinerU 质量达标。
+- 定向 10 passed、全后端 582 passed；独立代码复核无 blocker，backend/web/container CI 已通过。真实人工框标签不存在，目前仅验证计算及审阅契约，不代表 MinerU 质量达标。
 
 ## 2026-11-12 Rerank 预检与全文向量索引预算门（PR #41 Draft，CI 通过）
 

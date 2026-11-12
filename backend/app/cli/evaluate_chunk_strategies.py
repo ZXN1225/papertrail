@@ -16,6 +16,7 @@ from app.cli.evaluate_ai_labeled_tasks import (
     estimate_task_query_embedding_budget,
 )
 from app.config import get_settings
+from app.embeddings.client import EmbeddingError
 from app.evaluation.chunking import ChunkStrategyEvaluationError, run_evaluation
 from app.evaluation.fulltext_retrieval import DEFAULT_DATASET_PATH, load_dataset
 from app.storage.repository import PaperStore
@@ -130,9 +131,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "Refusing to overwrite an existing report; choose a new --output path.", file=sys.stderr
         )
         return 2
-    except (OSError, ValueError, KeyError, TypeError) as error:
+    except (EmbeddingError, OSError, ValueError, KeyError, TypeError) as error:
         message = type(error).__name__
-        if isinstance(error, ChunkStrategyEvaluationError) or (
+        if isinstance(error, EmbeddingError):
+            message = error.code
+        elif isinstance(error, ChunkStrategyEvaluationError) or (
             args.dry_run and isinstance(error, ValueError)
         ):
             message = str(error)

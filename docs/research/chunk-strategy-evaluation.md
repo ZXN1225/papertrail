@@ -89,7 +89,7 @@ At `@3`, the smaller arm had higher Hit (0.833 vs 0.667), Precision (0.278 vs 0.
 
 One selected chunk ID was stale after chunking changes. The evaluator now remaps it only when the historical chunk is from the same PDF hash and its exact evidence text occurs uniquely on the same current page and element type. It fails closed otherwise. This exact text remap resolved 1/6 tasks; the other 5 used current chunk IDs.
 
-The local approved snapshot uses `pdfplumber-layout-v27`, not MinerU. It provides no evidence about MinerU parsing or visual chart accuracy. Chunk×parent-proxy-rerank has a runnable paired evaluator, but a real rerank run requires explicit query-embedding data-transfer consent and a complete local embedding index; no strategy winner is claimed until that run and a held-out reviewed task set exist.
+The local approved snapshot uses `pdfplumber-layout-v27`, not MinerU. It provides no evidence about MinerU parsing or visual chart accuracy. Chunk×parent-proxy-rerank has a runnable paired evaluator, but a held-out independently reviewed task set is still needed before choosing a production strategy.
 
 ## Local rerank dry-run (2026-11-12)
 
@@ -99,6 +99,46 @@ chunk, so the parent-vector rerank arm is not runnable yet. Six task queries tot
 their query-only embedding upper-bound estimate is `$0.00000808`. Building the absent full-text
 index would submit 825,894 UTF-8 bytes, with an estimated upper-bound cost of `$0.01651788` at the
 configured price. This byte estimate is conservative and not provider token usage. The preview made
-zero provider calls, wrote no report, and the original user database hash remained unchanged. No
-full-text data transfer or rerank was authorized or performed; these estimates are not evidence of
+zero provider calls, wrote no report, and the original user database hash remained unchanged. This
+preview transferred no full text and performed no rerank; these estimates are not evidence of
 retrieval quality or rerank benefit.
+
+## Authorized live index and paired rerank diagnostic (2026-11-12)
+
+After the user authorized this exact corpus and six questions and updated the local API credential,
+one approved question succeeded as a minimal connectivity probe (13 input tokens, estimated
+`$0.00000026`); an earlier transient error returned no usage. The isolated schema-23 copy was
+then indexed with `text-embedding-3-small` at 1,536 dimensions: 3,294 current approved chunks,
+212,879 provider-reported input tokens, and an estimated `$0.00425758` at the configured
+`$0.02`/million-token price. The six questions used one additional embedding request, 92 input
+tokens, and an estimated `$0.00000184`. The report is local and ignored at
+`backend/.local/chunk-rerank-live-v1.json`; no vectors, paper text, or query embeddings were
+committed. The local report SHA-256 is
+`BBB7B421B46ED7AE76D2B072C02D0709BAB618C83CBBBEB2C67BC8BE56DB9B92`.
+The original user database SHA-256 remained
+`C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`.
+
+| 1,800-byte, zero-overlap arm | Hit@1 | MRR@8 | NDCG@5 | Recall@5 | Full selected-span coverage | Local mean / p95 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| BM25 | .500 | .622 | .712 | 1.000 | 1.000 | 1.22 / 3.05 |
+| BM25 then parent-vector proxy rerank | .333 | .417 | .439 | .500 | .500 | 49.99 / 70.95 |
+
+The local latency figures exclude the embedding provider call (about 3.36 seconds for all six
+questions). This parent-vector proxy promoted some selected spans and demoted others; on these six
+single-reviewer tasks it is worse overall than BM25. Do not enable it as a production default on
+this evidence. The labels are selected source spans, not independently judged relevance; the
+report retains `gold_standard=false` and `quality_claim_allowed=false`.
+
+The other five chunk configurations reported `candidate_to_parent_embedding_mapping_failed`,
+not a retrieval score. A separate read-only span-mapping audit of the same frozen snapshot found
+child chunks crossing two current parent chunk boundaries: 62/3,575 (900/0), 132/3,605
+(900/10%), 118/3,418 (1,200/0), 132/3,451 (1,200/10%), and 131/3,304 (1,800/10%). The
+evaluator requires every child to fit exactly
+inside one parent to avoid presenting a parent vector as a genuine child embedding. A valid
+cross-chunk rerank comparison needs embeddings of those child chunks or a separately specified
+multi-parent proxy, with its own data-transfer scope and quality limits. The existing index and
+this report provide neither a true child-vector nor a cross-encoder comparison.
+
+During the connectivity check, a transient `provider_unavailable` also exposed that the chunk
+evaluation CLI let `EmbeddingError` escape as a Python traceback. The CLI now reports only the safe
+error code and exits nonzero without writing a result file; a focused fake-provider test covers it.
