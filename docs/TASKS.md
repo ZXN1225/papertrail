@@ -1,10 +1,10 @@
 # 任务台账
 
-## 2026-11-12 MinerU 视觉证据接入（PR #31 实现与验证中）
+## 2026-11-12 MinerU 视觉证据接入（PR #31 Draft，CI 通过）
 
 - 将 advanced 图像/图表模型描述独立于逐字全文切片存储，并限制来源为 adapter 明确标注的 MinerU generated description 字段；私有 BM25 可检索，Harness 与引用 UI 必须显式标“未核验”，精确图注仍单独展示。账号/文档权限和删除级联沿用现有私有文档边界；每份文档最多 128 项、账号最多 2,560 项；表格仍保持排除。解析器元素和文档级 warning 均保留未核验标记。
 - 合成测试覆盖数据提取白名单、检索、类型化最终 claim/citation、租户隔离和删除。全后端 533 passed、Ruff check/format、OpenAPI export、pip-audit 均通过；Web 修改文件 Prettier、typecheck、production build、E2E 66/66 均通过，新增未核验视觉证据用例在 375/768/1440px 单独复跑通过。
-- 本机全局 `pnpm run format:check` 报告 26 个未修改文件格式不符；本次修改的三个 Web 文件单独检查通过。尚待 PR #31 的 GitHub CI。真实授权图表与逐图人工校核集、chunk/Rerank A/B、MinerU 与 pdfplumber 图表/正文分桶对照，以及真实解析/检索质量结论仍未完成；合成测试不测量视觉识读质量。
+- 本机全局 `pnpm run format:check` 报告 26 个未修改文件格式不符；本次修改的三个 Web 文件单独检查通过。PR #31 后端、Web、container GitHub CI 均通过，保持 Draft、未合并。真实授权图表与逐图人工校核集、chunk/Rerank A/B、MinerU 与 pdfplumber 图表/正文分桶对照，以及真实解析/检索质量结论仍未完成；合成测试不测量视觉识读质量。
 - Firecrawl 外部设计摘录已记录在 `docs/research/agent-and-evidence-design-references-2026-11-12.md`：NatureSkills 的 source-boundary/source inventory 与按需 skill fragments，以及 AI Research Writing Skill 的 claim-evidence map、生成图与确定性图分离和可执行质量门；只借鉴设计原则，PaperTrail 仍保持固定只读工具权限。
 
 ## 2026-11-12 MinerU advanced 图表分析开关（PR #30 草稿，CI 通过）
