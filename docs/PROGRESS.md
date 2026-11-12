@@ -1,5 +1,11 @@
 # 进度
 
+## 2026-11-12 真实获准语料 Chunk 对照（PR #35 实现与验证中）
+
+- 本机冻结 v27 快照的 9 篇已批准 CC-BY-4.0 来源、6 条单 reviewer selected-span 任务已在只读快照执行 900/1,800-byte 对照。原 DB schema 22 不能被当前代码只读打开，故只在忽略目录临时副本上迁移到 schema 23；原库 SHA-256 前后不变，0 provider calls。评测 manifest SHA-256 `87db19bece61ca54190b5b634ee0a0f731e3c5c0972acd9fdedf4b3f23e461a5`，本地报告位于 ignored `.local`，不提交。
+- 1,800-byte 对照：3,294 chunks，Hit@1 .500、MRR@8 .622、NDCG@5 .712、Recall@5 1.000、完整选定 span 覆盖 1.000、BM25 mean/p95 1.71/4.70 ms。900-byte：3,575 chunks，分别 .333、.561、.620、.917、.833、2.12/6.15 ms；其 Hit/Precision/Recall@3 更高（.833/.278/.750 vs .667/.222/.667）。小样本 selected-reference 指标不可称 gold 或泛化结论，不据此换线上默认。
+- 发现 1 条历史 chunk anchor 失效；现仅在原 PDF SHA 相同且历史 exact evidence text 能唯一映射到当前同页/同元素类型时安全重定位（1/6），否则失败关闭。定向存储/评测回归覆盖只读和精确唯一映射。当前 local 9 来源均为 `pdfplumber-layout-v27`，因此这不是 MinerU 或图表准确率评测；MinerU parser/图表集与 Chunk×Rerank 联合实验仍未完成。
+
 ## 2026-11-12 Harness 外部检索授权边界（PR #34 Draft，CI 通过）
 
 - 独立复核发现任务分类将“不要联网 / without online search”仍视作联网请求，且 runtime 只要求模型引用问题原句，否定原句也能满足该条件。现共享同一肯定意图解析器，并在 Harness 分类与 runtime 真正执行 OpenAlex/arXiv 前双重校验；模型计划还必须匹配用户明确授权的来源。

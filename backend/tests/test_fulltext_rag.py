@@ -105,12 +105,27 @@ def test_ingest_is_idempotent_and_returns_license_and_exact_evidence_locator() -
         assert repeat["status"] == "unchanged"
         assert first["content_sha256"] == repeat["content_sha256"]
         assert lineage is not None
+        assert lineage["title"] == "Retrieval augmented generation evaluation"
         assert lineage["current_sha256"] == first["content_sha256"]
         assert lineage["license_id"] == "CC-BY-4.0"
         assert lineage["parser_version"] == "plain-text-v1"
         assert lineage["chunk_count"] == 2
         assert first["chunk_count"] == 2
         assert result["status"] == "ok"
+        current_chunk = store.list_current_fulltext_chunks(
+            source_type="openalex", source_id="W900"
+        )[0]
+        historical_store = PaperStore(store.database_path, readonly=True)
+        historical_chunk = historical_store.get_approved_fulltext_chunk_by_id(
+            source_type="openalex", source_id="W900", chunk_id=current_chunk["chunk_id"]
+        )
+        assert historical_chunk is not None
+        assert historical_chunk["content_sha256"] == first["content_sha256"]
+        assert historical_chunk["source_document_sha256"] == first["source_document_sha256"]
+        with pytest.raises(ValueError, match="read-only"):
+            store.get_approved_fulltext_chunk_by_id(
+                source_type="openalex", source_id="W900", chunk_id=current_chunk["chunk_id"]
+            )
         hit = result["items"][0]
         assert hit["source_type"] == "openalex"
         assert hit["openalex_id"] == "W900"

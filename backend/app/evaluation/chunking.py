@@ -181,38 +181,13 @@ def run_evaluation(
     metric_cutoffs = tuple(sorted({1, min(3, top_k), min(5, top_k), top_k}))
     for task in dataset["tasks"]:
         source_id = task["source_id"]
-        anchor = source_chunks[source_id].get(task["reference_chunk_id"])
-        if (
-            anchor is None
-            or anchor.get("content_sha256") != dataset["sources"][source_id]["content_sha256"]
-            or anchor.get("page_number") != task["reference_page"]
-            or anchor.get("element_type") != task["reference_element_type"]
-            or not isinstance(anchor.get("element_id"), str)
-            or type(anchor.get("char_start")) is not int
-            or type(anchor.get("char_end")) is not int
-        ):
-            raise ChunkStrategyEvaluationError(
-                f"reference locator differs from manifest: {task['task_id']}"
-            )
-        source_element = next(
-            (
-                element
-                for element in source_elements[source_id]
-                if element.get("element_id") == anchor["element_id"]
-            ),
-            None,
+        anchor, source_element, anchor_resolution = _resolve_reference_anchor(
+            store,
+            task,
+            dataset["sources"][source_id],
+            source_chunks[source_id],
+            source_elements[source_id],
         )
-        if (
-            not isinstance(source_element, dict)
-            or not isinstance(source_element.get("text"), str)
-            or source_element.get("page_number") != anchor["page_number"]
-            or source_element.get("element_type") != anchor["element_type"]
-            or (json.loads(anchor["bbox_json"]) if anchor.get("bbox_json") else None)
-            != source_element.get("bbox")
-        ):
-            raise ChunkStrategyEvaluationError(
-                f"reference parser element locator differs: {task['task_id']}"
-            )
         coverage_anchor = {**anchor, "source_text": source_element["text"]}
 
         for strategy, candidates in candidates_by_strategy.items():
@@ -254,6 +229,7 @@ def run_evaluation(
                     "reference_page": anchor["page_number"],
                     "reference_element_type": anchor["element_type"],
                     "reference_span": [anchor["char_start"], anchor["char_end"]],
+                    "reference_anchor_resolution": anchor_resolution,
                     "relevant_chunk_count": len(relevant),
                     "retrieved_chunk_ids": ranking,
                     "retrieval_latency_ms": latency_ms,
@@ -332,6 +308,99 @@ def run_evaluation(
         },
         "strategies": strategy_reports,
     }
+
+
+def _resolve_reference_anchor(
+    store: PaperStore,
+    task: dict[str, Any],
+    expected_source: dict[str, Any],
+    current_chunks: dict[str, dict[str, Any]],
+    current_elements: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    task_id = task["task_id"]
+    source_id = task["source_id"]
+    anchor = current_chunks.get(task["reference_chunk_id"])
+    if anchor is not None:
+        if (
+            anchor.get("content_sha256") != expected_source["content_sha256"]
+            or anchor.get("page_number") != task["reference_page"]
+            or anchor.get("element_type") != task["reference_element_type"]
+            or not isinstance(anchor.get("element_id"), str)
+            or type(anchor.get("char_start")) is not int
+            or type(anchor.get("char_end")) is not int
+        ):
+            raise ChunkStrategyEvaluationError(
+                f"reference locator differs from manifest: {task_id}"
+            )
+        source_element = next(
+            (item for item in current_elements if item.get("element_id") == anchor["element_id"]),
+            None,
+        )
+        if (
+            not isinstance(source_element, dict)
+            or not isinstance(source_element.get("text"), str)
+            or source_element.get("page_number") != anchor["page_number"]
+            or source_element.get("element_type") != anchor["element_type"]
+            or (json.loads(anchor["bbox_json"]) if anchor.get("bbox_json") else None)
+            != source_element.get("bbox")
+        ):
+            raise ChunkStrategyEvaluationError(f"reference parser locator differs: {task_id}")
+        return anchor, source_element, "current_chunk"
+
+    historical = store.get_approved_fulltext_chunk_by_id(
+        source_type="arxiv", source_id=source_id, chunk_id=task["reference_chunk_id"]
+    )
+    evidence_text = (
+        (historical.get("evidence_text") or historical.get("text"))
+        if isinstance(historical, dict)
+        else None
+    )
+    if (
+        historical is None
+        or historical.get("source_document_sha256") != expected_source["source_document_sha256"]
+        or historical.get("license_id") != expected_source["license_id"]
+        or historical.get("license_url") != expected_source["license_url"]
+        or historical.get("page_number") != task["reference_page"]
+        or historical.get("element_type") != task["reference_element_type"]
+        or not isinstance(evidence_text, str)
+        or not evidence_text
+    ):
+        raise ChunkStrategyEvaluationError(
+            f"historical reference anchor is not verified against the current PDF: {task_id}"
+        )
+
+    matches: list[tuple[dict[str, Any], int]] = []
+    for element in current_elements:
+        text = element.get("text")
+        if (
+            element.get("page_number") != task["reference_page"]
+            or element.get("element_type") != task["reference_element_type"]
+            or not isinstance(text, str)
+        ):
+            continue
+        start = text.find(evidence_text)
+        if start >= 0 and text.find(evidence_text, start + 1) < 0:
+            matches.append((element, start))
+    if len(matches) != 1:
+        raise ChunkStrategyEvaluationError(
+            f"historical reference text does not map uniquely to the current PDF: {task_id}"
+        )
+    source_element, char_start = matches[0]
+    return (
+        {
+            "chunk_id": task["reference_chunk_id"],
+            "content_sha256": expected_source["content_sha256"],
+            "source_id": source_id,
+            "element_id": source_element["element_id"],
+            "page_number": source_element["page_number"],
+            "element_type": source_element["element_type"],
+            "char_start": char_start,
+            "char_end": char_start + len(evidence_text),
+            "bbox_json": json.dumps(source_element.get("bbox"), separators=(",", ":")),
+        },
+        source_element,
+        "exact_text_remap_same_pdf",
+    )
 
 
 def _span_is_covered(retrieved: list[dict[str, Any]], anchor: dict[str, Any]) -> bool:

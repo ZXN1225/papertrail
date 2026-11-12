@@ -4,10 +4,12 @@ import pytest
 
 from app.evaluation.chunking import (
     ChunkStrategyEvaluationError,
+    _resolve_reference_anchor,
     _retrieval_metrics,
     _span_is_covered,
     run_evaluation,
 )
+from app.evaluation.fulltext_retrieval import SCHEMA
 from app.retrieval.fulltext import ChunkSizeInfeasibleError, chunk_pdf_elements
 
 
@@ -163,3 +165,169 @@ def test_strategy_evaluation_rejects_a_writable_store_before_loading_any_corpus(
 
     with pytest.raises(ChunkStrategyEvaluationError, match="read-only"):
         run_evaluation(WritableStore(), {"synthetic": True}, "0" * 64)
+
+
+def test_strategy_evaluation_runs_both_arms_against_a_read_only_synthetic_snapshot():
+    source_id = "2401.00001"
+    source_hash = "a" * 64
+    pdf_hash = "b" * 64
+    text = "TEST retrieval evidence names the verified experimental result."
+    element = {
+        **_element("TEST-element", "paragraph", text),
+        "bbox": [1.0, 2.0, 3.0, 4.0],
+    }
+    source = {
+        "content_sha256": source_hash,
+        "source_document_sha256": pdf_hash,
+        "license_id": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "parser_version": "pdfplumber-layout-v1",
+    }
+    dataset = {
+        "schema": SCHEMA,
+        "dataset_id": "TEST-chunk-strategy",
+        "synthetic": False,
+        "gold_standard": False,
+        "quality_claim_allowed": False,
+        "reference_status": "single_reviewer_selected_reference",
+        "retrieval_method": "bm25",
+        "top_k": 3,
+        "sources": {source_id: source},
+        "tasks": [
+            {
+                "task_id": "R1",
+                "source_id": source_id,
+                "question": "TEST verified experimental result",
+                "reference_chunk_id": f"arxiv:{source_id}:TEST-old-chunk",
+                "reference_page": 7,
+                "reference_element_type": "paragraph",
+            }
+        ],
+    }
+    reference = {
+        "chunk_id": dataset["tasks"][0]["reference_chunk_id"],
+        "source_id": source_id,
+        "content_sha256": source_hash,
+        "title": "TEST paper",
+        "text": text,
+        "evidence_text": text,
+        "element_id": element["element_id"],
+        "page_number": 7,
+        "element_type": "paragraph",
+        "char_start": 0,
+        "char_end": len(text),
+        "bbox_json": "[1.0,2.0,3.0,4.0]",
+    }
+
+    class ReadOnlySnapshot:
+        readonly = True
+
+        def get_current_fulltext_metadata(self, **kwargs):
+            assert kwargs == {"source_type": "arxiv", "source_id": source_id}
+            return {
+                **source,
+                "source_type": "arxiv",
+                "source_id": source_id,
+                "title": "TEST paper",
+                "chunk_count": 1,
+                "status": "approved",
+            }
+
+        def list_current_fulltext_chunks(self, **kwargs):
+            assert kwargs == {"source_type": "arxiv", "source_id": source_id}
+            return [reference]
+
+        def list_current_fulltext_elements(self, **kwargs):
+            assert kwargs == {"source_type": "arxiv", "source_id": source_id}
+            return [element]
+
+    report = run_evaluation(ReadOnlySnapshot(), dataset, "c" * 64)
+
+    assert report["dataset"]["synthetic"] is False
+    assert report["dataset"]["gold_standard"] is False
+    assert report["dataset"]["quality_claim_allowed"] is False
+    assert report["retrieval"]["provider_calls"] == 0
+    assert all(item["status"] == "completed" for item in report["strategies"].values())
+    assert all(
+        item["tasks"][0]["reference_anchor_resolution"] == "current_chunk"
+        for item in report["strategies"].values()
+    )
+
+
+def test_historical_anchor_remaps_only_exact_unique_text_from_the_same_pdf():
+    source_hash = "a" * 64
+    selected_text = "TEST exact selected span"
+    element = _element("TEST-current-element", "paragraph", f"Before. {selected_text} After.")
+
+    class ReadOnlyStore:
+        def get_approved_fulltext_chunk_by_id(self, **kwargs):
+            assert kwargs["source_id"] == "TEST-source"
+            return {
+                "source_document_sha256": source_hash,
+                "license_id": "CC-BY-4.0",
+                "license_url": "https://creativecommons.org/licenses/by/4.0/",
+                "page_number": 7,
+                "element_type": "paragraph",
+                "evidence_text": selected_text,
+            }
+
+    task = {
+        "task_id": "R1",
+        "source_id": "TEST-source",
+        "reference_chunk_id": "TEST-old-chunk",
+        "reference_page": 7,
+        "reference_element_type": "paragraph",
+    }
+    expected_source = {
+        "content_sha256": "b" * 64,
+        "source_document_sha256": source_hash,
+        "license_id": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    }
+
+    anchor, resolved_element, resolution = _resolve_reference_anchor(
+        ReadOnlyStore(), task, expected_source, {}, [element]
+    )
+
+    assert resolution == "exact_text_remap_same_pdf"
+    assert resolved_element == element
+    assert element["text"][anchor["char_start"] : anchor["char_end"]] == selected_text
+
+
+def test_historical_anchor_fails_closed_when_text_is_ambiguous_or_pdf_changed():
+    selected_text = "TEST repeated evidence"
+    element = _element("TEST-current-element", "paragraph", f"{selected_text} then {selected_text}")
+
+    class ReadOnlyStore:
+        source_document_sha256 = "c" * 64
+
+        def get_approved_fulltext_chunk_by_id(self, **kwargs):
+            return {
+                "source_document_sha256": self.source_document_sha256,
+                "license_id": "CC-BY-4.0",
+                "license_url": "https://creativecommons.org/licenses/by/4.0/",
+                "page_number": 7,
+                "element_type": "paragraph",
+                "evidence_text": selected_text,
+            }
+
+    task = {
+        "task_id": "R2",
+        "source_id": "TEST-source",
+        "reference_chunk_id": "TEST-old-chunk",
+        "reference_page": 7,
+        "reference_element_type": "paragraph",
+    }
+    expected_source = {
+        "content_sha256": "d" * 64,
+        "source_document_sha256": "e" * 64,
+        "license_id": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    }
+
+    store = ReadOnlyStore()
+    with pytest.raises(ChunkStrategyEvaluationError, match="not verified against the current PDF"):
+        _resolve_reference_anchor(store, task, expected_source, {}, [element])
+    store.source_document_sha256 = expected_source["source_document_sha256"]
+    with pytest.raises(ChunkStrategyEvaluationError, match="does not map uniquely"):
+        _resolve_reference_anchor(store, task, expected_source, {}, [element])

@@ -1416,6 +1416,37 @@ class PaperStore:
             )
         return [dict(row) for row in rows]
 
+    def get_approved_fulltext_chunk_by_id(
+        self, *, source_type: str, source_id: str, chunk_id: str
+    ) -> dict[str, Any] | None:
+        """Read one current or historical chunk under an approved public source."""
+        if self.readonly is not True:
+            raise ValueError("historical evaluation anchors require a read-only PaperStore")
+        if source_type not in {"openalex", "arxiv"}:
+            raise ValueError("source_type must be openalex or arxiv")
+        if source_type == "openalex" and not re.fullmatch(r"W\d+", source_id):
+            raise ValueError("invalid OpenAlex work ID")
+        if source_type == "arxiv":
+            from app.sources.arxiv import normalize_arxiv_id
+
+            source_id = normalize_arxiv_id(source_id)
+        if not isinstance(chunk_id, str) or not chunk_id.strip() or len(chunk_id) > 500:
+            raise ValueError("invalid full-text chunk ID")
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            row = connection.execute(
+                """SELECT c.*,v.source_document_sha256,v.license_id,v.license_url,
+                v.parser_version FROM fulltext_documents d
+                JOIN fulltext_versions v ON v.source_type=d.source_type
+                AND v.source_id=d.source_id
+                JOIN fulltext_chunks c ON c.source_type=v.source_type
+                AND c.source_id=v.source_id AND c.content_sha256=v.content_sha256
+                WHERE d.status='approved' AND d.source_type=? AND d.source_id=?
+                AND c.chunk_id=? LIMIT 1""",
+                (source_type, source_id, chunk_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
     def list_current_fulltext_elements(
         self, *, source_type: str, source_id: str
     ) -> list[dict[str, Any]]:
@@ -1514,7 +1545,7 @@ class PaperStore:
         with self._connection() as connection:
             self._ensure_schema(connection)
             row = connection.execute(
-                """SELECT d.source_type, d.source_id, d.status, d.current_sha256,
+                """SELECT d.source_type, d.source_id, d.title, d.status, d.current_sha256,
                 d.current_sha256 AS content_sha256,
                 v.source_document_sha256, v.license_id, v.license_url, v.parser_version,
                 v.chunker_version, COUNT(c.chunk_id) AS chunk_count
@@ -1524,7 +1555,7 @@ class PaperStore:
                 LEFT JOIN fulltext_chunks c ON c.source_type=v.source_type
                 AND c.source_id=v.source_id AND c.content_sha256=v.content_sha256
                 WHERE d.source_type=? AND d.source_id=? AND d.status='approved'
-                GROUP BY d.source_type, d.source_id, d.status, d.current_sha256,
+                GROUP BY d.source_type, d.source_id, d.title, d.status, d.current_sha256,
                 v.source_document_sha256, v.license_id, v.license_url,
                 v.parser_version, v.chunker_version""",
                 (source_type, source_id),

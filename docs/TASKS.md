@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 真实获准语料 Chunk 策略对照（PR #35 实现中）
+
+- 对冻结 v27 9 篇 CC-BY-4.0 corpus / 6 个 selected-reference tasks 真实跑通 900/1,800-byte BM25 对照；原数据库 schema 22，仅在 ignored 临时副本迁移，原库 hash 不变。报告不可作 gold/通用质量声明，真实 MinerU 和 Chunk×Rerank 尚未覆盖。
+- 1,800-byte：Hit@1 .500、MRR@8 .622、NDCG@5 .712、Recall@5 1.0、span coverage 1.0；900-byte：.333、.561、.620、.917、.833。900-byte 在 @3 指标较高，样本小且单 reviewer，保持线上默认 1,800，不选胜者。
+- 修复真实 run 中发现的 anchor 过期：只对同一源 PDF、历史 span exact text 在当前同页同类型唯一匹配时重定位；其他失败关闭。后端全量 /CI 待 PR 复核。
+
 ## 2026-11-12 Harness 外部检索授权边界（PR #34 Draft）
 
 - `prepare_task` 将联网否定短语当作正向检索指令；ResearchRuntime 也仅校验计划引用原句，存在“明确拒绝联网却调用公开检索”风险。两处现共享肯定意图规则，执行前还限制到用户明确指定的公开来源。
