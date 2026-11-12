@@ -1160,6 +1160,7 @@ class AgentHarness:
                         "timeout",
                         "provider_unavailable",
                         "authentication_failed",
+                        "permission_denied",
                         "rate_limited",
                         "request_rejected",
                         "invalid_provider_response",

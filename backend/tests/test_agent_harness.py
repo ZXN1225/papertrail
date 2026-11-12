@@ -1097,12 +1097,13 @@ def test_harness_shared_token_budget_counts_embedding_tokens() -> None:
         temporary.cleanup()
 
 
-def test_harness_stops_when_embedding_usage_cannot_be_verified() -> None:
+@pytest.mark.parametrize("error_code", ["invalid_provider_response", "permission_denied"])
+def test_harness_stops_when_embedding_usage_cannot_be_verified(error_code: str) -> None:
     class FailingEmbeddings:
         model = "TEST-embedding"
 
         def embed(self, _texts: list[str]):
-            raise EmbeddingError("invalid_provider_response")
+            raise EmbeddingError(error_code)
 
     temporary, store = _store_in_tempdir()
     try:
@@ -1122,7 +1123,7 @@ def test_harness_stops_when_embedding_usage_cannot_be_verified() -> None:
         result = AgentHarness(model, registry).run("TEST use dense evidence")
 
         assert result.status == "usage_unavailable"
-        assert result.warnings == ["embedding_invalid_provider_response"]
+        assert result.warnings == [f"embedding_{error_code}"]
         assert len(model.instructions) == 1
         assert result.tool_calls == 1
         assert result.trace[-1].status == "error"

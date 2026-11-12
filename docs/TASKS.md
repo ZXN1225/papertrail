@@ -5,8 +5,8 @@
 - rerank dry-run 已在本机隔离 schema-23 副本核对 9 篇 / 3,294 chunks：3294 缺向量，活动索引不完整；6 条查询仅需 404 UTF-8 bytes、估算 `$0.00000808`；生成全文向量需传输约 825,894 UTF-8 bytes，按配置价字节上限估算 `$0.01651788`。0 provider calls、0 报告写入，原 DB SHA 不变。
 - 全文索引 CLI 现在要求 `--max-chunks` 和 `--max-cost-usd`，真实执行再要求 `--confirm-data-transfer`；dry-run 不创建 provider，限定只补缺失向量，并拒绝超预算/超 chunk/过长 chunk。查询预览的维度未配置会显示未验证，真实 rerank 在请求前失败关闭。
 - 用户授权指定语料外传后，初次及本机 key 更新后的重试均在首批 embedding 请求返回 `authentication_failed`；没有向量/usage，也未写本地索引。两库 SHA 均未变化；当前凭据仍不可用于 embeddings endpoint，需本机配置有效且有权限的 key，凭据不得发到聊天。
-- `embedding client` 现将 HTTP 401 和 403 分别归类为 `authentication_failed` 与 `permission_denied`；补充状态分类回归，后续重新运行可区分无效凭据和项目权限不足，当前没有再次调用 Provider。
-- 定向 26 passed、全后端 `579 passed`（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI（SHA 未变）、pip-audit、diff check 均通过。独立 reviewer 未发现阻断项；PR #40 基础提交及 PR #41 的 backend/web/Browser E2E/container CI 全绿，PR #41 保持 Draft、未合并。
+- `embedding client` 现将 HTTP 401 和 403 分别归类为 `authentication_failed` 与 `permission_denied`，Harness 会以安全 warning 保留这两个具体错误；补充客户端分类与 Harness 传播回归，当前没有再次调用 Provider。
+- 401/403 映射与 Harness 传播回归共 95 passed、全后端 `580 passed`（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI（SHA 未变）、pip-audit、diff check 均通过。PR #41 上一提交 backend/web/Browser E2E/container CI 全绿；最新 Harness 集成修复待 CI。PR #41 保持 Draft、未合并。
 - Rerank 质量效果仍待有效凭据、索引完成和足量 held-out 人审任务；尚不能据此评选策略。
 
 ## 2026-11-12 Chunk size/overlap 配置对照（PR #40 实现中）
