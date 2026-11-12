@@ -13,7 +13,7 @@
 
 - 真实私有语料回放发现：MinerU v11 的 16 个 figure caption chunk 已入库，但 `PrivateDocumentService.search_evidence` 与表格一起排除 figure；该数据库又无 advanced visual evidence，caption 精确查询只有 0/16 自身 figure 命中。
 - 最小修复是把私有 figure 原文图注重新加入只读 BM25 候选，同时继续排除未经结构化许可的 table。TEST 回归覆盖图注检索、工具观测保持原文图注、其他账号不可见、table 仍不可检索；定向 private document 测试 8 passed。全后端 561 passed；Ruff check/format、OpenAPI SHA、pip-audit、diff check 通过。
-- 同一 ignored schema-23 只读副本，3 篇 rights-attested MinerU v11 来源、16 个图注自查询在 limit 5 与 8 下均 16/16 命中；这是检索链路 smoke diagnostic，不是独立相关性金标，也没有图表数值/趋势准确率结论。原始数据库 SHA-256 未变化，未发生 Provider calls。新增高级 MinerU caption-only 回归分别验证 source-exact caption 与 `model_generated_unverified` 视觉解释的类型/ID，及跨账号隔离；独立代码 reviewer 未发现 blocker，并确认两种证据是有意区分展示。PR #37 提交与 CI 待完成。
+- 同一 ignored schema-23 只读副本，3 篇 rights-attested MinerU v11 来源、16 个图注自查询在 limit 5 与 8 下均 16/16 命中；这是检索链路 smoke diagnostic，不是独立相关性金标，也没有图表数值/趋势准确率结论。原始数据库 SHA-256 未变化，未发生 Provider calls。新增高级 MinerU caption-only 回归分别验证 source-exact caption 与 `model_generated_unverified` 视觉解释的类型/ID，及跨账号隔离；独立代码 reviewer 未发现 blocker，并确认两种证据是有意区分展示。PR #37 Draft 已创建，backend、Web Browser E2E、container CI 全部通过，未合并。
 
 ## 2026-11-12 真实获准语料 Chunk 对照（PR #35 Draft，CI 通过）
 
