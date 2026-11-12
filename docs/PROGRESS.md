@@ -4,7 +4,7 @@
 
 - 为人审后的 MinerU chart-task 集新增独立预算化 judge：只对 document-held-out test 的已裁决题运行，限制 judge model 与 candidate model 不同，结构化匹配预测事实与人审 reference IDs，并评价语义相关/事实忠实和 abstention；schema 校验每条预测/参考恰好归类一次。1/3/5 分有明确跨题锚点，Judge 不能改写参考标签，报告永不允许质量声明。
 - `--execute` 默认关闭；实跑另需 `--confirm-data-transfer`、不同模型、调用数和本地预估费用上限。只发送问题、候选事实和人工参考，不送页面图像、PDF 或解析报告；Judge 被要求把 JSON 中所有字段值视作不可信数据。先估计全量运行费用，超过 cap 则 provider 建立前拒绝；执行期间仍逐请求预留预算，cap 不是服务商硬限额。synthetic live 调用失败关闭。
-- 6 项 TEST/fake-model 定向测试通过（包含评分锚点、提示注入边界、整批预估超限前置拒绝，以及 provider 故障时 CLI 非零退出）；全后端 `575 passed`（1 条既有 Starlette 弃用 warning）。Ruff check/format、OpenAPI 导出（SHA 未变）、pip-audit 与 diff check 通过。未调用外部 provider；独立 reviewer 无 blocker，建议加强提示注入防护和整批成本预检，均已落实。PR #39 最新 commit 的 backend、web（含 Browser E2E）、container CI 全部通过。
+- 增加预算保护器的明确 halt reason 到 partial 报告，避免只显示泛化 `ModelUnavailable`；7 项定向测试通过（含费用预检触顶且 0 provider calls）；全后端 `576 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format 通过。OpenAPI SHA 与依赖审计此前已通过，本次改动不触及契约/依赖。PR #39 上一 commit backend、web（含 Browser E2E）、container CI 全绿；当前提交待 CI。
 
 ## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
 

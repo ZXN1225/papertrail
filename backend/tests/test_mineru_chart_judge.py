@@ -236,6 +236,31 @@ def test_chart_judge_full_run_cost_estimate_is_conservative() -> None:
     assert Decimal(estimate["estimated_max_cost_usd"]) > 0
 
 
+def test_chart_judge_reports_budget_guard_halt_reason() -> None:
+    model = TESTModel()
+    guarded = BudgetedModelClient(
+        model,
+        input_price_per_million_usd=Decimal("1"),
+        output_price_per_million_usd=Decimal("1"),
+        max_cost_usd=Decimal("0.000001"),
+        max_provider_calls=4,
+        max_output_tokens=800,
+    )
+
+    report = run_mineru_chart_judge(
+        _reviewed_dataset(),
+        _hash("TEST-reviewed-dataset"),
+        guarded,
+        candidate_model="TEST-mineru-vision",
+        judge_model="TEST-judge-model",
+    )
+
+    assert report["status"] == "partial"
+    assert report["halt_reason"] == "cost_preflight_cap_reached"
+    assert report["budget"]["provider_calls"] == 0
+    assert model.requests == []
+
+
 def test_chart_judge_rejects_invalid_fact_mapping_and_same_model() -> None:
     invalid = TESTModel()
     invalid.payload = {**invalid.default_payload}

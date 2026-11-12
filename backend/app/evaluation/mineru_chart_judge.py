@@ -212,7 +212,7 @@ def run_mineru_chart_judge(
                 output_schema=JUDGE_OUTPUT_SCHEMA,
             )
         except ModelUnavailable as error:
-            halt_reason = type(error).__name__
+            halt_reason = judge.halt_reason or type(error).__name__
             break
         if turn.refusal or turn.incomplete or turn.tool_calls or not turn.final_text:
             halt_reason = "invalid_or_refused_judge_response"
