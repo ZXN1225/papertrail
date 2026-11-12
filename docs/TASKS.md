@@ -4,7 +4,7 @@
 
 - `prepare_task` 将联网否定短语当作正向检索指令；ResearchRuntime 也仅校验计划引用原句，存在“明确拒绝联网却调用公开检索”风险。两处现共享肯定意图规则，执行前还限制到用户明确指定的公开来源。
 - 回归涵盖中文/英文否定、拒绝 OpenAlex 但正向授权 arXiv、计划超出来源授权时对外部 Registry 调用数为零。全后端 552 passed；Ruff、OpenAPI、pip-audit 通过。
-- PR #34 保持 Draft、未合并；最新来源范围提交的 backend/web/container CI 待检查。无 UI 代码变更，web 路径由现有 CI 覆盖。
+- PR #34 最新提交的 backend/web/container CI 均通过，保持 Draft、未合并。无 UI 代码变更，web 路径由现有 CI 覆盖。
 
 ## 2026-11-12 Chunk 策略只读对照（PR #33 Draft，CI 通过）
 
