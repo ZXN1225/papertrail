@@ -28,11 +28,13 @@ from app.storage.repository import (
 )
 
 STRATEGIES = {
-    "pdf_structure_900_bytes_v1": 900,
-    "pdf_structure_1800_bytes_v1": MAX_CHUNK_TOKEN_UPPER_BOUND,
+    "pdf_structure_900_bytes_v1": (900, 0),
+    "pdf_structure_900_bytes_10pct_overlap_v1": (900, 90),
+    "pdf_structure_1800_bytes_v1": (MAX_CHUNK_TOKEN_UPPER_BOUND, 0),
+    "pdf_structure_1800_bytes_10pct_overlap_v1": (MAX_CHUNK_TOKEN_UPPER_BOUND, 180),
 }
 MAX_TOTAL_ELEMENT_BYTES = 50_000_000
-REPORT_SCHEMA = "papertrail.chunk-strategy-report.v2"
+REPORT_SCHEMA = "papertrail.chunk-strategy-report.v3"
 PARENT_RERANK_METHOD = "bm25_parent_embedding_proxy_rerank"
 
 
@@ -172,12 +174,16 @@ def run_evaluation(
     candidates_by_strategy: dict[str, list[dict[str, Any]]] = {}
     build_time_ms: dict[str, float] = {}
     infeasible_strategies: set[str] = set()
-    for strategy, max_chunk_bytes in STRATEGIES.items():
+    for strategy, (max_chunk_bytes, max_overlap_bytes) in STRATEGIES.items():
         started = time.perf_counter_ns()
         candidates: list[dict[str, Any]] = []
         try:
             for source_id, elements in source_elements.items():
-                for chunk in chunk_pdf_elements(elements, max_chunk_bytes=max_chunk_bytes):
+                for chunk in chunk_pdf_elements(
+                    elements,
+                    max_chunk_bytes=max_chunk_bytes,
+                    max_overlap_bytes=max_overlap_bytes,
+                ):
                     if not chunk.element_id:
                         raise ChunkStrategyEvaluationError(
                             f"candidate chunk has no element locator: {source_id}"
@@ -358,7 +364,8 @@ def run_evaluation(
             strategy_reports[strategy] = {
                 "status": "unavailable",
                 "failure_reason": "table_structure_exceeds_candidate_chunk_size",
-                "max_chunk_bytes": STRATEGIES[strategy],
+                "max_chunk_bytes": STRATEGIES[strategy][0],
+                "max_overlap_bytes": STRATEGIES[strategy][1],
                 "chunk_build_latency_ms": build_time_ms[strategy],
                 "tasks": [],
             }
@@ -366,7 +373,8 @@ def run_evaluation(
         rows = task_results[strategy]["bm25"]
         strategy_report = {
             "status": "completed",
-            "max_chunk_bytes": STRATEGIES[strategy],
+            "max_chunk_bytes": STRATEGIES[strategy][0],
+            "max_overlap_bytes": STRATEGIES[strategy][1],
             "chunk_count": len(candidates_by_strategy[strategy]),
             "chunk_build_latency_ms": build_time_ms[strategy],
             "index_build_latency_ms": index_build_time_ms[strategy],

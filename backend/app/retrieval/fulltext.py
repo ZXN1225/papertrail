@@ -514,6 +514,7 @@ def chunk_pdf_elements(
     elements: list[dict[str, object]],
     *,
     max_chunk_bytes: int = MAX_CHUNK_TOKEN_UPPER_BOUND,
+    max_overlap_bytes: int = 0,
 ) -> list[TextChunk]:
     """Chunk PDF elements while retaining element lineage, local offsets and table headers.
 
@@ -521,14 +522,19 @@ def chunk_pdf_elements(
     ``text``. For paragraphs/headings/captions, the chunk text is that source slice.
     Table chunks repeat the title/header as retrieval context; their offsets identify
     the contiguous source data-row span named in ``locator`` (the repeated header is
-    contextual text and is not included in that span). ``max_chunk_bytes`` supports
-    offline ablation; ingestion continues to use the versioned default.
+    contextual text and is not included in that span). ``max_chunk_bytes`` and
+    ``max_overlap_bytes`` support offline ablation; ingestion continues to use the versioned
+    defaults. Overlap applies to text elements, not structured table rows.
     """
     if (
         type(max_chunk_bytes) is not int
         or not 800 <= max_chunk_bytes <= MAX_CHUNK_TOKEN_UPPER_BOUND
     ):
         raise ValueError("max_chunk_bytes must be an integer between 800 and 1,800")
+    if type(max_overlap_bytes) is not int or not 0 <= max_overlap_bytes <= max_chunk_bytes // 2:
+        raise ValueError(
+            "max_overlap_bytes must be an integer between zero and half the chunk size"
+        )
     chunks: list[TextChunk] = []
     for element in elements:
         if not isinstance(element, dict):
@@ -590,7 +596,31 @@ def chunk_pdf_elements(
                         element_id=element_id,
                     )
                 )
-            start = stop
+            next_start = stop
+            if max_overlap_bytes and stop < len(text):
+                candidate = actual_end
+                overlap_size = 0
+                while candidate > actual_start:
+                    char_size = len(text[candidate - 1].encode("utf-8"))
+                    if overlap_size + char_size > max_overlap_bytes:
+                        break
+                    candidate -= 1
+                    overlap_size += char_size
+                boundaries = [
+                    boundary
+                    for boundary in (
+                        text.find(" ", candidate, actual_end),
+                        text.find("\n", candidate, actual_end),
+                    )
+                    if boundary >= 0
+                ]
+                if boundaries:
+                    candidate = min(boundaries) + 1
+                while candidate < actual_end and text[candidate].isspace():
+                    candidate += 1
+                if start < candidate < stop:
+                    next_start = candidate
+            start = next_start
             while start < len(text) and text[start].isspace():
                 start += 1
             if len(chunks) > MAX_CHUNKS:

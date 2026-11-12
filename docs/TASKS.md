@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 Chunk overlap 配置对照（PR #40 实现中）
+
+- 将 0%/最高 10% overlap target × 900/1800-byte 作为离线 BM25 配置臂；生产 chunk 默认保持原行为，表格结构不重叠；报告版本升级为 v3。
+- 9 篇获准本机来源、6 条 single-reviewer selected-span 的四臂对照已跑完，0 provider calls，原数据库 hash 不变。当前只有 1800-byte+overlap 显示很小排序指标差异且 span coverage 不变；900-byte+overlap 指标变差。小样本不能选生产默认。parent-embedding proxy rerank 没有已确认 query embedding，故未执行。
+- 定向 87 tests 与全后端 `577 passed`（1 条既有 Starlette 弃用 warning）；Ruff/OpenAPI/pip-audit/diff check 通过，独立 reviewer 无 blocker。PR #39 前置 CI 已通过，PR #40 待提交并跑 CI。
+
 ## 2026-11-12 MinerU 图表 LLM-as-judge（PR #39 实现中）
 
 - 新增只读 judge runner/CLI：仅 human-reviewed held-out test 的 adjudicated tasks；candidate/judge 必须不同；结果 schema 校验 fact matching 完整性并保留 prompt/dataset/review-pack lineage、token/cost estimates。

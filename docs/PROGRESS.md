@@ -1,5 +1,11 @@
 # 进度
 
+## 2026-11-12 Chunk overlap 选型对照（PR #40 实现中）
+
+- 评测 evaluator-only 的 0%/最高 10% overlap × 900/1800-byte 四臂；重叠以 UTF-8 bytes 计算并对齐空白边界，仅用于段落/图注文本，不改变默认导入配置，也不重叠结构化表格行。报告 schema 升为 v3，记录 overlap 上限。
+- 本机只读回放冻结 v27 的 9 篇获准来源和 6 个 selected-reference 任务：1,800+最高 10% overlap 的 MRR@8/NDCG@5 小幅上升但 span coverage 不变；900+最高 10% overlap 的 NDCG@5/Recall@5 下滑。没有足够样本决定生产配置；rerank 两臂因无 query embeddings 未运行，provider calls=0。
+- 本机报告仅存 ignored `.local`，source DB SHA 保持不变；全后端 `577 passed`（1 条既有 Starlette 弃用 warning），Ruff/OpenAPI/pip-audit/diff check 通过。独立 reviewer 无 blocker；真实 6-task 小样本只支持探索诊断。PR/CI 待提交后验证。
+
 ## 2026-11-12 MinerU 图表 LLM-as-judge（PR #39 实现中）
 
 - 为人审后的 MinerU chart-task 集新增独立预算化 judge：只对 document-held-out test 的已裁决题运行，限制 judge model 与 candidate model 不同，结构化匹配预测事实与人审 reference IDs，并评价语义相关/事实忠实和 abstention；schema 校验每条预测/参考恰好归类一次。1/3/5 分有明确跨题锚点，Judge 不能改写参考标签，报告永不允许质量声明。

@@ -2,7 +2,7 @@
 
 ## Arms and runtime
 
-`python -m app.cli.evaluate_chunk_strategies` compares the current structure-preserving PDF chunker at 1,800 UTF-8 bytes with the same algorithm capped at 900 bytes. Table row/header structure, source element IDs, page numbers, bounding boxes, and half-open element-local offsets are retained. The production ingestion version remains unchanged; alternative chunks exist only in evaluator memory. Each chunk size now has a BM25 arm and an optional parent-embedding proxy rerank arm.
+`python -m app.cli.evaluate_chunk_strategies` compares the current structure-preserving PDF chunker at 1,800 UTF-8 bytes with the same algorithm capped at 900 bytes, each with zero overlap and a maximum overlap target of 10% of the byte cap. Whitespace alignment can make realized overlap smaller than that maximum. Overlap applies only to text elements; table row/header structure remains non-overlapping. Source element IDs, page numbers, bounding boxes, and half-open element-local offsets are retained. The production ingestion version remains unchanged; alternative chunks exist only in evaluator memory. Each chunk configuration has a BM25 arm and an optional parent-embedding proxy rerank arm.
 
 The command reads one frozen manifest and current approved full-text snapshot in read-only mode. It rejects stale hashes/parser versions/licenses, requires complete current-corpus coverage for the `all_approved_arxiv` scope, bounds source bytes/chunks, and refuses to overwrite a report. If a valid table header cannot fit in the 900-byte arm without losing its structure, that arm is reported unavailable while the 1,800-byte arm remains measurable. The default BM25 path performs no provider calls and neither path persists alternate chunks or embeddings.
 
@@ -38,7 +38,20 @@ These labels measure retrieval of a previously selected source span, not indepen
 
 The rerank arm uses the existing 1,800-byte indexed chunk vector as a proxy for each candidate chunk. Mapping requires exact source ID, source content hash, element ID/type, page, and half-open span containment in exactly one active indexed chunk; ambiguous or missing matches disable that arm. Candidates are selected by the first 128 unique BM25 parent chunks, then sorted by cosine similarity; children under one parent keep BM25 order. This avoids a 900-byte arm spending its entire budget on siblings, but it is not true child-chunk embedding, dense retrieval, or a cross-encoder. The report gives the mean children-per-parent and selected unique-parent count, and separates local retrieval latency from query embedding provider usage. Missing/incomplete vectors disable reranking rather than silently dropping affected tasks.
 
-MinerU visual descriptions remain separate `model_generated_unverified` evidence and are not included in exact-text chunk candidates. Figure captions remain searchable. This evaluator does not measure whether MinerU read chart values or trends correctly; that requires a separately licensed and manually checked chart set. It compares only chunk size and this parent-vector proxy; overlap/semantic windows, true child-chunk embeddings, and cross-encoder reranking remain unevaluated.
+MinerU visual descriptions remain separate `model_generated_unverified` evidence and are not included in exact-text chunk candidates. Figure captions remain searchable. This evaluator does not measure whether MinerU read chart values or trends correctly; that requires a separately licensed and manually checked chart set. It compares chunk size/overlap and this parent-vector proxy; semantic windows, true child-chunk embeddings, and cross-encoder reranking remain unevaluated. Chunk-level MRR/NDCG can shift when a method creates more overlapping relevant chunks, so interpret them beside exact evidence-span coverage and the raw candidate count.
+
+## Local overlap ablation (2026-11-12)
+
+The same frozen v27 manifest and 9-source local approved snapshot were replayed from a disposable `.local` database copy. The original user database SHA-256 remained `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`; the diagnostic used 6 single-reviewer selected-reference tasks and 0 provider calls. Results remain `gold_standard=false` and `quality_claim_allowed=false`.
+
+| Chunk configuration | Chunks | Hit@1 | MRR@8 | NDCG@5 | Recall@5 | Full span coverage | BM25 mean / p95 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1,800 bytes, no overlap | 3,294 | .500 | .622 | .712 | 1.000 | 1.000 | 1.47 / 3.95 |
+| 1,800 bytes, max 10% overlap target | 3,304 | .500 | .631 | .720 | 1.000 | 1.000 | 1.42 / 3.59 |
+| 900 bytes, no overlap | 3,575 | .333 | .561 | .620 | .917 | .833 | 1.77 / 3.93 |
+| 900 bytes, max 10% overlap target | 3,605 | .333 | .561 | .580 | .833 | .833 | 2.04 / 4.63 |
+
+The 1,800-byte overlap arm has a small MRR/NDCG increase without changing span coverage; the 900-byte overlap arm lowers NDCG/Recall and adds chunks. Six single-reviewer tasks are insufficient to choose a production default; no ingestion setting changed. Both rerank arms were unavailable because no query embeddings were supplied; no external query data was sent.
 
 ## Local approved-corpus run (2026-11-12)
 

@@ -70,6 +70,52 @@ def test_size_arms_preserve_exact_offsets_and_keep_visual_analysis_out_of_text()
     assert "generated chart trend description" not in figure_chunk.text
 
 
+def test_overlap_ablation_preserves_utf8_spans_and_leaves_table_chunks_unchanged():
+    body = "测试证据 evidence phrase " * 180
+    paragraph = _element("TEST-overlap-paragraph", "paragraph", body)
+    table = _element(
+        "TEST-overlap-table",
+        "table",
+        "Table 1\nName | Value\nTEST-a | 1\nTEST-b | 2",
+        structured={
+            "rows": [
+                {"cells": [{"text": "Name"}, {"text": "Value"}]},
+                {"row_index": 0, "cells": [{"text": "TEST-a"}, {"text": "1"}]},
+                {"row_index": 1, "cells": [{"text": "TEST-b"}, {"text": "2"}]},
+            ]
+        },
+    )
+
+    baseline = chunk_pdf_elements([paragraph], max_chunk_bytes=900)
+    overlapped = chunk_pdf_elements([paragraph], max_chunk_bytes=900, max_overlap_bytes=90)
+    baseline_table = chunk_pdf_elements([table], max_chunk_bytes=900)
+    overlapped_table = chunk_pdf_elements([table], max_chunk_bytes=900, max_overlap_bytes=90)
+
+    assert len(overlapped) > len(baseline)
+    assert all(len(chunk.text.encode("utf-8")) <= 900 for chunk in overlapped)
+    assert all(
+        chunk.evidence_text == body[chunk.char_start : chunk.char_end] for chunk in overlapped
+    )
+    assert all(
+        left.char_start < right.char_start < left.char_end
+        for left, right in zip(overlapped, overlapped[1:], strict=False)
+    )
+    assert all(
+        len(body[right.char_start : left.char_end].encode("utf-8")) <= 90
+        for left, right in zip(overlapped, overlapped[1:], strict=False)
+    )
+    assert baseline_table == overlapped_table
+
+    unspaced_text = "测" * 900
+    unspaced = _element("TEST-unspaced", "paragraph", unspaced_text)
+    exact_target_chunks = chunk_pdf_elements([unspaced], max_chunk_bytes=900, max_overlap_bytes=90)
+    assert len(exact_target_chunks) > 1
+    assert all(
+        len(unspaced_text[right.char_start : left.char_end].encode("utf-8")) <= 90
+        for left, right in zip(exact_target_chunks, exact_target_chunks[1:], strict=False)
+    )
+
+
 def test_small_table_chunks_repeat_header_and_retain_row_spans():
     rows = [
         {"row_index": index, "cells": [{"text": f"TEST-{index}"}, {"text": "x" * 80}]}
@@ -161,6 +207,18 @@ def test_chunk_size_rejects_out_of_range_or_boolean_values():
         chunk_pdf_elements([_element("TEST-e", "paragraph", "TEST text")], max_chunk_bytes=700)
     with pytest.raises(ValueError, match="max_chunk_bytes"):
         chunk_pdf_elements([_element("TEST-e", "paragraph", "TEST text")], max_chunk_bytes=True)
+    with pytest.raises(ValueError, match="max_overlap_bytes"):
+        chunk_pdf_elements(
+            [_element("TEST-e", "paragraph", "TEST text")],
+            max_chunk_bytes=900,
+            max_overlap_bytes=True,
+        )
+    with pytest.raises(ValueError, match="max_overlap_bytes"):
+        chunk_pdf_elements(
+            [_element("TEST-e", "paragraph", "TEST text")],
+            max_chunk_bytes=900,
+            max_overlap_bytes=451,
+        )
 
 
 def test_strategy_evaluation_rejects_a_writable_store_before_loading_any_corpus():
@@ -261,6 +319,13 @@ def test_strategy_evaluation_runs_both_arms_against_a_read_only_synthetic_snapsh
     assert report["dataset"]["quality_claim_allowed"] is False
     assert report["retrieval"]["retrieval_provider_calls"] == 0
     assert all(item["status"] == "completed" for item in report["strategies"].values())
+    assert (
+        report["strategies"]["pdf_structure_900_bytes_10pct_overlap_v1"]["max_overlap_bytes"] == 90
+    )
+    assert (
+        report["strategies"]["pdf_structure_1800_bytes_10pct_overlap_v1"]["max_overlap_bytes"]
+        == 180
+    )
     assert all(
         item["tasks"][0]["reference_anchor_resolution"] == "current_chunk"
         for item in report["strategies"].values()

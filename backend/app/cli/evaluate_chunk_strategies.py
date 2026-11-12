@@ -1,4 +1,4 @@
-"""Compare versioned PDF chunk sizes on one frozen, approved read-only corpus."""
+"""Compare versioned PDF chunk size and overlap strategies on a frozen read-only corpus."""
 
 from __future__ import annotations
 
