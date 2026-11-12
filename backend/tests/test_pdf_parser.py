@@ -406,6 +406,10 @@ def test_mineru_advanced_keeps_visual_analysis_out_of_source_exact_text(monkeypa
         "source": "mineru_advanced",
     }
     assert "mineru_visual_analysis_unverified" in figure["warnings"]
+    assert {
+        "page_number": 1,
+        "code": "mineru_visual_analysis_unverified",
+    } in result["warnings"]
     chunks = chunk_pdf_elements(result["elements"])
     assert [chunk.text for chunk in chunks] == ["Figure 1: TEST chart"]
 

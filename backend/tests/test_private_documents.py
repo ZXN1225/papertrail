@@ -660,6 +660,173 @@ def test_personal_document_private_retrieval_and_citation(tmp_path, monkeypatch)
         assert db.execute("SELECT COUNT(*) FROM user_chunk_embeddings").fetchone()[0] == 0
 
 
+def test_mineru_visual_analysis_is_separately_retrievable_and_scoped(tmp_path, monkeypatch) -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from app import private_documents
+    from app.agent.contracts import EvidenceSpan
+    from app.agent.harness import _collect_citations
+    from app.agent.tools import PaperToolRegistry
+
+    store = PaperStore(tmp_path / "visual.sqlite3")
+    owner = create_account(store, "visual_owner", "correct horse battery staple")
+    other = create_account(store, "visual_other", "correct horse battery staple")
+    assert owner and other
+    document = PrivateDocumentService(store).store_upload(
+        user_id=owner,
+        title="TEST chart paper",
+        filename="chart.pdf",
+        pdf_bytes=b"%PDF-TEST-chart",
+        rights_attested=True,
+    )
+    parsed = {
+        "parser_version": "mineru-4.1.7-papertrail-v11",
+        "elements": [
+            {
+                "element_id": "TEST-chart-e1",
+                "page_number": 4,
+                "element_type": "figure",
+                "text": "Figure 2. TEST caption",
+                "section_path": ["TEST Results"],
+                "bbox": [10, 20, 100, 200],
+                "structured": {
+                    "papertrail_visual_analysis": {
+                        "status": "model_generated_unverified",
+                        "source": "mineru_advanced",
+                    },
+                    "content": [
+                        {"type": "chart_body", "content": "TEST curve rises after treatment"},
+                        {"type": "chart_body", "content": "TEST control remains stable"},
+                        {"type": "image_base64", "content": "TEST must not be indexed"},
+                    ],
+                },
+            }
+        ],
+    }
+    monkeypatch.setattr(private_documents, "_parse_pdf_in_worker", lambda _path: parsed)
+    service = PrivateDocumentService(store)
+    service.process_document(owner, document["id"])
+    assert service.get_document(owner, document["id"])["state"] == "indexed"
+
+    observation = PaperToolRegistry(store, user_id=owner).execute(
+        "retrieve_paper_evidence",
+        json.dumps(
+            {
+                "query": "curve rises treatment",
+                "limit": 5,
+                "source_type": "personal",
+                "source_id": document["id"],
+                "retrieval_method": "bm25",
+            }
+        ),
+    )
+    assert observation["status"] == "ok"
+    visual = next(item for item in observation["items"] if "visual_analysis" in item)
+    assert visual["excerpt"] == "Figure 2. TEST caption"
+    assert visual["visual_analysis"] == {
+        "description": "TEST curve rises after treatment\nTEST control remains stable",
+        "status": "model_generated_unverified",
+        "source": "mineru_advanced",
+        "parser_version": "mineru-4.1.7-papertrail-v11",
+    }
+    assert "TEST must not be indexed" not in str(visual)
+    assert (
+        PaperToolRegistry(store, user_id=other).execute(
+            "retrieve_paper_evidence",
+            json.dumps(
+                {
+                    "query": "curve rises treatment",
+                    "limit": 5,
+                    "source_type": "personal",
+                    "source_id": document["id"],
+                    "retrieval_method": "bm25",
+                }
+            ),
+        )["items"]
+        == []
+    )
+
+    citations, observed_quotes = {}, {}
+    _collect_citations(observation, citations, observed_quotes)
+    citation = citations[f"personal:{document['id']}"]
+    visual_span = next(
+        span for span in citation.evidence if span.evidence_type == "visual_analysis"
+    )
+    assert visual_span.excerpt == "Figure 2. TEST caption"
+    assert (
+        visual_span.visual_description
+        == "TEST curve rises after treatment\nTEST control remains stable"
+    )
+    assert visual_span.verification_status == "model_generated_unverified"
+    assert visual_span.parser_version == "mineru-4.1.7-papertrail-v11"
+    assert (
+        "TEST curve rises after treatment\nTEST control remains stable",
+        visual["chunk_id"],
+        "visual_analysis",
+        "visual_description",
+    ) in observed_quotes[f"personal:{document['id']}"]
+    answer = {
+        "answer": "",
+        "cited_openalex_ids": [],
+        "cited_arxiv_ids": [],
+        "cited_personal_ids": [document["id"]],
+        "claims": [
+            {
+                "text": "The generated chart description says TEST curve rises after treatment.",
+                "evidence": [
+                    {
+                        "source_id": document["id"],
+                        "quote": "TEST curve rises after treatment",
+                        "evidence_type": "visual_analysis",
+                        "source_field": "visual_description",
+                        "chunk_id": visual["chunk_id"],
+                    }
+                ],
+            }
+        ],
+        "insufficient_evidence": False,
+    }
+    verified = AgentHarness._finalize(
+        json.dumps(answer),
+        citations,
+        observed_quotes,
+        [],
+        1,
+        1,
+        0,
+        0,
+        use_claim_text_only=True,
+    )
+    assert verified.status == "completed"
+    with pytest.raises(ValidationError, match="requires unverified marker"):
+        EvidenceSpan(
+            chunk_id="TEST-visual",
+            locator="Page 1",
+            excerpt="TEST caption",
+            evidence_type="visual_analysis",
+        )
+    with pytest.raises(ValidationError, match="cannot contain generated"):
+        EvidenceSpan(
+            chunk_id="TEST-exact",
+            locator="Page 1",
+            excerpt="TEST caption",
+            visual_description="TEST generated description",
+        )
+    with store._connection() as db:
+        db.execute("UPDATE user_documents SET state='failed' WHERE id=?", (document["id"],))
+        assert (
+            db.execute(
+                "SELECT COUNT(*) FROM user_document_visual_evidence WHERE document_id=?",
+                (document["id"],),
+            ).fetchone()[0]
+            == 1
+        )
+    assert service.delete_document(owner, document["id"]) == document["id"]
+    with store._connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM user_document_visual_evidence").fetchone()[0] == 0
+
+
 def test_private_document_api_requires_attestation_and_enforces_ownership(
     tmp_path, monkeypatch
 ) -> None:

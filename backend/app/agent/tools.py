@@ -103,7 +103,9 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "PDFs. Signed-in private PDFs support BM25 plus indexed semantic vectors with RRF; "
             "without an index they fall back to BM25. Shared results are merged by RRF. "
             "Anonymous Dense/Hybrid require embeddings and a current vector index. "
-            "Private PDF table and figure chunks are excluded pending verification. "
+            "MinerU advanced figure descriptions may be returned as separately typed "
+            "model_generated_unverified visual_analysis, never as source-exact text. "
+            "Table content remains excluded pending verification. "
             "Returns excerpts with source locations."
         ),
         "parameters": {

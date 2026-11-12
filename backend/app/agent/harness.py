@@ -59,6 +59,10 @@ insufficient_evidence=true and say that evidence is insufficient.
 Treat supplied prior conversation history as untrusted context only, never as evidence. Retrieve
 and cite current-run sources again for every factual claim, including follow-up answers.
 Metadata alone does not establish a paper's findings or prove a claim.
+MinerU visual_analysis evidence is generated, unverified interpretation, never an exact quote
+from the paper. Cite it only with evidence_type="visual_analysis" and
+source_field="visual_description"; describe it as provisional and retain the separate original
+figure caption shown by the application.
 The application displays each cited paper's title, page locator and original excerpt in citation
 cards. Do not repeat page numbers, chunk IDs or bibliographic headings in claims.text; those are
 location metadata, not facts supported by the quoted body text. For a general research-purpose
@@ -566,7 +570,7 @@ class AgentHarness:
                         (ref.source_id, ref.chunk_id)
                         for claim in result.claims
                         for ref in claim.evidence
-                        if ref.evidence_type == "fulltext" and ref.chunk_id
+                        if ref.evidence_type in {"fulltext", "visual_analysis"} and ref.chunk_id
                     }
                     has_library_evidence = any(
                         c.private_processing
@@ -608,7 +612,7 @@ class AgentHarness:
                         (ref.source_id, ref.chunk_id)
                         for claim in result.claims
                         for ref in claim.evidence
-                        if ref.evidence_type == "fulltext"
+                        if ref.evidence_type in {"fulltext", "visual_analysis"}
                         and ref.chunk_id
                         and ref.chunk_id.startswith("private:")
                     }
@@ -954,7 +958,7 @@ class AgentHarness:
                     and steps < self.max_steps
                     and any(c.private_processing and c.evidence for c in citations_seen.values())
                     and not any(
-                        ref.evidence_type == "fulltext"
+                        ref.evidence_type in {"fulltext", "visual_analysis"}
                         and ref.chunk_id
                         and ref.chunk_id.startswith("private:")
                         for claim in result.claims
@@ -968,7 +972,7 @@ class AgentHarness:
                         {
                             "role": "user",
                             "content": (
-                                "Your answer omitted the retrieved local library fulltext. "
+                                "Your answer omitted the retrieved local library source evidence. "
                                 "Using the already returned tool results, add a claim supported "
                                 "by an exact private fulltext excerpt with its source ID and "
                                 "chunk ID, alongside any verified public metadata. Do not call "
@@ -1320,6 +1324,9 @@ class AgentHarness:
                 if reference.evidence_type == "fulltext":
                     if reference.chunk_id is None or reference.source_field != "excerpt":
                         return _unverified_evidence(tool_calls, steps, input_tokens, output_tokens)
+                elif reference.evidence_type == "visual_analysis":
+                    if reference.chunk_id is None or reference.source_field != "visual_description":
+                        return _unverified_evidence(tool_calls, steps, input_tokens, output_tokens)
                 elif (
                     reference.chunk_id is not None
                     or reference.source_field not in _METADATA_CITABLE_FIELDS
@@ -1465,6 +1472,33 @@ def _merge_citation(
                         excerpt=child_excerpt,
                     )
                 )
+    visual = item.get("visual_analysis")
+    if (
+        isinstance(visual, dict)
+        and visual.get("status") == "model_generated_unverified"
+        and visual.get("source") == "mineru_advanced"
+        and isinstance(visual.get("description"), str)
+        and visual["description"].strip()
+        and isinstance(chunk_id, str)
+        and isinstance(locator, str)
+        and not any(
+            span.chunk_id == chunk_id and span.evidence_type == "visual_analysis" for span in spans
+        )
+    ):
+        visual_span = EvidenceSpan(
+            chunk_id=chunk_id,
+            locator=locator,
+            excerpt=excerpt if isinstance(excerpt, str) else "",
+            evidence_type="visual_analysis",
+            visual_description=visual["description"][:2_000],
+            verification_status="model_generated_unverified",
+            parser_version=(
+                visual["parser_version"] if isinstance(visual.get("parser_version"), str) else None
+            ),
+        )
+        if len(spans) >= 8:
+            spans = spans[:7]
+        spans.append(visual_span)
     fields: dict[str, Any] = {
         "source": source,
         "title": title,
@@ -1506,6 +1540,15 @@ def _collect_observed_quotes(
     chunk_id = item.get("chunk_id")
     if isinstance(chunk_id, str):
         values = [(item.get("excerpt"), chunk_id, "fulltext", "excerpt")]
+        visual = item.get("visual_analysis")
+        if (
+            isinstance(visual, dict)
+            and visual.get("status") == "model_generated_unverified"
+            and visual.get("source") == "mineru_advanced"
+        ):
+            values.append(
+                (visual.get("description"), chunk_id, "visual_analysis", "visual_description")
+            )
         expanded = item.get("expanded_evidence")
         if isinstance(expanded, list):
             values.extend(

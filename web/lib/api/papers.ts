@@ -25,6 +25,10 @@ export type Evidence = {
   chunk_id: string;
   locator: string;
   excerpt: string;
+  evidence_type?: "fulltext" | "visual_analysis";
+  visual_description?: string | null;
+  verification_status?: "model_generated_unverified" | null;
+  parser_version?: string | null;
 };
 
 export type Citation = {
@@ -44,7 +48,7 @@ export type Citation = {
 export type ClaimEvidence = {
   source_id: string;
   quote: string;
-  evidence_type: "metadata" | "fulltext";
+  evidence_type: "metadata" | "fulltext" | "visual_analysis";
   source_field: string;
   chunk_id: string | null;
 };

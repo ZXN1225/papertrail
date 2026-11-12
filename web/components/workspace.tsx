@@ -1682,10 +1682,13 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
                 <blockquote
                   key={`${evidence.source_id}-${evidence.chunk_id}-${evidenceIndex}`}
                 >
+                  {evidence.evidence_type === "visual_analysis" && (
+                    <p className="license-badge">MinerU AI 图表解读 · 未核验</p>
+                  )}
                   <p>{evidence.quote}</p>
                   <cite>
                     {evidence.source_id} ·{" "}
-                    {evidence.evidence_type === "fulltext" && evidence.chunk_id
+                    {evidence.evidence_type !== "metadata" && evidence.chunk_id
                       ? (answer.citations
                           .find(
                             (citation) =>
@@ -1694,7 +1697,10 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
                               citation.personal_id === evidence.source_id,
                           )
                           ?.evidence.find(
-                            (span) => span.chunk_id === evidence.chunk_id,
+                            (span) =>
+                              span.chunk_id === evidence.chunk_id &&
+                              (span.evidence_type ?? "fulltext") ===
+                                evidence.evidence_type,
                           )?.locator ?? evidence.chunk_id)
                       : `元数据字段：${evidence.source_field}`}
                   </cite>
@@ -1801,10 +1807,22 @@ function CitationCard({
         <p className="license-badge">私有全文 · 仅当前账号可见</p>
       )}
       {citation.evidence.map((span) => (
-        <blockquote key={span.chunk_id}>
-          <p>{span.excerpt}</p>
+        <blockquote
+          key={`${span.chunk_id}:${span.evidence_type ?? "fulltext"}`}
+        >
+          {span.evidence_type === "visual_analysis" ? (
+            <>
+              <p className="license-badge">MinerU AI 图表解读 · 未核验</p>
+              {span.excerpt && <p>原文图注：{span.excerpt}</p>}
+              <p>{span.visual_description}</p>
+            </>
+          ) : (
+            <p>{span.excerpt}</p>
+          )}
           <cite>
-            {span.locator} · {span.chunk_id}
+            {span.locator}
+            {span.parser_version && ` · ${span.parser_version}`} ·{" "}
+            {span.chunk_id}
           </cite>
         </blockquote>
       ))}

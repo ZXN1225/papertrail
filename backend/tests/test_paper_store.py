@@ -81,8 +81,8 @@ def test_migrations_are_repeatable_and_record_schema_version() -> None:
         store.migrate()
         store.migrate()
         with closing(sqlite3.connect(store.database_path)) as connection:
-            assert connection.execute("PRAGMA user_version").fetchone()[0] == 22
-            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 22
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 23
+            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 23
     finally:
         temporary.cleanup()
 
@@ -120,7 +120,7 @@ def test_readonly_store_opens_sqlite_in_read_only_mode(tmp_path: Path) -> None:
             connection.execute("CREATE TABLE forbidden_write (id INTEGER PRIMARY KEY)")
 
     with readonly._connection() as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 22
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 23
 
 
 def test_existing_v1_database_upgrades_without_losing_openalex_rows() -> None:
@@ -150,12 +150,12 @@ def test_existing_v1_database_upgrades_without_losing_openalex_rows() -> None:
 
         store.migrate()
         with closing(sqlite3.connect(store.database_path)) as connection:
-            assert connection.execute("PRAGMA user_version").fetchone()[0] == 22
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 23
             assert (
                 connection.execute("SELECT title FROM works WHERE openalex_id='W44'").fetchone()[0]
                 == "Legacy row"
             )
-            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 22
+            assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 23
     finally:
         temporary.cleanup()
 
@@ -225,7 +225,7 @@ def test_v6_fulltext_upgrade_marks_legacy_offsets_unknown_and_cascades_elements(
             ).fetchone()
             assert legacy["element_id"] is None
             assert legacy["char_offset_scope"] == "unknown_legacy"
-            assert connection.execute("PRAGMA user_version").fetchone()[0] == 22
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == 23
             assert legacy["retrieval_text"] == "TEST legacy passage"
             assert legacy["evidence_text"] == "TEST legacy passage"
             connection.execute(

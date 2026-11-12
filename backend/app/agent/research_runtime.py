@@ -800,6 +800,15 @@ class ResearchRuntime:
                 or "research question" in item["quote"].lower()
             )
         ][:24]
+        material["visual_evidence_notes"] = [
+            {
+                "evidence_id": key,
+                "status": "model_generated_unverified",
+                "instruction": "Interpretation only; not an exact quote or verified chart value.",
+            }
+            for key, item in bank.items()
+            if item["evidence_type"] == "visual_analysis"
+        ][:12]
         citation_checks: list[CitationCheckItem] = []
         check_claim_indices: dict[int, int] = {}
         if plan.intent == "citation_check":

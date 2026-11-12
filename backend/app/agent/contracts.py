@@ -157,12 +157,30 @@ class EvidenceSpan(StrictModel):
     chunk_id: str = Field(max_length=180)
     locator: str = Field(max_length=240)
     excerpt: str = Field(max_length=1_800)
+    evidence_type: Literal["fulltext", "visual_analysis"] = "fulltext"
+    visual_description: str | None = Field(default=None, max_length=2_000)
+    verification_status: Literal["model_generated_unverified"] | None = None
+    parser_version: str | None = Field(default=None, max_length=120)
+
+    @model_validator(mode="after")
+    def validate_visual_marker(self) -> EvidenceSpan:
+        if self.evidence_type == "visual_analysis" and (
+            not self.visual_description
+            or self.verification_status != "model_generated_unverified"
+            or not self.parser_version
+        ):
+            raise ValueError("visual analysis requires unverified marker, description and parser")
+        if self.evidence_type == "fulltext" and (
+            self.visual_description is not None or self.verification_status is not None
+        ):
+            raise ValueError("source-exact evidence cannot contain generated visual descriptions")
+        return self
 
 
 class ClaimEvidence(StrictModel):
     source_id: str = Field(min_length=4, max_length=64)
     quote: str = Field(min_length=1, max_length=1_000)
-    evidence_type: Literal["metadata", "fulltext"]
+    evidence_type: Literal["metadata", "fulltext", "visual_analysis"]
     source_field: str = Field(min_length=1, max_length=64)
     chunk_id: str | None = Field(max_length=180)
 

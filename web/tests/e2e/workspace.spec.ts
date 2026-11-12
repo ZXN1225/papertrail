@@ -497,6 +497,14 @@ test("shows personal citations with a private page locator and no public link", 
                 locator: "第 2 页",
                 excerpt: "TEST private excerpt.",
               },
+              {
+                chunk_id: "visual:TEST-PERSONAL:TEST-FIGURE",
+                locator: "Page 3 · MinerU 图表区域",
+                excerpt: "Figure 1. TEST original caption",
+                evidence_type: "visual_analysis",
+                visual_description: "TEST unverified line rises",
+                verification_status: "model_generated_unverified",
+              },
             ],
           },
         ],
@@ -510,6 +518,13 @@ test("shows personal citations with a private page locator and no public link", 
                 evidence_type: "fulltext",
                 source_field: "excerpt",
                 chunk_id: "TEST-CHUNK-PERSONAL",
+              },
+              {
+                source_id: personalId,
+                quote: "TEST unverified line rises",
+                evidence_type: "visual_analysis",
+                source_field: "visual_description",
+                chunk_id: "visual:TEST-PERSONAL:TEST-FIGURE",
               },
             ],
           },
@@ -527,10 +542,16 @@ test("shows personal citations with a private page locator and no public link", 
   const citation = page.locator(".citation-card");
   await expect(citation).toContainText("我的稿件");
   await expect(citation).toContainText("第 2 页");
+  await expect(citation).toContainText("MinerU AI 图表解读 · 未核验");
+  await expect(citation).toContainText("TEST original caption");
+  await expect(citation).toContainText("TEST unverified line rises");
   await expect(citation.getByRole("link")).toHaveCount(0);
   await expect(
     page.getByRole("region", { name: "逐条主张与证据" }),
   ).toContainText("第 2 页");
+  await expect(
+    page.getByRole("region", { name: "逐条主张与证据" }),
+  ).toContainText("MinerU AI 图表解读 · 未核验");
 });
 
 test("shows submitted message before the agent responds", async ({ page }) => {

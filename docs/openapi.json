@@ -2406,7 +2406,8 @@
             "type": "string",
             "enum": [
               "metadata",
-              "fulltext"
+              "fulltext",
+              "visual_analysis"
             ],
             "title": "Evidence Type"
           },
@@ -2493,6 +2494,51 @@
             "type": "string",
             "maxLength": 1800,
             "title": "Excerpt"
+          },
+          "evidence_type": {
+            "type": "string",
+            "enum": [
+              "fulltext",
+              "visual_analysis"
+            ],
+            "title": "Evidence Type",
+            "default": "fulltext"
+          },
+          "visual_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visual Description"
+          },
+          "verification_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "model_generated_unverified"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Status"
+          },
+          "parser_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parser Version"
           }
         },
         "additionalProperties": false,

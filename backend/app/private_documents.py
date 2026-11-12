@@ -30,10 +30,72 @@ MAX_PRIVATE_USER_CHUNKS = 25_000
 MAX_FILENAME_LENGTH = 180
 PRIVATE_PARSE_TIMEOUT_SECONDS = 1800
 MAX_PRIVATE_PARSE_OUTPUT_BYTES = 32 * 1024 * 1024
+MAX_PRIVATE_VISUAL_EVIDENCE_PER_DOCUMENT = 128
+MAX_PRIVATE_USER_VISUAL_EVIDENCE = MAX_USER_DOCUMENTS * MAX_PRIVATE_VISUAL_EVIDENCE_PER_DOCUMENT
+MAX_PRIVATE_VISUAL_DESCRIPTION_CHARS = 2_000
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _extract_visual_evidence(parsed: dict[str, Any]) -> list[dict[str, Any]]:
+    parser_version = parsed.get("parser_version")
+    elements = parsed.get("elements")
+    if not isinstance(parser_version, str) or not isinstance(elements, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for element in elements:
+        if not isinstance(element, dict) or element.get("element_type") != "figure":
+            continue
+        structured = element.get("structured")
+        marker = (
+            structured.get("papertrail_visual_analysis") if isinstance(structured, dict) else None
+        )
+        if not isinstance(marker, dict) or marker != {
+            "status": "model_generated_unverified",
+            "source": "mineru_advanced",
+        }:
+            continue
+        contents = structured.get("content")
+        descriptions = (
+            [
+                part.get("content")
+                for part in contents
+                if isinstance(part, dict)
+                and part.get("type") in {"chart_body", "image_body"}
+                and isinstance(part.get("content"), str)
+                and part["content"].strip()
+            ]
+            if isinstance(contents, list)
+            else []
+        )
+        description = "\n".join(descriptions).strip()[:MAX_PRIVATE_VISUAL_DESCRIPTION_CHARS]
+        element_id = element.get("element_id")
+        page_number = element.get("page_number")
+        if (
+            not description
+            or not isinstance(element_id, str)
+            or not element_id
+            or not isinstance(page_number, int)
+            or page_number < 1
+        ):
+            continue
+        bbox = element.get("bbox")
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            bbox = None
+        result.append(
+            {
+                "element_id": element_id,
+                "page_number": page_number,
+                "bbox": bbox,
+                "caption": str(element.get("text") or "")[:1_800],
+                "description": description,
+            }
+        )
+        if len(result) >= MAX_PRIVATE_VISUAL_EVIDENCE_PER_DOCUMENT:
+            break
+    return result
 
 
 def _safe_filename(value: str) -> str:
@@ -324,6 +386,7 @@ class PrivateDocumentService:
                 raise ValueError("private_document_hash_mismatch")
             parsed = _parse_pdf_in_worker(self._path(user_id, storage_key))
             chunks = chunk_pdf_elements(parsed["elements"])
+            visual_evidence = _extract_visual_evidence(parsed)
             with self.store._connection() as db:
                 existing_chunk_count = db.execute(
                     "SELECT COALESCE(SUM(chunk_count),0) FROM user_documents "
@@ -340,6 +403,9 @@ class PrivateDocumentService:
                 if current is None:
                     return
                 db.execute("DELETE FROM user_document_chunks WHERE document_id=?", (document_id,))
+                db.execute(
+                    "DELETE FROM user_document_visual_evidence WHERE document_id=?", (document_id,)
+                )
                 db.executemany(
                     "INSERT INTO user_document_chunks "
                     "(chunk_id,document_id,user_id,ordinal,retrieval_text,evidence_text,locator,"
@@ -364,6 +430,30 @@ class PrivateDocumentService:
                             expected_sha256,
                         )
                         for chunk in chunks
+                    ],
+                )
+                db.executemany(
+                    "INSERT INTO user_document_visual_evidence "
+                    "(visual_id,document_id,user_id,element_id,page_number,bbox_json,caption,"
+                    "description,parser_version,document_sha256,created_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    [
+                        (
+                            f"visual:{document_id}:{item['element_id']}",
+                            document_id,
+                            user_id,
+                            item["element_id"],
+                            item["page_number"],
+                            json.dumps(item["bbox"], separators=(",", ":"))
+                            if item["bbox"] is not None
+                            else None,
+                            item["caption"],
+                            item["description"],
+                            parsed["parser_version"],
+                            expected_sha256,
+                            _now(),
+                        )
+                        for item in visual_evidence
                     ],
                 )
                 db.execute(
@@ -497,13 +587,32 @@ class PrivateDocumentService:
                 "ORDER BY c.document_id,c.ordinal LIMIT ?",
                 [*params, MAX_PRIVATE_USER_CHUNKS + 1],
             ).fetchall()
-        if len(rows) > MAX_PRIVATE_USER_CHUNKS:
+            visual_rows = db.execute(
+                "SELECT v.*,d.source_type,d.source_id,d.title,d.source_url,d.document_sha256,"
+                "d.rights_attested_at FROM user_document_visual_evidence v JOIN user_documents d "
+                "ON d.id=v.document_id AND d.user_id=v.user_id WHERE "
+                "v.user_id=? AND d.state='indexed'"
+                + (" AND d.library_entry_id IS NOT NULL" if library_only else "")
+                + (" AND d.source_type=?" if source_type is not None else "")
+                + (" AND d.source_id=?" if source_id is not None else "")
+                + " ORDER BY v.document_id,v.page_number LIMIT ?",
+                [
+                    user_id,
+                    *([source_type] if source_type is not None else []),
+                    *([source_id] if source_id is not None else []),
+                    MAX_PRIVATE_USER_VISUAL_EVIDENCE + 1,
+                ],
+            ).fetchall()
+        if (
+            len(rows) > MAX_PRIVATE_USER_CHUNKS
+            or len(visual_rows) > MAX_PRIVATE_USER_VISUAL_EVIDENCE
+        ):
             return {
                 "status": "corpus_limit_exceeded",
                 "items": [],
-                "scanned_chunks": len(rows),
+                "scanned_chunks": len(rows) + len(visual_rows),
             }
-        if not rows:
+        if not rows and not visual_rows:
             return {"status": "no_results", "items": [], "scanned_chunks": 0}
         from app.retrieval.bm25 import BM25Index
 
@@ -515,7 +624,16 @@ class PrivateDocumentService:
             }
             for row in rows
         ]
+        documents.extend(
+            {
+                "openalex_id": row["visual_id"],
+                "title": row["title"],
+                "abstract": row["caption"] + "\n" + row["description"],
+            }
+            for row in visual_rows
+        )
         by_id = {row["chunk_id"]: row for row in rows}
+        visual_by_id = {row["visual_id"]: row for row in visual_rows}
         hits = BM25Index(documents).search(normalized, limit=max(limit, 32))
         ranked = [(hit.openalex_id, hit.score) for hit in hits]
         method = "private_bm25"
@@ -542,6 +660,39 @@ class PrivateDocumentService:
                 method = "private_hybrid_rrf"
         items = []
         for chunk_id, score in ranked[:limit]:
+            if chunk_id in visual_by_id:
+                row = visual_by_id[chunk_id]
+                item = {
+                    "source_type": row["source_type"],
+                    "source_id": row["source_id"],
+                    "title": row["title"],
+                    "source_url": row["source_url"],
+                    "chunk_id": row["visual_id"],
+                    "locator": f"Page {row['page_number']} · MinerU 图表区域",
+                    "page_number": row["page_number"],
+                    "element_type": "figure",
+                    "bbox": json.loads(row["bbox_json"]) if row["bbox_json"] else None,
+                    "excerpt": row["caption"],
+                    "visual_analysis": {
+                        "description": row["description"],
+                        "status": "model_generated_unverified",
+                        "source": "mineru_advanced",
+                        "parser_version": row["parser_version"],
+                    },
+                    "score": round(score, 6),
+                    "private_processing": True,
+                    "rights_attested_at": row["rights_attested_at"],
+                    "content_sha256": row["document_sha256"],
+                    "parser_warnings": ["mineru_visual_analysis_unverified"],
+                }
+                identifier_key = {
+                    "openalex": "openalex_id",
+                    "arxiv": "arxiv_id",
+                    "personal": "personal_id",
+                }[row["source_type"]]
+                item[identifier_key] = row["source_id"]
+                items.append(item)
+                continue
             row = by_id[chunk_id]
             item: dict[str, Any] = {
                 "source_type": row["source_type"],
@@ -576,6 +727,6 @@ class PrivateDocumentService:
         return {
             "status": "ok" if items else "no_results",
             "items": items,
-            "scanned_chunks": len(rows),
+            "scanned_chunks": len(rows) + len(visual_rows),
             "retrieval_method": method,
         }

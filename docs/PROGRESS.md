@@ -1,11 +1,20 @@
 # 进度
 
+## 2026-11-12 MinerU 视觉证据接入（PR #31 实现与验证中）
+
+- MinerU advanced 的图表/图片生成描述现通过新的独立 SQLite 表按账号、文档、解析器版本、PDF hash、页码和 bbox 保存；仅接受 adapter 添加的 `model_generated_unverified` 标记及 `chart_body`/`image_body` 字段，不把生成结果拼进 source-exact chunk 或 embeddings。每份文档最多保存 128 项，每项描述最多 2,000 字符；检索预算按账号最多 20 篇文件计算为 2,560 项。
+- 私有 BM25 可命中该独立描述；Agent schema 使用 `visual_analysis` / `visual_description`，引用卡片区分“MinerU AI 图表解读 · 未核验”和原文图注，按文档账号隔离，删除时级联清除。Standard 没有生成标记/描述时不会写入该表；表格仍不开放。
+- 新增 TEST 合成端到端回归，确认仅允许的 chart body 字段被检索、base64/其他字段不入索引、其他账号不可见、引用保留未核验类型、最终 claim contract 拒绝未标记的生成内容、删除级联；parser 顶层 warning 也记录未核验视觉内容。独立复核发现并修复了账号聚合视觉候选上限与顶层 warning 遗漏。
+- 仓库全局 `pnpm run format:check` 在 Windows 当前 Prettier 环境仍报告 26 个未修改文件格式不符；本轮触碰的三个前端文件单独检查通过。没有批量格式化无关文件。GitHub PR/CI 尚待创建与远程验证。
+- 尚不能把生成图表描述视为经过验证的科学事实；没有真实许可 MinerU 图表集、图表数值读取/趋势识别准确率或 MinerU/pdfplumber 对照结果，因此仍不能据此宣称 MinerU 解析质量达标或部署就绪。
+- Firecrawl 只读参考研究与适配原则见 [Agent 与论文证据设计参考](research/agent-and-evidence-design-references-2026-11-12.md)。
+
 ## 2026-11-12 MinerU advanced 图表分析开关（PR #30 草稿，CI 通过）
 
 - MinerU 解析器原来把 `image_analysis` 固定为 false，私有 PDF worker 也忽略 `PAPERTRAIL_MINERU_TIER`。现在仅在显式选择 `advanced` 时开启图像/图表分析，标准档仍关闭；私有 worker 转发所选 tier。解析器返回中的 advanced 视觉输出留在结构化数据并标为 `model_generated_unverified`，不会混入可逐字引用/检索文本；私有索引当前不持久化/检索这类视觉描述，来源 caption 仍作为独立文本。
 - 合成 chart fixture 验证 standard 关闭、advanced 开启、页/区域结构化留存及生成描述不进入 source-exact chunk；私有 worker tier 转发回归通过。定向后端 81 项通过（其中 parser/private worker 80 项、CLI 1 项），Ruff check/format 通过。
 - 全后端 532 passed，OpenAPI 导出、pip-audit 与 diff check 通过；PR #30 backend、web Browser E2E、container CI 全绿，Draft 堆叠于 PR #29、未合并。
-- 这还没有开放 Agent 对生成的视觉描述检索，也没有真实 MinerU 图表样本的数字/趋势准确率评测；需在独立的类型化视觉证据链路中明确模型生成来源与定位，完成同文档对照评测后才能考虑默认启用或作为回答证据。
+- PR #31 正在实现独立类型化视觉证据检索；真实 MinerU 图表样本的数字/趋势准确率评测仍未完成。
 
 ## 2026-11-12 MinerU 评测解析器版本解锁（PR #29 草稿，CI 通过）
 

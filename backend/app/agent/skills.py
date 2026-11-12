@@ -77,7 +77,7 @@ class SkillLoadError(RuntimeError):
 _DEFINITIONS: tuple[SkillDefinition, ...] = (
     SkillDefinition(
         skill_id="paper-qa",
-        version="1.1.0",
+        version="1.2.0",
         description="Answer a focused research question from traceable paper evidence.",
         filename="paper-qa.SKILL.md",
         triggers=("paper-qa", "论文问答", "论文问题", "研究问题", "paper question"),
@@ -88,7 +88,7 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_arxiv_metadata",
             "get_arxiv_metadata",
         ),
-        content_sha256="72bafae6e84c6543fc38ff9d766f05a2c6d1dfc61c3d909011ffbdb4f052856b",
+        content_sha256="b9368dcefa395262c507af5f49facf27421f41e6a850b0c89f72d66f123bb04e",
     ),
     SkillDefinition(
         skill_id="compare-papers",
@@ -101,7 +101,7 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
     ),
     SkillDefinition(
         skill_id="research-brief",
-        version="1.1.0",
+        version="1.2.0",
         description="Create a concise, evidence-linked research brief or literature overview.",
         filename="research-brief.SKILL.md",
         triggers=("research-brief", "研究简报", "文献综述", "研究综述", "literature review"),
@@ -113,7 +113,7 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_openalex_works",
             "search_arxiv_metadata",
         ),
-        content_sha256="766c4cb339e5c5cc2e6e408a5bd8f94cac064b0c13e67b7e3f55dbec9ebf5fce",
+        content_sha256="0ab5016b566ddce7a78a8108dd58ed617207a5b815c09494f1fa3e2e843cbd2a",
     ),
     SkillDefinition(
         skill_id="draft-revision",

@@ -81,14 +81,20 @@ FINAL_ANSWER_SCHEMA: dict[str, Any] = {
                                     },
                                     "evidence_type": {
                                         "type": "string",
-                                        "enum": ["metadata", "fulltext"],
+                                        "enum": ["metadata", "fulltext", "visual_analysis"],
                                     },
                                     "source_field": {
                                         "type": "string",
-                                        "enum": ["excerpt", *METADATA_CITABLE_FIELDS],
+                                        "enum": [
+                                            "excerpt",
+                                            "visual_description",
+                                            *METADATA_CITABLE_FIELDS,
+                                        ],
                                         "description": (
-                                            "For fulltext always use excerpt. For metadata use "
-                                            "the exact observed bibliographic field name."
+                                            "For fulltext use excerpt. For MinerU-generated figure "
+                                            "analysis use visual_analysis and visual_description; "
+                                            "this is unverified model output, not source text. "
+                                            "For metadata use the exact observed field name."
                                         ),
                                     },
                                     "chunk_id": {"type": ["string", "null"], "maxLength": 180},

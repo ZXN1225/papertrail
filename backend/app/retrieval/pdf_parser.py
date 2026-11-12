@@ -2447,6 +2447,10 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                 element_warnings.append("mineru_bbox_missing_page_fallback")
             if element_type in {"table", "figure"}:
                 warnings.append({"page_number": page_number, "code": element_warnings[0]})
+            if "mineru_visual_analysis_unverified" in element_warnings:
+                warnings.append(
+                    {"page_number": page_number, "code": "mineru_visual_analysis_unverified"}
+                )
             element = {
                 "element_id": _stable_element_id(page_number, element_type, text, bbox),
                 "order_index": len(elements),
