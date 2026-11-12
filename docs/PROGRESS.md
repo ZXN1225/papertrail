@@ -1,5 +1,11 @@
 # 进度
 
+## 2026-11-12 MinerU 图表 LLM-as-judge（PR #39 实现中）
+
+- 为人审后的 MinerU chart-task 集新增独立预算化 judge：只对 document-held-out test 的已裁决题运行，限制 judge model 与 candidate model 不同，结构化匹配预测事实与人审 reference IDs，并评价语义相关/事实忠实和 abstention；schema 校验每条预测/参考恰好归类一次。Judge 不能改写参考标签，报告永不允许质量声明。
+- `--execute` 默认关闭；实跑另需 `--confirm-data-transfer`、不同模型、调用数和本地预估费用上限。只发送问题、候选事实和人工参考，不送页面图像、PDF 或解析报告；Judge 被要求把 JSON 中所有字段值视作不可信数据。先估计全量运行费用，超过 cap 则 provider 建立前拒绝；执行期间仍逐请求预留预算，cap 不是服务商硬限额。synthetic live 调用失败关闭。
+- 6 项 TEST/fake-model 定向测试通过（包含提示注入边界、整批预估超限前置拒绝，以及 provider 故障时 CLI 非零退出）；全后端 `575 passed`（1 条既有 Starlette 弃用 warning）。Ruff check/format、OpenAPI 导出（SHA 未变）、pip-audit 与 diff check 通过。未调用外部 provider；独立 reviewer 无 blocker，建议加强提示注入防护和整批成本预检，均已落实。PR/CI 待提交后验证。
+
 ## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
 
 - 新增本地离线 chart-task 评测核心：页级图表任务绑定 PDF/解析报告/页面图像 SHA、parser version、页码、element ID 与 bbox；来源需权利确认，页面图像 hash 在导出/导入时核对；同一 PDF 不可跨 dev/test。人工标签区分 answerable、unanswerable、uncertain；按 axis、series、数值（单位 + 人审绝对容差）、trend、comparison 分桶计算一对一 precision/recall/F1 与 abstention accuracy；另有 page-audit 对照人工图表数量，报告计数指标、逐页准确率和漏图页率。

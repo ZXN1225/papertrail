@@ -41,3 +41,29 @@ All outputs should remain in ignored local review directories. Export/import ref
 ## Verification boundary
 
 Current automated fixtures use `TEST-*` synthetic tasks and verify exact categorical matches, numeric tolerance, one-to-one fact matching, abstention, uncertain rows, document-level split isolation, rights/provenance validation, and output overwrite/image hash guards. They validate evaluator mechanics only. Real MinerU chart-fact accuracy remains unmeasured until a rights-attested, independently human-reviewed, held-out set is prepared and evaluated. No provider transfer is part of this CLI.
+
+## Optional LLM-as-judge diagnostic
+
+The separate `app.cli.run_mineru_chart_judge` command consumes the imported human-reviewed dataset and judges only adjudicated test tasks. It asks a different model to match predicted fact indices to human reference fact IDs and score semantic relevance/faithfulness; it never changes reference labels. It is a secondary diagnostic beside deterministic exact/tolerance-aware scoring, not a source of gold labels. Each judge input is capped at 20,000 characters and all selected inputs are checked before the first provider call.
+
+Dry-run first. It reports the task count, a zero-call budget preflight, and the conservative full-run token/cost reservation without writing an output report. An execute run is rejected before creating a report or opening the provider if the estimated complete run exceeds the cost cap. During execution, each request is still checked against the remaining local budget; provider usage/pricing can differ from the estimate, so the cap is not provider-enforced. If a live run is explicitly authorized, it sends only the task question, candidate facts, abstention status, and human reference facts. These JSON values are treated as untrusted data by the judge prompt. It does not send page images, PDFs, parser reports, or whole paper text. Because the human reference facts and chart question are still externally transmitted, every live invocation requires `--confirm-data-transfer`, a non-synthetic reviewed dataset, a different candidate/judge model, and explicit per-million prices, call cap, and estimated-cost cap. This CLI does not run a live judge as part of CI or this implementation.
+
+```powershell
+uv run --locked python -m app.cli.run_mineru_chart_judge `
+  --dataset reports/live_eval/mineru/TEST-chart-reviewed.json `
+  --output reports/live_eval/mineru/TEST-chart-llm-judge.json `
+  --candidate-model "candidate-model-id" --judge-model "different-judge-model-id" `
+  --max-tasks 20 --max-provider-calls 20 --max-cost-usd 0.25 `
+  --input-price-per-million-usd 1 --output-price-per-million-usd 5
+
+# After checking the dry-run details and authorizing the listed data transfer:
+uv run --locked python -m app.cli.run_mineru_chart_judge `
+  --dataset reports/live_eval/mineru/TEST-chart-reviewed.json `
+  --output reports/live_eval/mineru/TEST-chart-llm-judge.json `
+  --candidate-model "candidate-model-id" --judge-model "different-judge-model-id" `
+  --max-tasks 20 --max-provider-calls 20 --max-cost-usd 0.25 `
+  --input-price-per-million-usd 1 --output-price-per-million-usd 5 `
+  --execute --confirm-data-transfer
+```
+
+The report carries the prompt version, dataset/review-pack hashes, model IDs, token/cost estimates, task-level structured verdicts, and unconditional `quality_claim_allowed=false`. Keep reports in ignored local directories; judge rationales may contain user-provided chart wording.
