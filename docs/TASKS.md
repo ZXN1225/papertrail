@@ -3,7 +3,7 @@
 ## 2026-11-12 真正候选向量 Rerank × Chunk 选型修正（PR #44 实施中）
 
 - 首次外传评测脚本错误地跨九篇建 BM25 池，与冻结 manifest 的每题单篇范围不一致；已发起 19 次调用、214,826 tokens（估算 `$0.00429652`），但报告中的 rerank 指标无效，不能用于选型。原 DB hash 不变，数据仍在 ignored `.local`。
-- 正确范围的只读预检为 2,221 个候选 ID / 824 段新文本 / 690,259 UTF-8 bytes；执行中 `timeout`，未写报告，旧脚本无法核算已完成批次费用。暂停额外外传，先实现逐批本地缓存、用量账本、来源范围一致性和续跑预算门；完成后再核对授权余额。当前没有有效真实候选向量 rerank 结果，不改变生产默认。
+- 正确范围的只读预检为 2,221 个候选 ID / 824 段新文本 / 690,259 UTF-8 bytes；执行中 `timeout`，未写报告，旧脚本无法核算已完成批次费用。新增正式 runner 保持 manifest 来源范围，逐批在 ignored `.local` 预留字节预算、原子缓存成功向量；再次 dry-run 0 provider calls、数量一致，synthetic 定向 4 passed、全后端 587 passed，Ruff/OpenAPI/diff check 通过。旧失败调用无法回填缓存，仍不在原授权下外传；当前无有效真实候选向量 rerank 结果，不改变生产默认。
 - 报告是单 reviewer selected-span 探索诊断，不是独立人审 gold，也不证明 MinerU 图表解析质量。协作 Agent 复核因使用额度限制失败，尚未通过复核。
 
 ## 2026-11-12 实时 Rerank 效果诊断（PR #43 Draft，CI 通过）

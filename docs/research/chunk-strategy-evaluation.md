@@ -175,3 +175,30 @@ provider usage only in an ignored local cache, and stop when the remaining autho
 cannot cover another attempt. Until a correct run completes, there is **no valid true candidate
 vector rerank comparison**. The existing BM25 and parent-vector proxy results above remain
 separate exploratory diagnostics, not MinerU chart-quality evidence or an independent gold set.
+
+The new `python -m tools.evaluate_true_candidate_rerank` command implements that source-scope
+and retry boundary. It defaults to a read-only, zero-provider dry-run. It requires an explicit
+dataset, output path, query count, new-text count, new UTF-8 byte cap, and positive estimated
+cost cap. A live run additionally requires `--execute --confirm-data-transfer` and an enabled
+OpenAI embedding provider. The current frozen-snapshot preview used:
+
+```powershell
+uv run --locked python -m tools.evaluate_true_candidate_rerank `
+  --dataset data/evaluation/arxiv-r01-r03-current-v27-v1.json `
+  --output .local/true-candidate-rerank-replay.json `
+  --max-query-embeddings 6 `
+  --max-new-texts 824 `
+  --max-new-utf8-bytes 690259 `
+  --max-cost-usd 0.02
+```
+
+The command uses the configured read-only database, embedding model, dimensions, and price; this
+snapshot needs the isolated schema-23 copy and `text-embedding-3-small`/1,536. It reuses current
+vectors only for exactly equal candidate input text. Each attempted provider batch reserves its
+UTF-8 byte estimate **before** the call in an ignored `.local/candidate-rerank-cache/<plan hash>`
+ledger. Completed batches store text hashes and vectors, without raw text, in that ignored cache.
+The next dry-run shows cached batches, remaining batches, and cumulative attempt reservation;
+live retry is rejected if the reservation plus remaining transfer exceeds the supplied cap.
+This is a local estimate gate, not a provider billing limit. It cannot reconstruct the unknown
+usage or vectors from the earlier one-off timed-out attempt, so no additional live call was made
+while completing this runner.

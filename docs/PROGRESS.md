@@ -4,7 +4,7 @@
 
 - 用户另行授权同一 9 篇获准来源的 6 道冻结题候选向量评测。第一次本机脚本把九篇全库 BM25 top-128 与 manifest 规定的单篇任务范围混用；虽完成 19 次 provider 调用、214,826 input tokens（按配置价估算 `$0.00429652`），其报告的 rerank 数字**无效，不能与基线配对或选型**。原数据库 SHA-256 不变，报告和脚本仅在 ignored `.local`。
 - 修正后的单篇范围只读预检为 2,221 个候选 ID、824 段新增去重文本 / 690,259 UTF-8 bytes；连同六题 404 bytes 的费用估算上限 `$0.01381326`。真实请求中途 `timeout`，未写报告；旧脚本无分批向量/用量持久化，因此本次已调用批数和费用未知，不在旧上限下盲重试。尚无有效真实候选向量 rerank 分数。
-- 正在将本机流程整理为可复现、默认零外传、严格沿用来源范围且支持分批本地缓存/预算续跑的正式命令；独立 Agent 复核因账号使用额度限制未完成，不计为验证。生产默认不变。详见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+- 新增正式 `tools.evaluate_true_candidate_rerank`：遵循 manifest 单篇/全库范围，BM25 前 128 候选按精确文本复用活动向量；默认零外传 dry-run，live 要显式确认和题数/文本数/字节/费用上限。每批请求前在 ignored `.local` 写入保守字节预算账本，成功批次原子保存哈希和向量以支持续跑；失败后旧授权余额不足时拒绝盲重试。真实隔离库 dry-run 重得 2,221 候选 / 824 新文本 / 690,259 bytes，0 provider calls；定向 synthetic 4 passed、全后端 587 passed（1 条既有 Starlette warning），Ruff check/format、OpenAPI SHA（未变）、diff check 通过。旧失败脚本的未知用量无法由新缓存恢复，本轮不再外传。独立 Agent 复核因账号使用额度限制未完成，不计为验证；生产默认不变。详见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
 
 ## 2026-11-12 获准语料实时向量索引与 Rerank 诊断（PR #43 Draft，CI 通过）
 
