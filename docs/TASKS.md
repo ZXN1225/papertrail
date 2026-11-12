@@ -1,5 +1,12 @@
 # 任务台账
 
+## 2026-11-12 Rerank 预检与全文向量索引预算门（PR #41 准备中）
+
+- rerank dry-run 已在本机隔离 schema-23 副本核对 9 篇 / 3,294 chunks：3294 缺向量，活动索引不完整；6 条查询仅需 404 UTF-8 bytes、估算 `$0.00000808`；生成全文向量需传输约 825,894 UTF-8 bytes，按配置价字节上限估算 `$0.01651788`。0 provider calls、0 报告写入，原 DB SHA 不变。
+- 全文索引 CLI 现在要求 `--max-chunks` 和 `--max-cost-usd`，真实执行再要求 `--confirm-data-transfer`；dry-run 不创建 provider，限定只补缺失向量，并拒绝超预算/超 chunk/过长 chunk。查询预览的维度未配置会显示未验证，真实 rerank 在请求前失败关闭。
+- 定向 26 passed、全后端 `579 passed`（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI（SHA 未变）、pip-audit、diff check 均通过。独立 reviewer 未发现阻断项；PR #40 当前基础提交 backend/web/Browser E2E/container CI 全绿。
+- 未获用户对论文全文 embedding 外传的明确确认；未执行索引或 rerank。PR #41 CI 尚待创建后运行，评测策略收益仍待授权与足量 held-out 人审任务。
+
 ## 2026-11-12 Chunk size/overlap 配置对照（PR #40 实现中）
 
 - 将 0%/最高 10% overlap target × 900/1200/1800-byte 作为离线 BM25 配置臂；生产 chunk 默认保持原行为，表格结构不重叠；报告版本升级为 v3。

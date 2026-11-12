@@ -873,11 +873,16 @@ def test_embedding_index_cli_batches_and_reports_safe_usage(monkeypatch, capsys)
             embedding_price_per_million_usd=0.02,
         )
 
+        provider_instances = []
+
         class FakeEmbeddingClient:
             def __init__(self, client_settings) -> None:
                 assert client_settings.embedding_api_key is not None
+                self.calls = 0
+                provider_instances.append(self)
 
             def embed(self, texts: list[str]) -> EmbeddingBatch:
+                self.calls += 1
                 assert texts == ["An approved text chunk to build an embedding index."]
                 return EmbeddingBatch("fake-test-encoder-v1", [[1.0, 0.0]], 12)
 
@@ -886,8 +891,73 @@ def test_embedding_index_cli_batches_and_reports_safe_usage(monkeypatch, capsys)
 
         monkeypatch.setattr(index_fulltext_embeddings, "get_settings", lambda: settings)
         monkeypatch.setattr(index_fulltext_embeddings, "OpenAIEmbeddingClient", FakeEmbeddingClient)
+        preview_code = index_fulltext_embeddings.main(
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--dry-run",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.01",
+            ]
+        )
+        preview = json.loads(capsys.readouterr().out)
+        assert preview_code == 0
+        assert preview["missing_chunks"] == 1
+        assert preview["input_utf8_bytes_upper_bound"] == len(
+            b"An approved text chunk to build an embedding index."
+        )
+        assert preview["provider_calls"] == 0
+        assert preview["index_written"] is False
+
+        no_consent_code = index_fulltext_embeddings.main(
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.01",
+            ]
+        )
+        assert no_consent_code == 3
+        assert "--confirm-data-transfer" in capsys.readouterr().err
+        assert provider_instances == []
+
+        over_budget_code = index_fulltext_embeddings.main(
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--confirm-data-transfer",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.0000000001",
+            ]
+        )
+        assert over_budget_code == 3
+        assert "upper-bound estimate exceeds" in capsys.readouterr().err
+        assert provider_instances == []
+
         exit_code = index_fulltext_embeddings.main(
-            ["--source-type", "openalex", "--source-id", "W900"]
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--confirm-data-transfer",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.01",
+            ]
         )
         output = json.loads(capsys.readouterr().out)
         assert exit_code == 0

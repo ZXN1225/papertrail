@@ -30,6 +30,27 @@ uv run --locked python -m app.cli.evaluate_chunk_strategies `
 
 Use a manifest whose parser version, source PDF hashes, approved-text hashes, and source set exactly match the local current index. A MinerU report requires a separately frozen MinerU manifest; a pdfplumber result cannot stand in for it.
 
+Before executing that arm, use `--dry-run` with the same dataset, query cap and cost cap. It checks
+the local vector index and reports query-only transfer cost without creating a provider client,
+writing the report, or sending data. The cost is a UTF-8 byte upper bound and applies only to query
+embeddings. If chunk vectors are missing, the preview separately estimates the cost of embedding
+their full text; that full-text transfer is a distinct operation and is not approved by the query
+confirmation flag. A complete index and configured dimensions are required before live reranking.
+
+The full-text index CLI has its own offline preview and transfer boundary. It only selects chunks
+missing a vector for the configured model/dimensions. Live indexing requires `--confirm-data-transfer`,
+`--max-chunks`, and `--max-cost-usd`; the preview requires the latter two bounds but never calls the
+provider:
+
+```powershell
+uv run --locked python -m app.cli.index_fulltext_embeddings `
+  --source-type arxiv `
+  --source-id 2401.00001 `
+  --dry-run `
+  --max-chunks 5000 `
+  --max-cost-usd 0.05
+```
+
 ## Anchor projection and metrics
 
 Each selected reference chunk is checked against the active source ID, content hash, page, element type, element ID, and exact character interval. A candidate chunk is treated as relevant only when its source interval overlaps that selected interval in the same parser element. Reports show Hit/MRR/NDCG/Precision/Recall@k, exact selected-span coverage across retrieved chunks, candidate count, chunk-build time, index-build time, and BM25 search latency.
@@ -69,3 +90,15 @@ At `@3`, the smaller arm had higher Hit (0.833 vs 0.667), Precision (0.278 vs 0.
 One selected chunk ID was stale after chunking changes. The evaluator now remaps it only when the historical chunk is from the same PDF hash and its exact evidence text occurs uniquely on the same current page and element type. It fails closed otherwise. This exact text remap resolved 1/6 tasks; the other 5 used current chunk IDs.
 
 The local approved snapshot uses `pdfplumber-layout-v27`, not MinerU. It provides no evidence about MinerU parsing or visual chart accuracy. Chunk×parent-proxy-rerank has a runnable paired evaluator, but a real rerank run requires explicit query-embedding data-transfer consent and a complete local embedding index; no strategy winner is claimed until that run and a held-out reviewed task set exist.
+
+## Local rerank dry-run (2026-11-12)
+
+The read-only preview ran against a disposable migrated copy of the approved v27 corpus (9 sources,
+3,294 active chunks). The configured `text-embedding-3-small` model had no current vectors for any
+chunk, so the parent-vector rerank arm is not runnable yet. Six task queries total 404 UTF-8 bytes;
+their query-only embedding upper-bound estimate is `$0.00000808`. Building the absent full-text
+index would submit 825,894 UTF-8 bytes, with an estimated upper-bound cost of `$0.01651788` at the
+configured price. This byte estimate is conservative and not provider token usage. The preview made
+zero provider calls, wrote no report, and the original user database hash remained unchanged. No
+full-text data transfer or rerank was authorized or performed; these estimates are not evidence of
+retrieval quality or rerank benefit.

@@ -5,7 +5,10 @@ from typing import Any
 
 import pytest
 
-from app.cli.evaluate_ai_labeled_tasks import embed_task_queries
+from app.cli.evaluate_ai_labeled_tasks import (
+    embed_task_queries,
+    estimate_task_query_embedding_budget,
+)
 
 
 class _FakeEmbeddingClient:
@@ -86,3 +89,17 @@ def test_embedding_queries_are_bounded_and_usage_is_reported() -> None:
     assert usage["query_count"] == 2
     assert usage["calculated_cost_usd"] == "5.2E-7"
     assert client.closed is True
+
+
+def test_query_embedding_budget_can_be_estimated_without_provider_client() -> None:
+    budget = estimate_task_query_embedding_budget(
+        _dataset(),
+        _settings(),
+        max_query_embeddings=2,
+        max_cost_usd="0.01",
+    )
+
+    assert budget["query_count"] == 2
+    assert budget["provider_call_upper_bound"] == 1
+    assert budget["input_utf8_bytes_upper_bound"] == 26
+    assert budget["estimated_upper_bound_cost_usd"] == "5.2E-7"

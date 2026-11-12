@@ -66,24 +66,16 @@ def embed_task_queries(
 ) -> tuple[dict[str, list[float]], dict[str, Any]]:
     if not confirm_data_transfer:
         raise ValueError("embedding-based retrieval requires --confirm-data-transfer")
+    if settings.embedding_provider != "openai":
+        raise ValueError("live embedding-based retrieval requires embedding provider=openai")
+    budget = estimate_task_query_embedding_budget(
+        dataset,
+        settings,
+        max_query_embeddings=max_query_embeddings,
+        max_cost_usd=max_cost_usd,
+    )
     tasks = dataset["tasks"]
-    if max_query_embeddings is None or max_query_embeddings < len(tasks):
-        raise ValueError("--max-query-embeddings must cover the complete task set")
-    if settings.embedding_provider != "openai" or settings.embedding_price_per_million_usd is None:
-        raise ValueError(
-            "priced OpenAI embeddings must be configured for embedding-based retrieval"
-        )
-    if max_cost_usd is None:
-        raise ValueError("embedding-based retrieval requires --max-cost-usd")
-    cost_limit = _decimal_cost(max_cost_usd)
-    queries = [task["question"] for task in tasks]
-    if any(not query.strip() or len(query) > MAX_INPUT_CHARS for query in queries):
-        raise ValueError("task questions exceed the embedding input limit")
-    token_upper_bound = sum(len(query.encode("utf-8")) for query in queries)
     price = Decimal(str(settings.embedding_price_per_million_usd))
-    upper_cost = price * token_upper_bound / Decimal(1_000_000)
-    if upper_cost > cost_limit:
-        raise ValueError("UTF-8 byte upper-bound estimate exceeds --max-cost-usd")
 
     vectors: dict[str, list[float]] = {}
     input_tokens = 0
@@ -104,16 +96,53 @@ def embed_task_queries(
     finally:
         client.close()
     actual_cost = price * input_tokens / Decimal(1_000_000)
-    if actual_cost > cost_limit:
+    if actual_cost > Decimal(budget["max_cost_usd"]):
         raise ValueError("provider-reported query embedding cost exceeds --max-cost-usd")
     return vectors, {
+        **budget,
         "model": client.model,
         "query_count": len(vectors),
         "provider_calls": calls,
         "input_tokens": input_tokens,
-        "input_token_upper_bound": token_upper_bound,
-        "estimated_upper_bound_cost_usd": str(upper_cost),
         "calculated_cost_usd": str(actual_cost),
+    }
+
+
+def estimate_task_query_embedding_budget(
+    dataset: dict[str, Any],
+    settings: Any,
+    *,
+    max_query_embeddings: int | None,
+    max_cost_usd: str | None,
+) -> dict[str, Any]:
+    """Estimate the complete query-only embedding request without creating a client."""
+    tasks = dataset["tasks"]
+    if max_query_embeddings is None or max_query_embeddings < len(tasks):
+        raise ValueError("--max-query-embeddings must cover the complete task set")
+    if (
+        settings.embedding_provider not in {"openai", "disabled"}
+        or settings.embedding_price_per_million_usd is None
+    ):
+        raise ValueError(
+            "a priced OpenAI embedding model must be configured for query cost estimation"
+        )
+    if max_cost_usd is None:
+        raise ValueError("embedding-based retrieval requires --max-cost-usd")
+    cost_limit = _decimal_cost(max_cost_usd)
+    queries = [task["question"] for task in tasks]
+    if any(not query.strip() or len(query) > MAX_INPUT_CHARS for query in queries):
+        raise ValueError("task questions exceed the embedding input limit")
+    token_upper_bound = sum(len(query.encode("utf-8")) for query in queries)
+    price = Decimal(str(settings.embedding_price_per_million_usd))
+    upper_cost = price * token_upper_bound / Decimal(1_000_000)
+    if upper_cost > cost_limit:
+        raise ValueError("UTF-8 byte upper-bound estimate exceeds --max-cost-usd")
+    return {
+        "query_count": len(tasks),
+        "provider_call_upper_bound": (len(tasks) + MAX_BATCH_SIZE - 1) // MAX_BATCH_SIZE,
+        "input_utf8_bytes_upper_bound": token_upper_bound,
+        "estimated_upper_bound_cost_usd": str(upper_cost),
+        "max_cost_usd": str(cost_limit),
     }
 
 
@@ -131,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "query_count": 0,
             "provider_calls": 0,
             "input_tokens": 0,
-            "input_token_upper_bound": 0,
+            "input_utf8_bytes_upper_bound": 0,
             "estimated_upper_bound_cost_usd": "0",
             "calculated_cost_usd": "0",
         }

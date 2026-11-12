@@ -1,5 +1,12 @@
 # 进度
 
+## 2026-11-12 Rerank 索引预算预览与外传门（PR #41 准备中）
+
+- 增加 parent-embedding rerank dry-run：只读核对当前批准语料向量覆盖、维度和查询数/费用；不建 provider、不写报告、不传数据。隔离副本的 9 篇/3,294 chunks 实测全部缺向量；6 条查询上限为 404 UTF-8 bytes、`$0.00000808`，补索引全文的字节费用估算上限约 `$0.01651788`。两项都未调用 provider；本地原 DB SHA 不变。
+- 给全文向量索引 CLI 加 dry-run、`--confirm-data-transfer`、必填 `--max-chunks` 和 `--max-cost-usd`，只处理缺失向量；UTF-8 字节估算超上限、输入过长或预算/题数未提供时在 provider 前拒绝。dry-run 即使 provider disabled 也可用。无维度配置时预览标为未验证且索引不可执行。
+- 26 项定向回归、全后端 `579 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format、OpenAPI hash（未变）、pip-audit 与 diff check 通过。PR #40 最新基础提交 backend/web/Browser E2E/container CI 全绿；本分支 CI 待创建后运行。
+- 当前尚未授权把 3,294 个全文 chunk 发给 embedding provider，故真实索引与 rerank 臂仍未跑，不能比较 rerank 效果。PR #40 的 overlap 六臂与该 dry-run 均为探索诊断，不改变线上默认。
+
 ## 2026-11-12 Chunk size/overlap 选型对照（PR #40 实现中）
 
 - 评测 evaluator-only 的 0%/最高 10% overlap × 900/1200/1800-byte 六臂；重叠以 UTF-8 bytes 计算并对齐空白边界，仅用于段落/图注文本，不改变默认导入配置，也不重叠结构化表格行。报告 schema 升为 v3，记录 overlap 上限。

@@ -260,11 +260,13 @@ EMBEDDING_PRICE_PER_MILLION_USD=0.02
 
 `EMBEDDING_PRICE_PER_MILLION_USD` 用于本机估算报告，需按当前账户/模型价格手动维护；留空则费用估算为 null。该字段不决定实际账单。
 
-重启后端后，明确运行一次索引命令才会产生文档 embedding 请求和费用；该命令只处理本地当前已批准的全文，默认最多 2000 个 chunks，可用来源过滤器限定单篇：
+重启后端后，先用 `--dry-run` 核对缺失 chunk 数、UTF-8 字节费用上限和配置模型；不调用 provider、不写数据库。全库缺失量和单篇都必须显式给出 chunk/费用上限：
 
 ```powershell
-uv run --directory backend --frozen python -m app.cli.index_fulltext_embeddings --source-type arxiv --source-id 2609.25991
+uv run --directory backend --frozen python -m app.cli.index_fulltext_embeddings --source-type arxiv --source-id 2609.25991 --dry-run --max-chunks 2000 --max-cost-usd 0.05
 ```
+
+真实索引还必须同时提供 `--confirm-data-transfer`；这会将缺失 chunk 的全文发给 embedding provider。费用是 UTF-8 字节上限估算而非服务商账单硬限额。
 
 然后 API 可按 `retrieval_method=bm25|dense|hybrid` 检索。Dense/Hybrid 的每个搜索问题也会发一次 embedding 请求；Hybrid 使用 BM25 与 Dense 的 RRF（k=60）。若某模型/维度索引不完整，接口返回 `embeddings_missing`，不会悄悄退回 BM25 冒充混合结果。没有启用 Provider 时 Dense/Hybrid 返回 503。Agent 全文工具包含相同检索方法参数；默认仍选 BM25，模型可明确请求 Dense/Hybrid。
 
