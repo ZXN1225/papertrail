@@ -1,5 +1,12 @@
 # 进度
 
+## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
+
+- 新增本地离线 chart-task 评测核心：页级图表任务绑定 PDF/解析报告/页面图像 SHA、parser version、页码、element ID 与 bbox；来源需权利确认，页面图像 hash 在导出/导入时核对；同一 PDF 不可跨 dev/test。人工标签区分 answerable、unanswerable、uncertain；按 axis、series、数值（单位 + 人审绝对容差）、trend、comparison 分桶计算一对一 precision/recall/F1 与 abstention accuracy；另有 page-audit 对照人工图表数量，报告计数指标、逐页准确率和漏图页率。
+- 新增严格的人审 pack export/import/evaluate CLI；必须完整审核、显式 `--confirm-human-review`、新文件写入，数据集/报告始终声明 `gold_standard=false`、`quality_claim_allowed=false`。评测校验导入时记录的源 dataset/review pack/评分内容 hash，阻止复核后静默改预测或标签。`rights_attested` 与源 PDF/parser report hash 是 operator 声明，CLI 只校验本地图像 hash，不独立验证原 PDF/许可。synthetic tests 验证指标/容差/不确定样本、论文级隔离、来源和页面 hash；不产生实际 MinerU 质量结果。
+- 定向 8 passed、全后端 569 passed（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI export（hash 未变）、pip-audit 与 `git diff --check` 通过。独立 reviewer 复核 digest / split 保护后无 blocker；page count 指标不评价图框 localization。
+- 真实图表 qrels 仍未人审；当前 4 个本机 AI-assisted 候选不是金标。本协议当前不做 LLM-as-judge 或外部 provider 调用；后续 judge 必须沿用数据外传确认与费用预算，并且不得替代人工参考标签。
+
 ## 2026-11-12 Chunk × Rerank 配对评测（PR #36 Draft，CI 通过）
 
 - Chunk evaluator 增加 900/1,800-byte × BM25/父 chunk embedding proxy rerank 的可选配对诊断；子 chunk 只有在来源、内容 hash、page/element/type 与半开字符区间唯一包含映射到当前 chunk 时才借用其已存向量，候选预算按唯一父 chunk 计算，平分时保留 BM25 顺序。它明确不是 child dense 或 cross-encoder。

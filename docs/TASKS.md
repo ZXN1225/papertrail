@@ -1,5 +1,11 @@
 # 任务台账
 
+## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
+
+- 新增本地 chart-task review/export/import/evaluate：固定 PDF、解析报告、图像与区域 provenance；逐篇 rights attestation；来源/PDF hash 级 dev/test 防泄漏；reviewer 可标 answerable/unanswerable/uncertain；按轴名、series/legend、数值+容差、趋势和比较生成分桶指标；page audit 需要包含零预测页样本并与人审图表数量对照，以测漏图。抽样策略由数据准备流程记录，本 CLI 不自动抽样。
+- Import 仅在完整逐任务与页面审阅并显式确认后可写 `human_reviewed`；输出仍不称 gold、不开放质量结论；评分内容 hash 可检测导入后数据漂移，相同输入只写新文件。此 CLI 离线，不发 provider 请求。
+- 8 个 synthetic 定向测试通过；全后端 569 passed，Ruff check/format、OpenAPI export、pip-audit、CLI help、diff check 通过；独立代码复核对内容 hash 与 split 校验无 blocker。page count 指标不评价图框 localization。无真实人工复核 MinerU chart set，因此没有解析/事实准确率数值或策略胜者；PR CI 待运行。协议说明见 [MinerU 图表事实评测](research/mineru-chart-fact-evaluation.md)。
+
 ## 2026-11-12 私有论文图注检索修复（PR #37 Draft，CI 通过）
 
 - 真实回放发现私有检索同时排除 table 与 figure；16 个 MinerU v11 图注 chunk 已解析入库但无 advanced visual evidence，exact-caption query 原路径为 0/16 命中。
