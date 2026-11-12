@@ -4,7 +4,7 @@
 
 - 公开论文发现任务支持 OpenAlex 与 arXiv 有界分页，计划最多请求 25 条，每页至多 10 条；每页是独立白名单工具调用，按现有工具预算、trace、取消与超时策略执行。arXiv 精确 ID 查询不做无效翻页；若用户明确要求超过 25 条，返回上限内已取得结果但标为不完整并提示分批检索。
 - 用户要求数量未达到、任一页来源失败或仅部分来源可用时保留已取得的可追溯记录，但任务标为 `insufficient_evidence` 并提示部分结果；成功条件仍要求达到计划数且没有来源失败。
-- 新增 OpenAlex 完整三页、arXiv 空页、来源中页失败、工具预算耗尽后保留已取结果及超过最大结果数时不误报完成的 runtime 回归；后端 526 passed，Ruff/OpenAPI/pip-audit 与 diff check 通过。独立复核发现并修复了预算耗尽时早期结果被丢弃的问题；PR CI 待完成。
+- 新增 OpenAlex 完整三页、arXiv 空页、来源中页失败、工具预算耗尽后保留已取结果及超过最大结果数时不误报完成的 runtime 回归；后端 526 passed，Ruff/OpenAPI/pip-audit 与 diff check 通过。独立复核发现并修复了预算耗尽时早期结果被丢弃的问题；PR #28 backend、web Browser E2E 和 container CI 全部通过，Draft 堆叠于 PR #27、未合并。
 
 ## 2026-11-12 PR #27 同题 BM25/Dense/Hybrid 诊断
 

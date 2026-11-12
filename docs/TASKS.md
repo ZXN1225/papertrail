@@ -3,7 +3,7 @@
 ## 2026-11-12 PR #28 公开发现有界分页（进行中）
 
 - OpenAlex/arXiv 发现支持每次最多 25 条结果，按不超过 10 条的页大小执行；每页消耗独立工具预算和 trace，精确 arXiv ID 不做无效分页。
-- 已验证 OpenAlex 多页合并、arXiv 空页、中页失败及工具预算耗尽；预算耗尽保留已检索记录并返回 `insufficient_evidence`。全后端、远端 Draft PR CI 和其它来源故障边界仍待完成。基于 PR #27 分支，不合并 main。
+- 已验证 OpenAlex 多页合并、arXiv 空页、中页失败、工具预算耗尽及超过 25 条时的结果上限披露；预算耗尽保留已检索记录并返回 `insufficient_evidence`。后端 526 passed，Ruff/OpenAPI/pip-audit 通过，PR #28 backend/web Browser E2E/container CI 全绿；Draft 基于 PR #27、未合并 main。
 
 ## 2026-11-12 PR #27 同题检索方法比较（完成，Draft）
 
