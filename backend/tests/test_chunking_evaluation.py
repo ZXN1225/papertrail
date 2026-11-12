@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.evaluation.chunking import (
     ChunkStrategyEvaluationError,
+    _map_candidates_to_current_chunks,
+    _parent_embedding_proxy_rerank,
     _resolve_reference_anchor,
     _retrieval_metrics,
     _span_is_covered,
@@ -241,17 +245,185 @@ def test_strategy_evaluation_runs_both_arms_against_a_read_only_synthetic_snapsh
             assert kwargs == {"source_type": "arxiv", "source_id": source_id}
             return [element]
 
+        def list_current_fulltext_embeddings(self, **kwargs):
+            assert kwargs == {
+                "source_type": "arxiv",
+                "source_ids": [source_id],
+                "model": "TEST-embedding-v1",
+                "dimensions": 2,
+            }
+            return {reference["chunk_id"]: [1.0, 0.0]}
+
     report = run_evaluation(ReadOnlySnapshot(), dataset, "c" * 64)
 
     assert report["dataset"]["synthetic"] is False
     assert report["dataset"]["gold_standard"] is False
     assert report["dataset"]["quality_claim_allowed"] is False
-    assert report["retrieval"]["provider_calls"] == 0
+    assert report["retrieval"]["retrieval_provider_calls"] == 0
     assert all(item["status"] == "completed" for item in report["strategies"].values())
     assert all(
         item["tasks"][0]["reference_anchor_resolution"] == "current_chunk"
         for item in report["strategies"].values()
     )
+
+    reranked = run_evaluation(
+        ReadOnlySnapshot(),
+        dataset,
+        "c" * 64,
+        query_embeddings={"R1": [1.0, 0.0]},
+        embedding_model="TEST-embedding-v1",
+    )
+    assert reranked["retrieval"]["reranker_type"] == (
+        "parent_chunk_embedding_proxy_not_child_dense_or_cross_encoder"
+    )
+    for strategy in reranked["strategies"].values():
+        method = strategy["retrieval_methods"]["bm25_parent_embedding_proxy_rerank"]
+        assert method["status"] == "completed"
+        assert method["reranker"] == "existing_1800_byte_parent_embedding_proxy"
+        assert method["candidate_parent_limit"] == 128
+        assert method["tasks"][0]["reference_span"] == [0, len(text)]
+
+
+def test_chunk_rerank_fails_closed_when_current_embedding_index_is_incomplete():
+    source_id = "2401.00001"
+    source_hash = "a" * 64
+    source = {
+        "content_sha256": source_hash,
+        "source_document_sha256": "b" * 64,
+        "license_id": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "parser_version": "pdfplumber-layout-v1",
+    }
+    text = "TEST evidence remains exactly locatable."
+    element = _element("TEST-element", "paragraph", text)
+    reference = {
+        "chunk_id": f"arxiv:{source_id}:TEST-current",
+        "source_id": source_id,
+        "content_sha256": source_hash,
+        "title": "TEST paper",
+        "text": text,
+        "evidence_text": text,
+        "element_id": element["element_id"],
+        "page_number": 7,
+        "element_type": "paragraph",
+        "char_start": 0,
+        "char_end": len(text),
+        "bbox_json": "[12.0,24.0,120.0,240.0]",
+    }
+    dataset = {
+        "schema": SCHEMA,
+        "dataset_id": "TEST-chunk-rerank-missing-vector",
+        "synthetic": False,
+        "gold_standard": False,
+        "quality_claim_allowed": False,
+        "reference_status": "single_reviewer_selected_reference",
+        "retrieval_method": "bm25",
+        "top_k": 2,
+        "sources": {source_id: source},
+        "tasks": [
+            {
+                "task_id": "R1",
+                "source_id": source_id,
+                "question": "TEST evidence",
+                "reference_chunk_id": reference["chunk_id"],
+                "reference_page": 7,
+                "reference_element_type": "paragraph",
+            }
+        ],
+    }
+
+    class ReadOnlySnapshot:
+        readonly = True
+
+        def get_current_fulltext_metadata(self, **kwargs):
+            return source | {"title": "TEST paper", "chunk_count": 1, "status": "approved"}
+
+        def list_current_fulltext_chunks(self, **kwargs):
+            return [reference]
+
+        def list_current_fulltext_elements(self, **kwargs):
+            return [element]
+
+        def list_current_fulltext_embeddings(self, **kwargs):
+            return {reference["chunk_id"]: None}
+
+    report = run_evaluation(
+        ReadOnlySnapshot(),
+        dataset,
+        "c" * 64,
+        query_embeddings={"R1": [1.0, 0.0]},
+        embedding_model="TEST-embedding-v1",
+    )
+
+    assert all(
+        strategy["retrieval_methods"]["bm25_parent_embedding_proxy_rerank"]["failure_reason"]
+        == "current_chunk_embedding_index_incomplete"
+        for strategy in report["strategies"].values()
+    )
+
+
+def test_parent_embedding_mapping_requires_exact_single_source_span_containment():
+    candidates = [
+        {
+            "chunk_id": "TEST-candidate",
+            "source_id": "TEST-source",
+            "content_sha256": "a" * 64,
+            "element_id": "TEST-element",
+            "element_type": "paragraph",
+            "page_number": 7,
+            "char_start": 5,
+            "char_end": 10,
+        }
+    ]
+    parent = {
+        "content_sha256": "a" * 64,
+        "element_id": "TEST-element",
+        "element_type": "paragraph",
+        "page_number": 7,
+        "char_start": 0,
+        "char_end": 20,
+    }
+    assert _map_candidates_to_current_chunks(
+        candidates, {"TEST-source": {"TEST-parent": parent}}
+    ) == {"TEST-candidate": "TEST-parent"}
+    with pytest.raises(ChunkStrategyEvaluationError, match="one current parent"):
+        _map_candidates_to_current_chunks(
+            [{**candidates[0], "char_start": 19, "char_end": 21}],
+            {"TEST-source": {"TEST-parent": parent}},
+        )
+    with pytest.raises(ChunkStrategyEvaluationError, match="one current parent"):
+        _map_candidates_to_current_chunks(
+            candidates,
+            {"TEST-source": {"TEST-parent": parent, "TEST-duplicate": parent}},
+        )
+
+
+def test_parent_proxy_rerank_budgets_unique_parents_and_uses_bm25_tie_breaks():
+    candidates = [
+        {"chunk_id": "TEST-child-a", "source_id": "TEST-source"},
+        {"chunk_id": "TEST-child-b", "source_id": "TEST-source"},
+        {"chunk_id": "TEST-child-c", "source_id": "TEST-source"},
+    ]
+    hits = [
+        SimpleNamespace(openalex_id="TEST-child-a"),
+        SimpleNamespace(openalex_id="TEST-child-b"),
+        SimpleNamespace(openalex_id="TEST-child-c"),
+    ]
+    ranked, parent_count = _parent_embedding_proxy_rerank(
+        hits,
+        candidates,
+        {
+            "TEST-child-a": "TEST-parent-1",
+            "TEST-child-b": "TEST-parent-1",
+            "TEST-child-c": "TEST-parent-2",
+        },
+        {"TEST-parent-1": [0.0, 1.0], "TEST-parent-2": [1.0, 0.0]},
+        [1.0, 0.0],
+        limit=3,
+    )
+
+    assert parent_count == 2
+    assert ranked == ["TEST-child-c", "TEST-child-a", "TEST-child-b"]
 
 
 def test_historical_anchor_remaps_only_exact_unique_text_from_the_same_pdf():

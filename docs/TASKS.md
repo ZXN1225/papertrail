@@ -1,10 +1,17 @@
 # 任务台账
 
-## 2026-11-12 真实获准语料 Chunk 策略对照（PR #35 实现中）
+## 2026-11-12 Chunk × Parent Embedding Proxy Rerank 配对评测（PR #36 实现中）
+
+- 增加 900/1,800-byte × BM25/父 chunk embedding proxy rerank 四臂只读评测；子 chunk 到当前向量父项必须按来源 hash、page、element/type 和半开 span 唯一严格映射，按唯一父 chunk 计算候选预算，缺向量时整臂显式不可用。
+- rerank 只借用当前 1,800-byte chunk 向量，不是 child dense 或 cross-encoder；BM25 继续零 provider 默认。只有显式确认数据外传、query 数和费用上限时，才发送 query 给 embedding provider；不发送论文全文/替代 chunk。
+- 合成 paired-rerank、唯一映射/缺向量失败关闭、只读向量加载、预算预检及已有输出防 provider 费用回归已验证；全后端 561 passed，Ruff check/format、OpenAPI、pip-audit、diff check 通过。PR #35 最新 f23a0a7 CI 通过；PR #36 尚待创建并跑 GitHub CI。
+- 真实 v27 的两条 BM25 臂已在 9 篇、6 条 selected-span 任务上跑完；未确认 query 数据外传，因此两条 embedding proxy rerank 臂未执行。当前扫描到 3 篇 rights-attested 私有 MinerU v11 文档和 16 个 figure chunks，但未建立图表人工/独立复核 qrels，不能作 MinerU 质量结论或 gold/普遍检索质量声明。MinerU chart set 与 parser/index 同源评测仍未闭环。
+
+## 2026-11-12 真实获准语料 Chunk 策略对照（PR #35 Draft，CI 通过）
 
 - 对冻结 v27 9 篇 CC-BY-4.0 corpus / 6 个 selected-reference tasks 真实跑通 900/1,800-byte BM25 对照；原数据库 schema 22，仅在 ignored 临时副本迁移，原库 hash 不变。报告不可作 gold/通用质量声明，真实 MinerU 和 Chunk×Rerank 尚未覆盖。
 - 1,800-byte：Hit@1 .500、MRR@8 .622、NDCG@5 .712、Recall@5 1.0、span coverage 1.0；900-byte：.333、.561、.620、.917、.833。900-byte 在 @3 指标较高，样本小且单 reviewer，保持线上默认 1,800，不选胜者。
-- 修复真实 run 中发现的 anchor 过期：只对同一源 PDF、历史 span exact text 在当前同页同类型唯一匹配时重定位；其他失败关闭。后端全量 /CI 待 PR 复核。
+- 修复真实 run 中发现的 anchor 过期：只对同一源 PDF、历史 span exact text 在当前同页同类型唯一匹配时重定位；其他失败关闭。PR #35 backend/web/container CI 通过，Draft 未合并 main。
 
 ## 2026-11-12 Harness 外部检索授权边界（PR #34 Draft）
 

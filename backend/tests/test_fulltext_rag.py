@@ -656,6 +656,53 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         temporary.cleanup()
 
 
+def test_current_embedding_diagnostic_lookup_is_read_only_and_model_scoped() -> None:
+    temporary, store = _seed_store()
+    try:
+        _ingest(store, "An approved paragraph for the TEST embedding diagnostic.")
+        chunks = store.list_current_fulltext_chunks(source_type="openalex", source_id="W900")
+        readonly = PaperStore(store.database_path, readonly=True)
+        with pytest.raises(ValueError, match="read-only"):
+            store.list_current_fulltext_embeddings(
+                source_type="openalex",
+                source_ids=["W900"],
+                model="TEST-embedding-v1",
+                dimensions=2,
+            )
+        assert readonly.list_current_fulltext_embeddings(
+            source_type="openalex",
+            source_ids=["W900"],
+            model="TEST-embedding-v1",
+            dimensions=2,
+        ) == {chunk["chunk_id"]: None for chunk in chunks}
+        store.store_fulltext_embeddings(
+            model="TEST-embedding-v1",
+            dimensions=2,
+            items=[
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "content_sha256": chunk["content_sha256"],
+                    "vector": [1.0, 0.0],
+                }
+                for chunk in chunks
+            ],
+        )
+        assert readonly.list_current_fulltext_embeddings(
+            source_type="openalex",
+            source_ids=["W900"],
+            model="TEST-embedding-v1",
+            dimensions=2,
+        ) == {chunk["chunk_id"]: [1.0, 0.0] for chunk in chunks}
+        assert readonly.list_current_fulltext_embeddings(
+            source_type="openalex",
+            source_ids=["W900"],
+            model="TEST-other-model",
+            dimensions=2,
+        ) == {chunk["chunk_id"]: None for chunk in chunks}
+    finally:
+        temporary.cleanup()
+
+
 def test_dense_retrieval_reports_incomplete_index_and_refuses_stale_embedding_write() -> None:
     temporary, store = _seed_store()
     try:

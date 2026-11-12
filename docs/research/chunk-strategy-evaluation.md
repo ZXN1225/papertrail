@@ -2,14 +2,30 @@
 
 ## Arms and runtime
 
-`python -m app.cli.evaluate_chunk_strategies` compares the current structure-preserving PDF chunker at 1,800 UTF-8 bytes with the same algorithm capped at 900 bytes. Table row/header structure, source element IDs, page numbers, bounding boxes, and half-open element-local offsets are retained. The production ingestion version remains unchanged; alternative chunks exist only in evaluator memory.
+`python -m app.cli.evaluate_chunk_strategies` compares the current structure-preserving PDF chunker at 1,800 UTF-8 bytes with the same algorithm capped at 900 bytes. Table row/header structure, source element IDs, page numbers, bounding boxes, and half-open element-local offsets are retained. The production ingestion version remains unchanged; alternative chunks exist only in evaluator memory. Each chunk size now has a BM25 arm and an optional parent-embedding proxy rerank arm.
 
-The command reads one frozen manifest and current approved full-text snapshot in read-only mode. It rejects stale hashes/parser versions/licenses, requires complete current-corpus coverage for the `all_approved_arxiv` scope, bounds source bytes/chunks, and refuses to overwrite a report. If a valid table header cannot fit in the 900-byte arm without losing its structure, that arm is reported unavailable while the 1,800-byte arm remains measurable. It performs no provider calls and persists no alternate chunks or embeddings.
+The command reads one frozen manifest and current approved full-text snapshot in read-only mode. It rejects stale hashes/parser versions/licenses, requires complete current-corpus coverage for the `all_approved_arxiv` scope, bounds source bytes/chunks, and refuses to overwrite a report. If a valid table header cannot fit in the 900-byte arm without losing its structure, that arm is reported unavailable while the 1,800-byte arm remains measurable. The default BM25 path performs no provider calls and neither path persists alternate chunks or embeddings.
+
+BM25 is the zero-provider default:
 
 ```powershell
 uv run --locked python -m app.cli.evaluate_chunk_strategies `
   --dataset data/evaluation/arxiv-r01-r03-current-v27-v1.json `
   --output reports/chunk-strategy-v1.json
+```
+
+To compare reranking, the explicitly acknowledged operation sends only task questions to the
+configured embedding provider. The evaluator uses existing current chunk vectors and does not send
+paper excerpts or alternate chunks. Both the question-count cap and estimated-cost cap are required:
+
+```powershell
+uv run --locked python -m app.cli.evaluate_chunk_strategies `
+  --dataset data/evaluation/arxiv-r01-r03-current-v27-v1.json `
+  --output reports/chunk-rerank-v1.json `
+  --parent-embedding-rerank `
+  --confirm-data-transfer `
+  --max-query-embeddings 6 `
+  --max-cost-usd 0.01
 ```
 
 Use a manifest whose parser version, source PDF hashes, approved-text hashes, and source set exactly match the local current index. A MinerU report requires a separately frozen MinerU manifest; a pdfplumber result cannot stand in for it.
@@ -20,7 +36,9 @@ Each selected reference chunk is checked against the active source ID, content h
 
 These labels measure retrieval of a previously selected source span, not independent human relevance judgments. The diagnostic manifest is single-reviewer selected-reference data, so the report always says `gold_standard=false` and `quality_claim_allowed=false`. It is useful for paired strategy diagnostics, not a universal quality score or a production-default decision by itself.
 
-MinerU visual descriptions remain separate `model_generated_unverified` evidence and are not included in exact-text chunk candidates. Figure captions remain searchable. This evaluator does not measure whether MinerU read chart values or trends correctly; that requires a separately licensed and manually checked chart set. The current arms vary chunk size only; overlap/semantic windows, other retrieval methods, and chunk-plus-rerank interaction have not yet been compared here.
+The rerank arm uses the existing 1,800-byte indexed chunk vector as a proxy for each candidate chunk. Mapping requires exact source ID, source content hash, element ID/type, page, and half-open span containment in exactly one active indexed chunk; ambiguous or missing matches disable that arm. Candidates are selected by the first 128 unique BM25 parent chunks, then sorted by cosine similarity; children under one parent keep BM25 order. This avoids a 900-byte arm spending its entire budget on siblings, but it is not true child-chunk embedding, dense retrieval, or a cross-encoder. The report gives the mean children-per-parent and selected unique-parent count, and separates local retrieval latency from query embedding provider usage. Missing/incomplete vectors disable reranking rather than silently dropping affected tasks.
+
+MinerU visual descriptions remain separate `model_generated_unverified` evidence and are not included in exact-text chunk candidates. Figure captions remain searchable. This evaluator does not measure whether MinerU read chart values or trends correctly; that requires a separately licensed and manually checked chart set. It compares only chunk size and this parent-vector proxy; overlap/semantic windows, true child-chunk embeddings, and cross-encoder reranking remain unevaluated.
 
 ## Local approved-corpus run (2026-11-12)
 
@@ -35,4 +53,4 @@ At `@3`, the smaller arm had higher Hit (0.833 vs 0.667), Precision (0.278 vs 0.
 
 One selected chunk ID was stale after chunking changes. The evaluator now remaps it only when the historical chunk is from the same PDF hash and its exact evidence text occurs uniquely on the same current page and element type. It fails closed otherwise. This exact text remap resolved 1/6 tasks; the other 5 used current chunk IDs.
 
-The local approved snapshot uses `pdfplumber-layout-v27`, not MinerU. It provides no evidence about MinerU parsing or visual chart accuracy. MinerU chart evaluation, real BM25-vs-rerank comparison, and chunk×rerank interaction remain open.
+The local approved snapshot uses `pdfplumber-layout-v27`, not MinerU. It provides no evidence about MinerU parsing or visual chart accuracy. Chunk×parent-proxy-rerank has a runnable paired evaluator, but a real rerank run requires explicit query-embedding data-transfer consent and a complete local embedding index; no strategy winner is claimed until that run and a held-out reviewed task set exist.

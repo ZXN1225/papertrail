@@ -1,5 +1,12 @@
 # 进度
 
+## 2026-11-12 Chunk × Rerank 配对评测（PR #36 实现与验证中）
+
+- Chunk evaluator 增加 900/1,800-byte × BM25/父 chunk embedding proxy rerank 的可选配对诊断；子 chunk 只有在来源、内容 hash、page/element/type 与半开字符区间唯一包含映射到当前 chunk 时才借用其已存向量，候选预算按唯一父 chunk 计算，平分时保留 BM25 顺序。它明确不是 child dense 或 cross-encoder。
+- embedding 路径复用已有显式数据外传确认、题数预算、正费用上限；只向配置的 embedding provider 发送 query，不发送全文/候选 chunk。BM25 默认 0 provider calls。当前未获本轮 query 外传确认，真实 rerank 臂尚未执行。
+- 全后端 561 passed（1 条既有 Starlette 弃用 warning；Windows 系统临时目录 ACL 不允许 pytest 枚举，使用忽略目录 `.local` 作为 basetemp 通过）；Ruff check/format、OpenAPI 导出（SHA-256 `79ae0865e3c382e1f20dfe04b7f1a5573c1d77ac19b45bc439fdbb9d46a585c3`）、pip-audit、`git diff --check` 通过。PR #35 最新 f23a0a7 的 backend/web/container CI 通过。
+- 本轮 BM25 复跑冻结 v27 9 篇许可源 / 6 条 single-reviewer selected-span 任务，排序指标与 PR #35 一致；全候选排序时延本次 mean/p95：1,800-byte 1.03/2.69 ms、900-byte 1.46/4.52 ms，仅作机器诊断。仅在 ignored `.local` 副本迁移 schema 22→23，原库 SHA-256 保持 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`。报告 `quality_claim_allowed=false`、query embedding provider calls 0；来源为 pdfplumber，不是 MinerU。
+
 ## 2026-11-12 真实获准语料 Chunk 对照（PR #35 Draft，CI 通过）
 
 - 本机冻结 v27 快照的 9 篇已批准 CC-BY-4.0 来源、6 条单 reviewer selected-span 任务已在只读快照执行 900/1,800-byte 对照。原 DB schema 22 不能被当前代码只读打开，故只在忽略目录临时副本上迁移到 schema 23；原库 SHA-256 前后不变，0 provider calls。评测 manifest SHA-256 `87db19bece61ca54190b5b634ee0a0f731e3c5c0972acd9fdedf4b3f23e461a5`，本地报告位于 ignored `.local`，不提交。

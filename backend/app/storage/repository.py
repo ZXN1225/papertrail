@@ -1416,6 +1416,90 @@ class PaperStore:
             )
         return [dict(row) for row in rows]
 
+    def list_current_fulltext_embeddings(
+        self,
+        *,
+        source_type: str,
+        source_ids: Sequence[str],
+        model: str,
+        dimensions: int | None,
+    ) -> dict[str, list[float] | None]:
+        """Read current approved chunk vectors for offline retrieval diagnostics."""
+        import math
+
+        if self.readonly is not True:
+            raise ValueError("retrieval evaluation requires a read-only PaperStore")
+        if source_type not in {"openalex", "arxiv"}:
+            raise ValueError("source_type must be openalex or arxiv")
+        if (
+            not source_ids
+            or len(source_ids) > MAX_ACTIVE_FULLTEXT_CHUNKS
+            or any(not isinstance(source_id, str) or not source_id for source_id in source_ids)
+        ):
+            raise ValueError("source_ids must be a non-empty bounded list")
+        if len(set(source_ids)) != len(source_ids):
+            raise ValueError("source_ids must be unique")
+        if not isinstance(model, str) or not model.strip() or len(model) > 160:
+            raise ValueError("invalid embedding model")
+        if dimensions is not None and (type(dimensions) is not int or not 1 <= dimensions <= 8_192):
+            raise ValueError("invalid embedding dimensions")
+        if source_type == "openalex" and any(
+            not isinstance(source_id, str) or not re.fullmatch(r"W\d+", source_id)
+            for source_id in source_ids
+        ):
+            raise ValueError("invalid OpenAlex work ID")
+        if source_type == "arxiv":
+            from app.sources.arxiv import normalize_arxiv_id
+
+            source_ids = [normalize_arxiv_id(source_id) for source_id in source_ids]
+            if len(set(source_ids)) != len(source_ids):
+                raise ValueError("source_ids must be unique after normalization")
+
+        placeholders = ",".join("?" for _ in source_ids)
+        dimension_clause = "AND e.dimensions=?" if dimensions is not None else ""
+        params: list[Any] = [model]
+        if dimensions is not None:
+            params.append(dimensions)
+        params.extend((source_type, *source_ids, MAX_ACTIVE_FULLTEXT_CHUNKS + 1))
+        with self._connection() as connection:
+            self._ensure_schema(connection)
+            rows = connection.execute(
+                f"""SELECT c.chunk_id,e.vector_json FROM fulltext_documents d
+                JOIN fulltext_chunks c ON c.source_type=d.source_type
+                AND c.source_id=d.source_id AND c.content_sha256=d.current_sha256
+                LEFT JOIN fulltext_embeddings e ON e.chunk_id=c.chunk_id
+                AND e.model=? {dimension_clause} AND e.normalization='none'
+                WHERE d.status='approved' AND d.source_type=?
+                AND d.source_id IN ({placeholders})
+                ORDER BY d.source_id,c.ordinal LIMIT ?""",
+                params,
+            ).fetchall()
+        if len(rows) > MAX_ACTIVE_FULLTEXT_CHUNKS:
+            raise ValueError("current approved corpus exceeds the embedding evaluation limit")
+        vectors: dict[str, list[float] | None] = {}
+        for row in rows:
+            if row["vector_json"] is None:
+                vectors[row["chunk_id"]] = None
+                continue
+            try:
+                vector = json.loads(row["vector_json"])
+            except (TypeError, json.JSONDecodeError) as error:
+                raise ValueError("stored embedding vector is malformed") from error
+            if (
+                not isinstance(vector, list)
+                or (dimensions is not None and len(vector) != dimensions)
+                or not 1 <= len(vector) <= 8_192
+                or any(
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(value)
+                    for value in vector
+                )
+            ):
+                raise ValueError("stored embedding vector is malformed")
+            vectors[row["chunk_id"]] = [float(value) for value in vector]
+        return vectors
+
     def get_approved_fulltext_chunk_by_id(
         self, *, source_type: str, source_id: str, chunk_id: str
     ) -> dict[str, Any] | None:

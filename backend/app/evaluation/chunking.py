@@ -19,15 +19,21 @@ from app.retrieval.fulltext import (
     ChunkSizeInfeasibleError,
     chunk_pdf_elements,
 )
+from app.retrieval.vectors import cosine_similarity
 from app.sources.arxiv import normalize_arxiv_id
-from app.storage.repository import MAX_ACTIVE_FULLTEXT_CHUNKS, PaperStore
+from app.storage.repository import (
+    MAX_ACTIVE_FULLTEXT_CHUNKS,
+    RERANK_CANDIDATE_LIMIT,
+    PaperStore,
+)
 
 STRATEGIES = {
     "pdf_structure_900_bytes_v1": 900,
     "pdf_structure_1800_bytes_v1": MAX_CHUNK_TOKEN_UPPER_BOUND,
 }
 MAX_TOTAL_ELEMENT_BYTES = 50_000_000
-REPORT_SCHEMA = "papertrail.chunk-strategy-report.v1"
+REPORT_SCHEMA = "papertrail.chunk-strategy-report.v2"
+PARENT_RERANK_METHOD = "bm25_parent_embedding_proxy_rerank"
 
 
 class ChunkStrategyEvaluationError(ValueError):
@@ -35,7 +41,12 @@ class ChunkStrategyEvaluationError(ValueError):
 
 
 def run_evaluation(
-    store: PaperStore, dataset: dict[str, Any], dataset_sha256: str
+    store: PaperStore,
+    dataset: dict[str, Any],
+    dataset_sha256: str,
+    *,
+    query_embeddings: dict[str, list[float]] | None = None,
+    embedding_model: str | None = None,
 ) -> dict[str, Any]:
     if getattr(store, "readonly", False) is not True:
         raise ChunkStrategyEvaluationError("evaluation requires a read-only PaperStore")
@@ -45,6 +56,25 @@ def run_evaluation(
         raise ChunkStrategyEvaluationError(str(error)) from error
     if not _is_sha256(dataset_sha256):
         raise ChunkStrategyEvaluationError("dataset_sha256 must be lowercase SHA-256")
+    if (query_embeddings is None) != (embedding_model is None):
+        raise ChunkStrategyEvaluationError("query embeddings and model must be provided together")
+    if query_embeddings is not None and (
+        set(query_embeddings) != {task["task_id"] for task in dataset["tasks"]}
+        or any(
+            not isinstance(vector, list)
+            or not 1 <= len(vector) <= 8_192
+            or any(
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(value)
+                for value in vector
+            )
+            for vector in query_embeddings.values()
+        )
+    ):
+        raise ChunkStrategyEvaluationError(
+            "query embeddings must cover each task with finite vectors"
+        )
 
     source_metadata: dict[str, dict[str, Any]] = {}
     source_chunks: dict[str, dict[str, dict[str, Any]]] = {}
@@ -86,6 +116,35 @@ def run_evaluation(
         source_metadata[source_id] = actual
         source_chunks[source_id] = {chunk["chunk_id"]: chunk for chunk in chunks}
         source_elements[source_id] = elements
+
+    parent_vectors: dict[str, list[float]] = {}
+    rerank_unavailable_reason: str | None = None
+    if query_embeddings is not None:
+        dimensions = len(next(iter(query_embeddings.values())))
+        if any(len(vector) != dimensions for vector in query_embeddings.values()):
+            raise ChunkStrategyEvaluationError("query embedding dimensions are inconsistent")
+        try:
+            stored_vectors = store.list_current_fulltext_embeddings(
+                source_type="arxiv",
+                source_ids=list(source_metadata),
+                model=embedding_model or "",
+                dimensions=dimensions,
+            )
+        except (AttributeError, ValueError) as error:
+            raise ChunkStrategyEvaluationError(
+                "current chunk embeddings are unavailable"
+            ) from error
+        indexed_chunk_ids = {chunk_id for chunks in source_chunks.values() for chunk_id in chunks}
+        if set(stored_vectors) != indexed_chunk_ids or any(
+            vector is None for vector in stored_vectors.values()
+        ):
+            rerank_unavailable_reason = "current_chunk_embedding_index_incomplete"
+        else:
+            parent_vectors = {
+                chunk_id: vector
+                for chunk_id, vector in stored_vectors.items()
+                if vector is not None
+            }
 
     source_scope = dataset.get("source_scope", "exact_arxiv_id_per_task")
     if source_scope == "all_approved_arxiv":
@@ -175,8 +234,32 @@ def run_evaluation(
             }
         index_build_time_ms[strategy] = (time.perf_counter_ns() - started) / 1_000_000
 
-    task_results: dict[str, list[dict[str, Any]]] = {name: [] for name in STRATEGIES}
-    latency_by_strategy: dict[str, list[float]] = {name: [] for name in STRATEGIES}
+    candidate_parent_ids: dict[str, dict[str, str]] = {}
+    rerank_reason_by_strategy: dict[str, str] = {}
+    if query_embeddings is None:
+        rerank_reason_by_strategy = {
+            name: "query_embeddings_not_provided" for name in candidates_by_strategy
+        }
+    elif rerank_unavailable_reason:
+        rerank_reason_by_strategy = {
+            name: rerank_unavailable_reason for name in candidates_by_strategy
+        }
+    else:
+        for strategy, candidates in candidates_by_strategy.items():
+            try:
+                candidate_parent_ids[strategy] = _map_candidates_to_current_chunks(
+                    candidates, source_chunks
+                )
+            except ChunkStrategyEvaluationError:
+                rerank_reason_by_strategy[strategy] = "candidate_to_parent_embedding_mapping_failed"
+
+    task_results: dict[str, dict[str, list[dict[str, Any]]]] = {
+        name: {"bm25": [], PARENT_RERANK_METHOD: []} for name in STRATEGIES
+    }
+    latency_by_method: dict[str, dict[str, list[float]]] = {
+        name: {"bm25": [], PARENT_RERANK_METHOD: []} for name in STRATEGIES
+    }
+    rerank_candidate_counts: dict[str, list[int]] = {name: [] for name in STRATEGIES}
     top_k = dataset["top_k"]
     metric_cutoffs = tuple(sorted({1, min(3, top_k), min(5, top_k), top_k}))
     for task in dataset["tasks"]:
@@ -203,10 +286,10 @@ def run_evaluation(
             )
             by_id = {item["chunk_id"]: item for item in scoped}
             started = time.perf_counter_ns()
-            hits = index.search(task["question"], limit=top_k)
-            latency_ms = (time.perf_counter_ns() - started) / 1_000_000
-            latency_by_strategy[strategy].append(latency_ms)
-            ranking = [hit.openalex_id for hit in hits]
+            hits = index.search(task["question"], limit=len(scoped))
+            bm25_latency_ms = (time.perf_counter_ns() - started) / 1_000_000
+            latency_by_method[strategy]["bm25"].append(bm25_latency_ms)
+            bm25_ranking = [hit.openalex_id for hit in hits[:top_k]]
             relevant = {
                 item["chunk_id"]: 1
                 for item in scoped
@@ -219,27 +302,53 @@ def run_evaluation(
                 raise ChunkStrategyEvaluationError(
                     f"reference span is not represented by {strategy}: {task['task_id']}"
                 )
-            metrics = _retrieval_metrics(ranking, relevant, metric_cutoffs)
-            task_results[strategy].append(
-                {
-                    "task_id": task["task_id"],
-                    "source_id": source_id,
-                    "reference_chunk_id": task["reference_chunk_id"],
-                    "reference_element_id": anchor["element_id"],
-                    "reference_page": anchor["page_number"],
-                    "reference_element_type": anchor["element_type"],
-                    "reference_span": [anchor["char_start"], anchor["char_end"]],
-                    "reference_anchor_resolution": anchor_resolution,
-                    "relevant_chunk_count": len(relevant),
-                    "retrieved_chunk_ids": ranking,
-                    "retrieval_latency_ms": latency_ms,
-                    "evidence_span_covered": _span_is_covered(
-                        [by_id[item_id] for item_id in ranking if item_id in by_id],
-                        coverage_anchor,
-                    ),
-                    "metrics": {
-                        **metrics,
-                    },
+            task_results[strategy]["bm25"].append(
+                _task_method_result(
+                    task,
+                    anchor,
+                    anchor_resolution,
+                    relevant,
+                    bm25_ranking,
+                    by_id,
+                    coverage_anchor,
+                    bm25_latency_ms,
+                    metric_cutoffs,
+                )
+            )
+            if strategy in rerank_reason_by_strategy:
+                continue
+            parent_map = candidate_parent_ids[strategy]
+            query_vector = query_embeddings[task["task_id"]]
+            started = time.perf_counter_ns()
+            reranked_ids, parent_candidate_count = _parent_embedding_proxy_rerank(
+                hits,
+                scoped,
+                parent_map,
+                parent_vectors,
+                query_vector,
+                limit=top_k,
+            )
+            rerank_latency_ms = (time.perf_counter_ns() - started) / 1_000_000
+            latency_by_method[strategy][PARENT_RERANK_METHOD].append(
+                bm25_latency_ms + rerank_latency_ms
+            )
+            rerank_candidate_counts[strategy].append(parent_candidate_count)
+            task_results[strategy][PARENT_RERANK_METHOD].append(
+                _task_method_result(
+                    task,
+                    anchor,
+                    anchor_resolution,
+                    relevant,
+                    reranked_ids,
+                    by_id,
+                    coverage_anchor,
+                    bm25_latency_ms + rerank_latency_ms,
+                    metric_cutoffs,
+                )
+                | {
+                    "unique_parent_candidates": parent_candidate_count,
+                    "bm25_candidate_retrieval_latency_ms": bm25_latency_ms,
+                    "rerank_latency_ms": rerank_latency_ms,
                 }
             )
 
@@ -254,31 +363,43 @@ def run_evaluation(
                 "tasks": [],
             }
             continue
-        rows = task_results[strategy]
-        latencies = latency_by_strategy[strategy]
-        ordered = sorted(latencies)
-        metrics = [row["metrics"] for row in rows]
-        strategy_reports[strategy] = {
+        rows = task_results[strategy]["bm25"]
+        strategy_report = {
             "status": "completed",
             "max_chunk_bytes": STRATEGIES[strategy],
             "chunk_count": len(candidates_by_strategy[strategy]),
             "chunk_build_latency_ms": build_time_ms[strategy],
             "index_build_latency_ms": index_build_time_ms[strategy],
-            "retrieval_latency_ms": {
-                "mean": statistics.fmean(latencies),
-                "p50": ordered[max(0, math.ceil(0.5 * len(ordered)) - 1)],
-                "p95": ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)],
-            },
-            "metrics_macro_average": {
-                metric: statistics.fmean(item[metric] for item in metrics) for metric in metrics[0]
-            }
-            | {
-                "evidence_span_coverage": statistics.fmean(
-                    float(row["evidence_span_covered"]) for row in rows
-                ),
-            },
+            **_summarize_method(rows, latency_by_method[strategy]["bm25"]),
             "tasks": rows,
         }
+        if strategy in rerank_reason_by_strategy:
+            strategy_report["retrieval_methods"] = {
+                "bm25": {"status": "completed", "tasks": rows},
+                PARENT_RERANK_METHOD: {
+                    "status": "unavailable",
+                    "failure_reason": rerank_reason_by_strategy[strategy],
+                    "tasks": [],
+                },
+            }
+        else:
+            rerank_rows = task_results[strategy][PARENT_RERANK_METHOD]
+            rerank_method = {
+                "status": "completed",
+                "reranker": "existing_1800_byte_parent_embedding_proxy",
+                "candidate_parent_limit": RERANK_CANDIDATE_LIMIT,
+                "parent_candidate_count_mean": statistics.fmean(rerank_candidate_counts[strategy]),
+                "unique_parent_count": len(set(candidate_parent_ids[strategy].values())),
+                "candidate_chunks_per_parent_mean": len(candidates_by_strategy[strategy])
+                / len(set(candidate_parent_ids[strategy].values())),
+                **_summarize_method(rerank_rows, latency_by_method[strategy][PARENT_RERANK_METHOD]),
+                "tasks": rerank_rows,
+            }
+            strategy_report["retrieval_methods"] = {
+                "bm25": {"status": "completed", "tasks": rows},
+                PARENT_RERANK_METHOD: rerank_method,
+            }
+        strategy_reports[strategy] = strategy_report
 
     return {
         "report_schema": REPORT_SCHEMA,
@@ -293,10 +414,14 @@ def run_evaluation(
             "sources": source_metadata,
         },
         "retrieval": {
-            "method": "bm25",
+            "method": "paired_bm25_and_parent_embedding_proxy_rerank",
             "source_scope": source_scope,
             "top_k": top_k,
-            "provider_calls": 0,
+            "retrieval_provider_calls": 0,
+            "query_embedding_model": embedding_model,
+            "query_embedding_count": len(query_embeddings) if query_embeddings else 0,
+            "reranker_type": "parent_chunk_embedding_proxy_not_child_dense_or_cross_encoder",
+            "query_embedding_provider_latency_included": False,
             "qrel_projection": (
                 "candidate chunk is relevant when its exact source span overlaps the selected "
                 "reference chunk span within the same parser element"
@@ -307,6 +432,122 @@ def run_evaluation(
             ),
         },
         "strategies": strategy_reports,
+    }
+
+
+def _map_candidates_to_current_chunks(
+    candidates: list[dict[str, Any]],
+    source_chunks: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, str]:
+    mapped: dict[str, str] = {}
+    for candidate in candidates:
+        matches = [
+            chunk_id
+            for chunk_id, parent in source_chunks[candidate["source_id"]].items()
+            if parent.get("content_sha256") == candidate["content_sha256"]
+            and parent.get("element_id") == candidate["element_id"]
+            and parent.get("element_type") == candidate["element_type"]
+            and parent.get("page_number") == candidate["page_number"]
+            and type(parent.get("char_start")) is int
+            and type(parent.get("char_end")) is int
+            and parent["char_start"] <= candidate["char_start"]
+            and parent["char_end"] >= candidate["char_end"]
+        ]
+        if len(matches) != 1:
+            raise ChunkStrategyEvaluationError(
+                "candidate chunk does not map to one current parent chunk"
+            )
+        mapped[candidate["chunk_id"]] = matches[0]
+    return mapped
+
+
+def _parent_embedding_proxy_rerank(
+    bm25_hits: list[Any],
+    candidates: list[dict[str, Any]],
+    parent_by_candidate: dict[str, str],
+    parent_vectors: dict[str, list[float]],
+    query_vector: list[float],
+    *,
+    limit: int,
+) -> tuple[list[str], int]:
+    by_id = {item["chunk_id"]: item for item in candidates}
+    bm25_rank = {hit.openalex_id: rank for rank, hit in enumerate(bm25_hits)}
+    candidate_ids_by_parent: dict[str, list[str]] = {}
+    parent_first_rank: dict[str, int] = {}
+    for hit in bm25_hits:
+        chunk_id = hit.openalex_id
+        if chunk_id not in by_id:
+            continue
+        parent_id = parent_by_candidate[chunk_id]
+        candidate_ids_by_parent.setdefault(parent_id, []).append(chunk_id)
+        parent_first_rank.setdefault(parent_id, bm25_rank[chunk_id])
+
+    selected_parent_ids = sorted(
+        candidate_ids_by_parent,
+        key=lambda parent_id: parent_first_rank[parent_id],
+    )[:RERANK_CANDIDATE_LIMIT]
+    scored_parents = [
+        (parent_id, cosine_similarity(query_vector, parent_vectors[parent_id]))
+        for parent_id in selected_parent_ids
+    ]
+    scored_parents.sort(key=lambda item: (-item[1], parent_first_rank[item[0]], item[0]))
+    ranking = [
+        chunk_id
+        for parent_id, _score in scored_parents
+        for chunk_id in sorted(
+            candidate_ids_by_parent[parent_id], key=lambda item_id: bm25_rank[item_id]
+        )
+    ]
+    return ranking[:limit], len(selected_parent_ids)
+
+
+def _task_method_result(
+    task: dict[str, Any],
+    anchor: dict[str, Any],
+    anchor_resolution: str,
+    relevant: dict[str, int],
+    ranking: list[str],
+    by_id: dict[str, dict[str, Any]],
+    coverage_anchor: dict[str, Any],
+    latency_ms: float,
+    metric_cutoffs: tuple[int, ...],
+) -> dict[str, Any]:
+    return {
+        "task_id": task["task_id"],
+        "source_id": task["source_id"],
+        "reference_chunk_id": task["reference_chunk_id"],
+        "reference_element_id": anchor["element_id"],
+        "reference_page": anchor["page_number"],
+        "reference_element_type": anchor["element_type"],
+        "reference_span": [anchor["char_start"], anchor["char_end"]],
+        "reference_anchor_resolution": anchor_resolution,
+        "relevant_chunk_count": len(relevant),
+        "retrieved_chunk_ids": ranking,
+        "retrieval_latency_ms": latency_ms,
+        "evidence_span_covered": _span_is_covered(
+            [by_id[item_id] for item_id in ranking if item_id in by_id], coverage_anchor
+        ),
+        "metrics": _retrieval_metrics(ranking, relevant, metric_cutoffs),
+    }
+
+
+def _summarize_method(rows: list[dict[str, Any]], latencies: list[float]) -> dict[str, Any]:
+    ordered = sorted(latencies)
+    metrics = [row["metrics"] for row in rows]
+    return {
+        "retrieval_latency_ms": {
+            "mean": statistics.fmean(latencies),
+            "p50": ordered[max(0, math.ceil(0.5 * len(ordered)) - 1)],
+            "p95": ordered[max(0, math.ceil(0.95 * len(ordered)) - 1)],
+        },
+        "metrics_macro_average": {
+            metric: statistics.fmean(item[metric] for item in metrics) for metric in metrics[0]
+        }
+        | {
+            "evidence_span_coverage": statistics.fmean(
+                float(row["evidence_span_covered"]) for row in rows
+            ),
+        },
     }
 
 
