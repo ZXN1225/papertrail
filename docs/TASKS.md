@@ -1,6 +1,6 @@
 # 任务台账
 
-## 2026-11-12 实时 Rerank 效果诊断（PR #43 Draft，CI 待运行）
+## 2026-11-12 实时 Rerank 效果诊断（PR #43 Draft，CI 通过）
 
 - 用户更新凭据后，已按授权在隔离库完成 9 篇 / 3,294 chunks 的 small 模型向量索引，212,879 tokens、估算 `$0.00425758`；6 条查询 92 tokens、估算 `$0.00000184`。原用户库 hash 保持不变，报告与向量只在 ignored `.local`。
 - 1800-byte 无重叠臂的父向量代理 rerank 在六个 single-reviewer selected-span 任务上低于 BM25（MRR@8 `.417` vs `.622`、span coverage `.5` vs `1.0`），不切换生产默认。其余五臂有跨父边界的 child chunk，按既有严格映射被正确标为 unavailable；下一步需真实 child 向量与独立人审任务，不能把本报告称为质量达标。
