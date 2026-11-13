@@ -674,7 +674,7 @@ class PrivateDocumentService:
                     "title": row["title"],
                     "source_url": row["source_url"],
                     "chunk_id": row["visual_id"],
-                    "locator": f"Page {row['page_number']} · MinerU 图表区域",
+                    "locator": f"Page {row['page_number']} · MinerU 视觉区域",
                     "page_number": row["page_number"],
                     "element_type": "figure",
                     "bbox": json.loads(row["bbox_json"]) if row["bbox_json"] else None,

@@ -497,7 +497,7 @@ test("shows personal citations with a private page locator and no public link", 
               },
               {
                 chunk_id: "visual:TEST-PERSONAL:TEST-FIGURE",
-                locator: "Page 3 · MinerU 图表区域",
+                locator: "Page 3 · MinerU 视觉区域",
                 excerpt: "Figure 1. TEST original caption",
                 evidence_type: "visual_analysis",
                 visual_description: "TEST unverified line rises",
@@ -540,7 +540,7 @@ test("shows personal citations with a private page locator and no public link", 
   const citation = page.locator(".citation-card");
   await expect(citation).toContainText("我的稿件");
   await expect(citation).toContainText("第 2 页");
-  await expect(citation).toContainText("MinerU AI 图表解读 · 未核验");
+  await expect(citation).toContainText("MinerU AI 视觉解读 · 未核验");
   await expect(citation).toContainText("TEST original caption");
   await expect(citation).toContainText("TEST unverified line rises");
   await expect(citation.getByRole("link")).toHaveCount(0);
@@ -549,7 +549,7 @@ test("shows personal citations with a private page locator and no public link", 
   ).toContainText("第 2 页");
   await expect(
     page.getByRole("region", { name: "逐条主张与证据" }),
-  ).toContainText("MinerU AI 图表解读 · 未核验");
+  ).toContainText("MinerU AI 视觉解读 · 未核验");
 });
 
 test("shows available MinerU visual evidence as unverified in the document list", async ({

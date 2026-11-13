@@ -754,6 +754,7 @@ def test_mineru_visual_analysis_is_separately_retrievable_and_scoped(tmp_path, m
     )
     assert observation["status"] == "ok"
     visual = next(item for item in observation["items"] if "visual_analysis" in item)
+    assert visual["locator"].endswith("MinerU 视觉区域")
     assert visual["excerpt"] == "Figure 2. TEST caption"
     assert visual["visual_analysis"] == {
         "description": "TEST curve rises after treatment\nTEST control remains stable",
