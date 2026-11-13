@@ -1,16 +1,22 @@
 # 进度
 
-## 2026-11-13 科研助手状态显示修正（PR #45 Draft，CI 待确认）
+## 2026-11-13 PR 收敛与剩余验收门
+
+- 用户要求以可在页面演示的完整功能为一个 PR，全部测评收敛为一个完成 PR。GitHub 上原有连续堆叠的 #23–#45 共 23 个 Draft PR 已关闭、均未合并；远端分支和提交历史保留，最新累计代码在 `codex/accurate-agent-service-status`，其修正后 PR #45 CI backend/web（含 Browser E2E）/container 全绿。此后不按单一修复或单次测评新建 PR。
+- 剩余三项测评门：①真实 MinerU 解析与图表定位/事实核验（含可复核页面参考和错漏分桶）；②同一 MinerU 语料的检索→证据→Agent 回答端到端验收；③足够规模、独立复核的冻结题集上比较 chunk/BM25/rerank，涵盖延迟和错误案例。现有 6 题 pdfplumber 候选向量诊断只说明当前小样本不应切换生产默认，不能替代这三门。未达门槛前不声称质量达标、不部署上线。
+- 本机首次用标准输入调用 MinerU advanced 时，Windows PDF 渲染子进程因入口不可导入而退出；改用已有 `app.cli.parse_private_pdf` 模块入口后，一份 6 页已入库私有 PDF 在本地完成 `mineru-4.1.7-papertrail-v11` advanced 解析，输出 97 元素、7 个 figure，且 `_extract_visual_evidence` 可提取 7 项 `model_generated_unverified` 描述。结果仅在 ignored `.local`，无外部 provider 调用、不改原数据库；这些页面是图形区域，尚未核定为统计图表或验证描述正确性。
+
+## 2026-11-13 科研助手状态显示修正（PR #45 已关闭、未合并，最终 CI 通过）
 
 - 后端 `/api/health/ready` 只验证应用与 SQLite，`checks.llm=configured` 不探测模型连通性；旧 Web 顶栏却显示“后端已就绪”，容易被理解为 Agent 可用。现在显示“后端已连接 · 模型未验证”；当后端报告 `checks.llm=disabled` 时显示“后端已连接 · 模型未启用”。不添加自动模型探测，避免页面加载产生额外 provider 调用或费用。
-- 浏览器回归先复现旧文案，再验证禁用模型状态显示正确；Web typecheck/build 与 69/69 浏览器 E2E 通过。首个 PR CI 的 Web job 因新增测试的 Prettier 换行格式失败，已按 CI 要求修正该测试并单文件复查通过；重跑待确认。Windows 全库 Prettier 对 27 个文件报格式差异，未因此批量改动无关文件。这个改动只修正状态语义，不代表模型服务实际可用，调用失败仍通过现有错误码显示。
+- 浏览器回归先复现旧文案，再验证禁用模型状态显示正确；Web typecheck/build 与 69/69 浏览器 E2E 通过。首个 PR CI 的 Web job 因新增测试的 Prettier 换行格式失败，按 CI 要求修正后新一轮 backend/web（含 Browser E2E）/container CI 全绿。Windows 全库 Prettier 对 27 个文件报格式差异，未因此批量改动无关文件。这个改动只修正状态语义，不代表模型服务实际可用，调用失败仍通过现有错误码显示。
 
 ## 2026-11-13 正确单篇范围候选向量实测（PR #44 runner，PR #45 结果记录）
 
 - 用户重新明确授权后，零外传预检核对 9 篇、6 题、2,221 个候选 ID、824 段新文本（690,259 bytes）与 6 题（404 bytes）；`source_scope=exact_arxiv_id_per_task`、最多 14 批、字节费用估算 `$0.01381326`、CLI 上限 `$0.02`。真实执行完成 14 批，provider 返回 170,342 input tokens，按配置价格估算本次 `$0.00340684`；缓存 14/14，原用户库 SHA-256 不变。
 - 六种 chunk 臂的真实候选文本向量 rerank 均低于配对 BM25；1,800-byte/0 overlap 的 MRR@8 `.417` vs `.622`、NDCG@5 `.438` vs `.712`、完整 span coverage `.5` vs `1.0`。36 个 task/arm 的 top 排名逐项核实仅来自该题指定论文，候选列表最多 128。保持 BM25 与现有 chunker 为生产默认。六题是 single-reviewer selected-span、源解析器为 pdfplumber v27；报告 `quality_claim_allowed=false`，不能据此断言一般 RAG、MinerU 或图表质量。旧超时请求费用仍未知。详见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
 
-## 2026-11-12 真正候选向量 × Chunk 配对诊断修正（PR #44 Draft，CI 通过）
+## 2026-11-12 真正候选向量 × Chunk 配对诊断修正（PR #44 已关闭、未合并，CI 通过）
 
 - 用户另行授权同一 9 篇获准来源的 6 道冻结题候选向量评测。第一次本机脚本把九篇全库 BM25 top-128 与 manifest 规定的单篇任务范围混用；虽完成 19 次 provider 调用、214,826 input tokens（按配置价估算 `$0.00429652`），其报告的 rerank 数字**无效，不能与基线配对或选型**。原数据库 SHA-256 不变，报告和脚本仅在 ignored `.local`。
 - 修正后的单篇范围只读预检为 2,221 个候选 ID、824 段新增去重文本 / 690,259 UTF-8 bytes；连同六题 404 bytes 的费用估算上限 `$0.01381326`。真实请求中途 `timeout`，未写报告；旧脚本无分批向量/用量持久化，因此本次已调用批数和费用未知，不在旧上限下盲重试。尚无有效真实候选向量 rerank 分数。

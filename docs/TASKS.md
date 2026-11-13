@@ -1,16 +1,22 @@
 # 任务台账
 
-## 2026-11-13 科研助手服务状态准确性（PR #45 Draft，CI 待确认）
+## 2026-11-13 收敛后的交付门（暂不提交新 PR）
+
+- #23–#45 的 23 个堆叠 Draft PR 已全部关闭、未合并；分支/提交保留。后续以完整页面功能和完整测评各自成 PR，不再逐小步开 PR。
+- 测评仅保留三项必须完成的门：真实 MinerU 解析/图表区域与事实核验；同源检索与 Agent 页面端到端；独立复核冻结题集上的 chunk/BM25/rerank 策略、延迟及失败案例。完成前不部署、不将六题探索诊断描述为质量证明。
+- 本机 MinerU advanced 对一份 6 页已入库私有 PDF 完成解析并生成 7 项未核验视觉描述；下一步要核对它们的图表类型、事实正确性及在隔离库检索和页面展示的闭环，不把描述自动当原文证据。
+
+## 2026-11-13 科研助手服务状态准确性（PR #45 已关闭、未合并，最终 CI 通过）
 
 - 顶栏不得把 API/数据库 readiness 显示为模型可用：已调整为后端连接与模型配置状态的准确说明；模型已配置时明确“未验证”，禁用时明确“未启用”。
-- 浏览器定向回归先红后绿；Web typecheck/build 与 69/69 E2E 通过。首轮 PR CI 的 Web job 因新增测试换行格式失败，已修正，待下一轮 CI 确认。仍需实际模型调用验证服务商连通性，readiness 不能替代这一检查。
+- 浏览器定向回归先红后绿；Web typecheck/build 与 69/69 E2E 通过。首轮 PR CI 的 Web job 因新增测试换行格式失败，修正后新一轮 backend/web（含 Browser E2E）/container CI 全绿。仍需实际模型调用验证服务商连通性，readiness 不能替代这一检查。
 
 ## 2026-11-13 正确范围候选向量 Rerank 实测
 
 - 新授权下 PR #44 runner 已完成同一获准 9 篇 / 6 题的 14 批候选 embedding；170,342 provider input tokens，估算 `$0.00340684`。六种 chunk 配置的候选向量 rerank 在 MRR@8、NDCG@5、完整证据 span coverage 上均低于对应 BM25；保持当前生产默认，详见 [结果与限制](research/chunk-strategy-evaluation.md)。
 - 尚需独立复核的更大 held-out 题集、MinerU 同源图表任务和真实上线负载验证；此 6 题 single-reviewer 结果不得写成通用质量达标。之前超时请求费用未知。
 
-## 2026-11-12 真正候选向量 Rerank × Chunk 选型修正（PR #44 Draft，CI 通过）
+## 2026-11-12 真正候选向量 Rerank × Chunk 选型修正（PR #44 已关闭、未合并，CI 通过）
 
 - 首次外传评测脚本错误地跨九篇建 BM25 池，与冻结 manifest 的每题单篇范围不一致；已发起 19 次调用、214,826 tokens（估算 `$0.00429652`），但报告中的 rerank 指标无效，不能用于选型。原 DB hash 不变，数据仍在 ignored `.local`。
 - 正确范围的只读预检为 2,221 个候选 ID / 824 段新文本 / 690,259 UTF-8 bytes；执行中 `timeout`，未写报告，旧脚本无法核算已完成批次费用。新增正式 runner 保持 manifest 来源范围，逐批在 ignored `.local` 预留字节预算、原子缓存成功向量；再次 dry-run 0 provider calls、数量一致，synthetic 定向 4 passed、全后端 587 passed，Ruff/OpenAPI/diff check 通过。旧失败调用无法回填缓存，仍不在原授权下外传；当前无有效真实候选向量 rerank 结果，不改变生产默认。
