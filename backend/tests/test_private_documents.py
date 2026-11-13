@@ -12,7 +12,7 @@ from app.agent.harness import AgentHarness, _collect_citations
 from app.auth import create_account
 from app.config import Settings
 from app.main import create_app
-from app.private_documents import PrivateDocumentService
+from app.private_documents import PrivateDocumentService, _extract_visual_evidence
 from app.storage.repository import PaperStore
 
 
@@ -687,6 +687,81 @@ def test_personal_document_private_retrieval_and_citation(tmp_path, monkeypatch)
     service.delete_document(owner, uploaded["id"])
     with store._connection() as db:
         assert db.execute("SELECT COUNT(*) FROM user_chunk_embeddings").fetchone()[0] == 0
+
+
+def test_mineru_subpanels_retain_their_nearby_shared_caption() -> None:
+    def panel(identifier: str, text: str, top: int) -> dict:
+        return {
+            "element_id": identifier,
+            "page_number": 3,
+            "element_type": "figure",
+            "text": text,
+            "bbox": [100, top, 300, top + 100],
+            "structured": {
+                "papertrail_visual_analysis": {
+                    "status": "model_generated_unverified",
+                    "source": "mineru_advanced",
+                },
+                "content": [{"type": "chart_body", "content": "TEST visual values"}],
+            },
+        }
+
+    result = _extract_visual_evidence(
+        {
+            "parser_version": "TEST-mineru",
+            "elements": [
+                panel("TEST-a", "(a) TEST success", 100),
+                panel("TEST-b", "(b) TEST alignment", 100),
+                {
+                    "element_type": "figure_caption",
+                    "page_number": 3,
+                    "bbox": [80, 215, 400, 250],
+                    "text": "Figure 4.1: TEST shared comparison caption.",
+                },
+                panel("TEST-unrelated", "(a) TEST distant figure", 400),
+            ],
+        }
+    )
+    assert [item["caption"] for item in result] == [
+        "Figure 4.1: TEST shared comparison caption.\n(a) TEST success",
+        "Figure 4.1: TEST shared comparison caption.\n(b) TEST alignment",
+        "(a) TEST distant figure",
+    ]
+
+
+def test_mineru_subpanels_share_caption_embedded_in_adjacent_panel() -> None:
+    content = {
+        "papertrail_visual_analysis": {
+            "status": "model_generated_unverified",
+            "source": "mineru_advanced",
+        },
+        "content": [{"type": "image_body", "content": "TEST visual description"}],
+    }
+    result = _extract_visual_evidence(
+        {
+            "parser_version": "TEST-mineru",
+            "elements": [
+                {
+                    "element_id": "TEST-left",
+                    "page_number": 4,
+                    "element_type": "figure",
+                    "text": "(a) TEST before",
+                    "bbox": [80, 100, 290, 220],
+                    "structured": content,
+                },
+                {
+                    "element_id": "TEST-right",
+                    "page_number": 4,
+                    "element_type": "figure",
+                    "text": "(b) TEST after\nFigure 4.2: TEST paired images.",
+                    "bbox": [305, 100, 515, 220],
+                    "structured": content,
+                },
+            ],
+        }
+    )
+    assert result[0]["caption"] == "Figure 4.2: TEST paired images.\n(a) TEST before"
+    assert result[1]["caption"] == "(b) TEST after\nFigure 4.2: TEST paired images."
 
 
 def test_mineru_visual_analysis_is_separately_retrievable_and_scoped(tmp_path, monkeypatch) -> None:

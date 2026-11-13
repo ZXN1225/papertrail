@@ -44,6 +44,35 @@ def _extract_visual_evidence(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     elements = parsed.get("elements")
     if not isinstance(parser_version, str) or not isinstance(elements, list):
         return []
+    page_captions: dict[int, list[tuple[list[float], str]]] = {}
+    sibling_captions: dict[int, list[tuple[str, list[float], str]]] = {}
+    for element in elements:
+        if not isinstance(element, dict) or element.get("element_type") not in {
+            "figure_caption",
+            "figure",
+        }:
+            continue
+        page_number, bbox, caption = (
+            element.get("page_number"),
+            element.get("bbox"),
+            element.get("text"),
+        )
+        if (
+            isinstance(page_number, int)
+            and isinstance(bbox, list)
+            and len(bbox) == 4
+            and all(isinstance(value, (int, float)) for value in bbox)
+            and isinstance(caption, str)
+            and caption.strip()
+        ):
+            if element["element_type"] == "figure_caption":
+                page_captions.setdefault(page_number, []).append((bbox, caption.strip()))
+            elif re.match(r"^\([a-z]\)", caption, re.IGNORECASE):
+                numbered = re.search(r"(?m)^Figure\s+\d+(?:\.\d+)*\s*:.+", caption)
+                if numbered and isinstance(element.get("element_id"), str):
+                    sibling_captions.setdefault(page_number, []).append(
+                        (element["element_id"], bbox, numbered.group())
+                    )
     result: list[dict[str, Any]] = []
     for element in elements:
         if not isinstance(element, dict) or element.get("element_type") != "figure":
@@ -84,12 +113,34 @@ def _extract_visual_evidence(parsed: dict[str, Any]) -> list[dict[str, Any]]:
         bbox = element.get("bbox")
         if not isinstance(bbox, list) or len(bbox) != 4:
             bbox = None
+        caption = str(element.get("text") or "").strip()
+        if bbox is not None and re.match(r"^\([a-z]\)", caption, re.IGNORECASE):
+            nearby = [
+                (caption_bbox[1] - bbox[3], parent)
+                for caption_bbox, parent in page_captions.get(page_number, [])
+                if 0 <= caption_bbox[1] - bbox[3] <= 120
+                and caption_bbox[0] < bbox[2]
+                and bbox[0] < caption_bbox[2]
+            ]
+            if nearby:
+                caption = f"{min(nearby)[1]}\n{caption}"
+            else:
+                siblings = [
+                    (max(other_bbox[0] - bbox[2], bbox[0] - other_bbox[2], 0), parent)
+                    for other_id, other_bbox, parent in sibling_captions.get(page_number, [])
+                    if other_id != element_id
+                    and abs(other_bbox[1] - bbox[1]) <= 24
+                    and abs(other_bbox[3] - bbox[3]) <= 24
+                    and max(other_bbox[0] - bbox[2], bbox[0] - other_bbox[2], 0) <= 40
+                ]
+                if siblings:
+                    caption = f"{min(siblings)[1]}\n{caption}"
         result.append(
             {
                 "element_id": element_id,
                 "page_number": page_number,
                 "bbox": bbox,
-                "caption": str(element.get("text") or "")[:1_800],
+                "caption": caption[:1_800],
                 "description": description,
             }
         )
