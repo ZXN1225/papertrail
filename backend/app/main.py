@@ -164,6 +164,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     class ConversationInput(BaseModel):
         title: str = Field(min_length=1, max_length=120)
 
+    class PrivateDocumentInfo(BaseModel):
+        id: str
+        library_entry_id: str | None
+        source_type: str
+        source_id: str
+        title: str
+        source_url: str
+        original_filename: str
+        document_sha256: str
+        size_bytes: int
+        state: str
+        rights_attested_at: str
+        parser_version: str | None
+        chunker_version: str | None
+        error_code: str | None
+        chunk_count: int
+        visual_evidence_count: int
+        created_at: str
+        updated_at: str
+        indexed_at: str | None
+        stored_chunk_count: int | None = None
+
     @application.post("/api/v1/auth/register", tags=["auth"], status_code=201)
     def register(body: Credentials, request: Request) -> dict[str, str]:
         check_auth_limit(request, body.username)
@@ -349,7 +371,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="library_entry_not_found")
         return Response(status_code=204)
 
-    @application.get("/api/v1/documents", tags=["documents"])
+    @application.get(
+        "/api/v1/documents",
+        tags=["documents"],
+        response_model=list[PrivateDocumentInfo],
+        response_model_exclude_unset=True,
+    )
     def list_private_documents(
         request: Request,
         library_entry_id: str | None = Query(default=None, max_length=64),
@@ -359,7 +386,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         store.migrate()
         return PrivateDocumentService(store).list_documents(owner, library_entry_id)
 
-    @application.post("/api/v1/documents", tags=["documents"], status_code=202)
+    @application.post(
+        "/api/v1/documents",
+        tags=["documents"],
+        status_code=202,
+        response_model=PrivateDocumentInfo,
+        response_model_exclude_unset=True,
+    )
     async def upload_private_document(
         request: Request,
         file: Annotated[UploadFile, File()],
@@ -411,7 +444,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         schedule_private_document(str(document["id"]), owner)
         return document
 
-    @application.get("/api/v1/documents/{document_id}", tags=["documents"])
+    @application.get(
+        "/api/v1/documents/{document_id}",
+        tags=["documents"],
+        response_model=PrivateDocumentInfo,
+        response_model_exclude_unset=True,
+    )
     def get_private_document(document_id: str, request: Request) -> dict[str, object]:
         owner = _require_user(request, app_settings)
         document = PrivateDocumentService(

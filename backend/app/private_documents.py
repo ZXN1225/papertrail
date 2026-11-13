@@ -252,7 +252,9 @@ class PrivateDocumentService:
                 "d.rights_attested_at,d.parser_version,d.chunker_version,d.error_code,d.chunk_count,"
                 "d.created_at,d.updated_at,d.indexed_at,"
                 "(SELECT COUNT(*) FROM user_document_chunks c WHERE c.document_id=d.id "
-                "AND c.user_id=d.user_id) AS stored_chunk_count "
+                "AND c.user_id=d.user_id) AS stored_chunk_count,"
+                "(SELECT COUNT(*) FROM user_document_visual_evidence v WHERE v.document_id=d.id "
+                "AND v.user_id=d.user_id) AS visual_evidence_count "
                 "FROM user_documents d WHERE d.id=? AND d.user_id=?",
                 (document_id, user_id),
             ).fetchone()
@@ -267,7 +269,11 @@ class PrivateDocumentService:
                 "SELECT id,library_entry_id,source_type,source_id,title,source_url,"
                 "original_filename,"
                 "document_sha256,size_bytes,state,rights_attested_at,parser_version,chunker_version,error_code,"
-                "chunk_count,created_at,updated_at,indexed_at FROM user_documents "
+                "chunk_count,created_at,updated_at,indexed_at,"
+                "(SELECT COUNT(*) FROM user_document_visual_evidence v "
+                "WHERE v.document_id=user_documents.id "
+                "AND v.user_id=user_documents.user_id) AS visual_evidence_count "
+                "FROM user_documents "
                 "WHERE user_id=? AND (? IS NULL OR library_entry_id=?) "
                 "ORDER BY created_at DESC LIMIT ?",
                 (user_id, library_entry_id, library_entry_id, MAX_USER_DOCUMENTS),

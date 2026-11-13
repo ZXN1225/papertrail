@@ -31,6 +31,7 @@ type PrivateDocument = {
   parser_version?: string | null;
   error_code?: string | null;
   chunk_count: number;
+  visual_evidence_count: number;
 };
 type ConversationSummary = { id: string; title: string };
 
@@ -1034,7 +1035,10 @@ export function Workspace({
                               {document.original_filename} ·{" "}
                               {documentStateLabel(document.state)}
                               {document.state === "indexed" &&
-                                ` · ${document.chunk_count} 个解析片段（图表内容暂不可用于问答）`}
+                                ` · ${document.chunk_count} 个解析片段`}
+                              {document.state === "indexed" &&
+                                document.visual_evidence_count > 0 &&
+                                ` · ${document.visual_evidence_count} 条视觉解读（AI 生成，未核验）`}
                               {document.state === "failed" &&
                                 ` · ${documentFailureLabel(document.error_code)}`}
                             </span>
@@ -1172,8 +1176,9 @@ export function Workspace({
                         {document.state === "indexed" && (
                           <>
                             {" "}
-                            · {document.chunk_count}{" "}
-                            个解析片段（图表内容暂不可用于问答）
+                            · {document.chunk_count} 个解析片段
+                            {document.visual_evidence_count > 0 &&
+                              ` · ${document.visual_evidence_count} 条视觉解读（AI 生成，未核验）`}
                           </>
                         )}
                         {document.state === "failed" && (

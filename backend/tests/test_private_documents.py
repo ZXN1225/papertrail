@@ -737,6 +737,8 @@ def test_mineru_visual_analysis_is_separately_retrievable_and_scoped(tmp_path, m
     service = PrivateDocumentService(store)
     service.process_document(owner, document["id"])
     assert service.get_document(owner, document["id"])["state"] == "indexed"
+    assert service.get_document(owner, document["id"])["visual_evidence_count"] == 1
+    assert service.list_documents(owner)[0]["visual_evidence_count"] == 1
 
     observation = PaperToolRegistry(store, user_id=owner).execute(
         "retrieve_paper_evidence",

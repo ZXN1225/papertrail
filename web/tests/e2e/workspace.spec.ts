@@ -401,9 +401,7 @@ test("saves a paper snapshot and searches the personal library", async ({
   });
   await savedCard.getByRole("checkbox").check();
   await savedCard.getByRole("button", { name: "上传并解析" }).click();
-  await expect(savedCard).toContainText(
-    "7 个解析片段（图表内容暂不可用于问答）",
-  );
+  await expect(savedCard).toContainText("7 个解析片段");
   await savedCard.getByRole("button", { name: "删除 PDF" }).click();
   await expect(savedCard).not.toContainText("TEST-manuscript.pdf");
 });
@@ -552,6 +550,36 @@ test("shows personal citations with a private page locator and no public link", 
   await expect(
     page.getByRole("region", { name: "逐条主张与证据" }),
   ).toContainText("MinerU AI 图表解读 · 未核验");
+});
+
+test("shows available MinerU visual evidence as unverified in the document list", async ({
+  page,
+}) => {
+  await installCommonMocks(page);
+  await page.route("**/api/documents**", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "00000000-0000-4000-8000-000000000021",
+          library_entry_id: null,
+          source_type: "personal",
+          source_id: "00000000-0000-4000-8000-000000000021",
+          title: "TEST chart manuscript",
+          source_url: "",
+          original_filename: "TEST-chart.pdf",
+          size_bytes: 1024,
+          state: "indexed",
+          chunk_count: 12,
+          visual_evidence_count: 2,
+        },
+      ],
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByText("2 条视觉解读（AI 生成，未核验）", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByText("图表内容暂不可用于问答")).toHaveCount(0);
 });
 
 test("distinguishes a disabled model from backend readiness", async ({

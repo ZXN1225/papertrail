@@ -2,6 +2,9 @@
 
 ## 2026-11-13 PR 收敛与剩余验收门
 
+- 真实 MinerU advanced 诊断扩展到一份获准本机处理的 64 页私有 PDF：本地解析得到 563 个元素（14 个表格、9 个 figure）和 32 条 warning；隔离数据库索引 643 个 chunk、9 条 `model_generated_unverified` 视觉解读。限定该文档的查询可在 rank 1 找到第 36 页视觉解读；实际后端与 Web 登录页面显示“9 条视觉解读（AI 生成，未核验）”，在 1440px 和 375px 浏览器核对。Provider 调用为 0，原用户数据库不变。这只是解析→索引→检索→页面展示的局部闭环，尚未验证模型回答。
+- 第二复核 Agent 只读检查第 36、40、42 页图像与本机解析：第 36 页第二个面板的原图本身没有可辨的模型类别标签，MinerU 的 Group 编号也无法证明其模型对应关系，需对模型映射拒答；第 40、42 页的箱线和曲线数值仅是目视近似。第 42 页图注的区间连接符在渲染图像可见，但 MinerU 输出与 PDF 原生文字层均为替换字符，不能仅凭文字层安全自动修正。复核为 AI 辅助诊断，不是人工金标；真实图表定位、事实评分及 Agent 回答验收仍未完成。
+- 已改私有文档列表 API 与页面，显示可用视觉解读数量及未核验状态，去掉对已生成解读的“图表内容暂不可用于问答”错误提示；OpenAPI 同步。全后端 587 passed，Ruff check/format、Web typecheck/build、浏览器全量 E2E 72/72 通过。Windows 全库 Prettier 因仓库既有 26 个文件的 CRLF 差异不通过，本轮改动的两份 Web 文件单独检查通过。
 - 用户要求以可在页面演示的完整功能为一个 PR，全部测评收敛为一个完成 PR。GitHub 上原有连续堆叠的 #23–#45 共 23 个 Draft PR 已关闭、均未合并；远端分支和提交历史保留，最新累计代码在 `codex/accurate-agent-service-status`，其修正后 PR #45 CI backend/web（含 Browser E2E）/container 全绿。此后不按单一修复或单次测评新建 PR。
 - 剩余三项测评门：①真实 MinerU 解析与图表定位/事实核验（含可复核页面参考和错漏分桶）；②同一 MinerU 语料的检索→证据→Agent 回答端到端验收；③足够规模、独立复核的冻结题集上比较 chunk/BM25/rerank，涵盖延迟和错误案例。现有 6 题 pdfplumber 候选向量诊断只说明当前小样本不应切换生产默认，不能替代这三门。未达门槛前不声称质量达标、不部署上线。
 - 本机首次用标准输入调用 MinerU advanced 时，Windows PDF 渲染子进程因入口不可导入而退出；改用已有 `app.cli.parse_private_pdf` 模块入口后，一份 6 页已入库私有 PDF 在本地完成 `mineru-4.1.7-papertrail-v11` advanced 解析，输出 97 元素、7 个 figure，且 `_extract_visual_evidence` 可提取 7 项 `model_generated_unverified` 描述。结果仅在 ignored `.local`，无外部 provider 调用、不改原数据库；这些页面是图形区域，尚未核定为统计图表或验证描述正确性。

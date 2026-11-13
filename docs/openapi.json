@@ -323,8 +323,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/PrivateDocumentInfo"
                   },
                   "title": "Response List Private Documents Api V1 Documents Get"
                 }
@@ -365,9 +364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Upload Private Document Api V1 Documents Post"
+                  "$ref": "#/components/schemas/PrivateDocumentInfo"
                 }
               }
             }
@@ -409,9 +406,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Private Document Api V1 Documents  Document Id  Get"
+                  "$ref": "#/components/schemas/PrivateDocumentInfo"
                 }
               }
             }
@@ -2587,6 +2582,155 @@
           "source_id"
         ],
         "title": "LibraryEntry"
+      },
+      "PrivateDocumentInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "library_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Entry Id"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "document_sha256": {
+            "type": "string",
+            "title": "Document Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "rights_attested_at": {
+            "type": "string",
+            "title": "Rights Attested At"
+          },
+          "parser_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parser Version"
+          },
+          "chunker_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunker Version"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "chunk_count": {
+            "type": "integer",
+            "title": "Chunk Count"
+          },
+          "visual_evidence_count": {
+            "type": "integer",
+            "title": "Visual Evidence Count"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "indexed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexed At"
+          },
+          "stored_chunk_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Chunk Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "library_entry_id",
+          "source_type",
+          "source_id",
+          "title",
+          "source_url",
+          "original_filename",
+          "document_sha256",
+          "size_bytes",
+          "state",
+          "rights_attested_at",
+          "parser_version",
+          "chunker_version",
+          "error_code",
+          "chunk_count",
+          "visual_evidence_count",
+          "created_at",
+          "updated_at",
+          "indexed_at"
+        ],
+        "title": "PrivateDocumentInfo"
       },
       "SkillUsage": {
         "properties": {
