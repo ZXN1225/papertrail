@@ -2,6 +2,21 @@
 
 ## 2026-11-13 页面功能与测评交付门
 
+## 2026-11-13 上线准备（首个单机生产包）
+
+- 新增 `compose.production.yaml` 与 Caddy HTTPS 入口，使用已有 Web/API 容器及 SQLite/PDF/MinerU 持久卷；生产覆盖层要求域名、LLM key 和模型名，默认打开有限的用户日 token 预算。新增 `docs/deployment.md`，记录单 Linux VPS 启动、MinerU 模型安装、浏览器验收、备份恢复与已知单机限制；README 增加入口，解析器说明更新为 MinerU + pdfplumber 显式回退。
+- 修复基础 Compose 未传递 `AGENT_DAILY_USER_TOKEN_BUDGET` 的配置缺口，并修正文档关于 Agent 私有 PDF Hybrid 查询外发 embedding 的旧描述。
+- 本机 Docker Compose CLI 对基础栈和生产覆盖层 `config --quiet` 均通过；本机 Docker daemon 不可用，不能声称已本地 build/start。CI 已增加生产覆盖层解析步骤，远端结果待提交后确认。当前尚无 VPS、DNS 或生产凭据；不能在缺少这些接入信息时声称已部署上线。
+- 生产包是单实例/单机部署，不提供 HA、对象存储、自动异地备份、GPU MinerU 部署或运营监控。实际启用 Dense/Hybrid 私有全文检索需由部署方另外配置 embedding provider 并对获准数据执行建索引；缺省 BM25 与 Agent/论文页面仍可运行。
+
+- 图表区域 AI 辅助抽查已完成：9 篇冻结许可 PDF 中，每篇抽 1 个有预测页和 1 个零预测页，共 18/18 页；粗略观察到 11 个可见图表/表格区域，未发现明显零预测页漏检或明显假阳性。`2610.10204` p.2 的正文图号引用经核对不是漏检，Figure 1 实体位于 p.3 且已检测。PNG、PDF、MinerU parse report 哈希均匹配，0 provider calls。仅定性 AI 辅助复核，不是人工金标；未评 IoU、全语料召回、表格数值或图表事实正确率，`quality_claim_allowed=false`。复核报告位于本机忽略目录 `backend/.local/mineru-frozen-nine-v1/chart-region-audit-v1/ai-visual-review.json`。
+- 用户实际 Agent 工具仅开放 BM25、Dense、Hybrid；个人全文有向量时使用 BM25+dense RRF，无向量时 BM25 回退。真实 Agent 没有二阶段 reranker；底层 `bm25_dense_rerank` 目前只在检索接口/评测路径，未开放给 function calling。MinerU rerank 对照仍未完成；pdfplumber 六题旧结果不支持上线启用 reranker。
+
+- 9 篇用户提供的冻结 v1 PDF SHA-256 全部匹配任务集；仅在 ignored `.local` 以 MinerU 4.1.7 advanced v12 本机重解析并按真实 `PaperStore` 导入流程写入隔离副本：217 页、1,906 元素、35 table regions、82 visual regions、2,290 chunks；205 warnings 中 199 个是未核验标记，5 页 table native text 缺失、1 页 caption native words 缺失；bbox/元素 ID 结构检查为 0 错。原库未改、无 provider 调用。44 个 AI-authored 题目中 25 个引用锚点在单元素唯一精确匹配，2 个只能页级拼接匹配；独立 AI 辅助复核确认另 8 题的证据内容保留但存在文本格式/分段差异，9 题仍未解决。17 个严格未定位项不等于 17 个解析缺失，也不计作检索失败。复核者查看 217 页低清 contact sheet 和 6 个高清 warning 页，仅为大型区域漏检初筛；非人工 gold，未测 bbox recall/IoU 或图表事实准确率。
+- MinerU v12 映射子集的六种 BM25 chunk 配置已完成；1800-byte 无重叠在 25 个映射题的 NDCG@8=.853、MRR@8=.820、跨度覆盖 .96；900-byte 无重叠 MRR=.835 但跨度覆盖 .56。pdfplumber 上的 44 题诊断中 1200-byte 无重叠 MRR=.769，1800-byte 无重叠跨度覆盖 .886。它们是同索引派生题的探索性结果，不构成人审 gold 或通用配置胜者；MinerU rerank 尚未评测。
+- 新跑全量 9 篇许可语料的 AI-authored BM25 诊断：53 题（44 可答、9 不可答），只读 schema-current 副本、0 provider calls。Answerable Recall@8 39/44=.886、MRR@8=.705、NDCG@8=.750；图注 5/5、multi-hop 11/12、单事实 22/24、表格查询仅 1/3。表格限定候选通道在这 3 道同索引派生题上为 3/3，但题集不是独立相关性判断，不能据此选生产策略。9 道不可答题均有 BM25 候选，说明候选返回率不能代替 Agent 的拒答评估。报告在 ignored `.local/ai-labeled-bm25-refresh-20261113.json`，质量声明保持 false。
+- 先前官方网页复核报告的 R101–R127 编号未能与当前冻结题集对应，且图表事实未验证；该报告不纳入结果。本轮改用已哈希核对的 v1 原 PDF 和当前 53 题集合复评。
+
 - 收尾复核：MinerU v12 修复了 advanced 解析将 `Figure N` 图注并入 table chunk 的错配；同页几何唯一的邻近 figure 无论图注在图上方或下方都可关联，歧义时保留独立图注并发 warning。真实本机 MinerU 对 `TEST` 合成表格+柱图 PDF 重解析后，表格行与 Figure 1 图注分开。隔离 SQLite 中 v11 文档经 `reindex_required` 重试恢复为 `indexed`、v12、7 个 chunk；使用本机已安装 MinerU 的解释器，因为当前 worktree `.venv` 未安装该可选依赖。全后端 591 passed（1 条既有 warning），Ruff check/format 通过。Docker daemon 当前未启动，容器内验收待完成。
 - 第二复核 Agent 已对同一获准本机 PDF 的全部 64 页生成低分辨率 contact sheet 并查看零预测页：9 个预测框定性覆盖对应对象；零预测页未见明显大型漏图；页尾标志为非图表误检。低清审核不能排除小图漏检，无 IoU、人工复核或 recall 估计；报告只留 ignored `.local`。该结果是解析诊断，不是质量通过证据。
 - 已推送评测分支提交 `44f48f8` 以运行远程 CI（未创建 PR）；GitHub Actions run `43399876974` 的 backend、web、container 全部 success。Web job 包含 Browser E2E；container job 已完成 Compose config/build/start、Web-to-API readiness 与首页 smoke，并清理隔离卷。它证明部署栈可启动，不是实际 MinerU 重解析准确率评测。

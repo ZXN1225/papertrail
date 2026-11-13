@@ -107,7 +107,7 @@ BM25 为默认全文检索。Dense 可选使用 OpenAI embeddings 与 cosine 相
 | 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                    |
 | 数据源 | OpenAlex Works / Authors API、arXiv API、逐篇许可的本机 PDF 全文          |
 | 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60                  |
-| 解析   | pdfplumber 结构化解析（元素/章节/表格/图注 + 页级 bbox 与解析告警）       |
+| 解析   | MinerU 本机结构化解析（元素/章节/表格/图注 + 页级 bbox 与解析告警）；pdfplumber 可显式回退 |
 | 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions            |
 
 ## 检索策略与评测证据
@@ -296,6 +296,7 @@ uv run --locked python -m app.cli.evaluate_p14 --allow-provider-call
 
 ## 项目文档
 
+- [单机生产部署与备份恢复](docs/deployment.md)
 - [项目规格](docs/PROJECT_SPEC.md) · [任务台账](docs/TASKS.md) · [阶段进度](docs/PROGRESS.md) · [执行计划](docs/EXECUTION_PLAN.md)
 - [开发与验收指南](docs/development.md) · [OpenAPI 契约](docs/openapi.json) · [项目约定](AGENTS.md)
 - [R02 v27 解析升级记录](docs/research/R02-v27-parse-upgrade.md) · [R01/R03 AI 标注评测](docs/research/R01-R03-ai-labeled-evaluation.md)
