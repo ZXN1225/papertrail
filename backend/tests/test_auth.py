@@ -111,7 +111,7 @@ def test_account_login_and_private_library_are_scoped(tmp_path) -> None:
 
 def test_agent_turns_are_saved_to_the_owned_conversation(tmp_path, monkeypatch) -> None:
     from app import main as main_module
-    from app.agent.contracts import AgentResponse
+    from app.agent.contracts import AgentResponse, Citation, EvidenceSpan
 
     observed_library: list[tuple[str, str]] = []
     observed_users: list[str] = []
@@ -125,7 +125,25 @@ def test_agent_turns_are_saved_to_the_owned_conversation(tmp_path, monkeypatch) 
             observed_library.extend(kwargs["user_library"])
             observed_users.append(kwargs["user_id"])
             observed_histories.append([(turn.role, turn.content) for turn in kwargs["history"]])
-            return AgentResponse(status="completed", answer="TEST synthetic answer")
+            return AgentResponse(
+                status="completed",
+                answer="TEST synthetic answer",
+                context_state={"objective": "TEST objective"},
+                citations=[
+                    Citation(
+                        openalex_id="W100",
+                        title="TEST synthetic source",
+                        source_url="https://openalex.org/W100",
+                        evidence=[
+                            EvidenceSpan(
+                                chunk_id="TEST-chunk",
+                                locator="TEST page 1",
+                                excerpt="TEST synthetic evidence",
+                            )
+                        ],
+                    )
+                ],
+            )
 
     monkeypatch.setattr(main_module, "AgentService", FakeAgentService)
     client = TestClient(
@@ -167,6 +185,11 @@ def test_agent_turns_are_saved_to_the_owned_conversation(tmp_path, monkeypatch) 
         ("user", "TEST question"),
         ("assistant", "TEST synthetic answer"),
     ]
+    assert messages[0]["response"] is None
+    assert messages[1]["response"]["citations"][0]["evidence"][0]["excerpt"] == (
+        "TEST synthetic evidence"
+    )
+    assert messages[1]["response"]["context_state"]["objective"] == "TEST objective"
     second = client.post(
         "/api/v1/agent/ask",
         json={"question": "TEST followup", "conversation_id": conversation["id"]},

@@ -42,9 +42,14 @@ export function AuthGate() {
         const saved = (await messages.json()) as {
           role: "user" | "assistant";
           content: string;
+          response?: AgentTurn["response"];
         }[];
         setInitialHistory(
-          saved.map(({ role, content }) => ({ role, content })),
+          saved.map(({ role, content, response }) => ({
+            role,
+            content,
+            response,
+          })),
         );
       }
     } else {
@@ -75,10 +80,15 @@ export function AuthGate() {
       const saved = (await response.json()) as {
         role: "user" | "assistant";
         content: string;
+        response?: AgentTurn["response"];
       }[];
       if (version === selectionVersion.current)
         setInitialHistory(
-          saved.map(({ role, content }) => ({ role, content })),
+          saved.map(({ role, content, response }) => ({
+            role,
+            content,
+            response,
+          })),
         );
     } catch {
       // The selection stays empty until the next successful reload.

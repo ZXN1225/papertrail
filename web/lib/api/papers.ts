@@ -63,6 +63,7 @@ export type Claim = {
 export type AgentTurn = {
   role: "user" | "assistant";
   content: string;
+  response?: AgentResponse | null;
 };
 
 export type AgentResponse = {

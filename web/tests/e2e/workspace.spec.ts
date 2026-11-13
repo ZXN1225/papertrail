@@ -754,13 +754,23 @@ test("supports bounded request-scoped follow-up context and reset", async ({
     { role: "assistant", content: agentAnswer.answer },
   ]);
 
+  for (const number of [3, 4, 5]) {
+    await page.getByLabel("你的研究问题").fill(`TEST question ${number}`);
+    await page.getByRole("button", { name: "发送" }).click();
+    await expect(page.locator(".conversation-turn.assistant")).toHaveCount(
+      number,
+    );
+  }
+  await expect(page.getByText("TEST first question")).toBeVisible();
+  expect(requests[4].history).toHaveLength(8);
+
   await page.getByRole("button", { name: "清空对话" }).click();
   await page.getByLabel("你的研究问题").fill("TEST new conversation");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(
     page.locator(".conversation-turn.assistant p").last(),
   ).toHaveText(agentAnswer.answer);
-  expect(requests[2].history).toEqual([]);
+  expect(requests[5].history).toEqual([]);
 });
 
 test("explains when the account daily agent token budget is exhausted", async ({
@@ -858,6 +868,73 @@ test("switching conversations isolates delayed history and active replies", asyn
   await page.waitForTimeout(1500);
   await expect(page.getByText(`TEST history ${ids[1]}`)).toHaveCount(0);
   await expect(page.getByText(agentAnswer.answer)).toHaveCount(0);
+});
+
+test("restores saved citations for each assistant turn after reopening a conversation", async ({
+  page,
+}) => {
+  await installCommonMocks(page);
+  const oldResponse = {
+    ...agentAnswer,
+    answer: "TEST older answer",
+    citations: [{ ...agentAnswer.citations[0], title: "TEST older source" }],
+  };
+  const newResponse = {
+    ...agentAnswer,
+    answer: "TEST newer answer",
+    citations: [{ ...agentAnswer.citations[0], title: "TEST newer source" }],
+  };
+  await page.route("**/api/conversations", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({ json: { id: "TEST-CONVERSATION", title: "TEST chat" } })
+      : route.fulfill({
+          json: [{ id: "TEST-CONVERSATION", title: "TEST chat" }],
+        }),
+  );
+  await page.route("**/api/conversations/*/messages", (route) =>
+    route.fulfill({
+      json: [
+        { role: "user", content: "TEST legacy question", response: null },
+        { role: "assistant", content: "TEST legacy answer", response: null },
+        { role: "user", content: "TEST older question", response: null },
+        {
+          role: "assistant",
+          content: oldResponse.answer,
+          response: oldResponse,
+        },
+        { role: "user", content: "TEST newer question", response: null },
+        {
+          role: "assistant",
+          content: newResponse.answer,
+          response: newResponse,
+        },
+      ],
+    }),
+  );
+  await page.goto("/");
+  await openAssistant(page);
+  await expect(
+    page.getByText("旧对话未保存引用，请重新提问核查来源。"),
+  ).toBeVisible();
+  await expect(page.locator(".citation-card")).toContainText(
+    "TEST newer source",
+  );
+  await page
+    .getByRole("button", { name: "查看证据：TEST older answer" })
+    .click();
+  await expect(page.locator(".citation-card")).toContainText(
+    "TEST older source",
+  );
+  await page.getByLabel("你的研究问题").fill("TEST followup");
+  const request = page.waitForRequest("**/api/agent");
+  await page.getByRole("button", { name: "发送" }).click();
+  const body = (await request).postDataJSON();
+  expect(
+    body.history.every(
+      (turn: Record<string, unknown>) =>
+        Object.keys(turn).sort().join(",") === "content,role",
+    ),
+  ).toBe(true);
 });
 
 test("deleting last conversation succeeds even if replacement request fails", async ({

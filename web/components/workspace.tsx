@@ -134,6 +134,13 @@ export function Workspace({
     setQuestion("");
   }, [conversationId]);
 
+  useEffect(() => {
+    setAnswer(
+      [...initialHistory].reverse().find((turn) => turn.role === "assistant")
+        ?.response ?? null,
+    );
+  }, [initialHistory]);
+
   useEffect(() => setPendingQuestion(null), [conversationId]);
 
   useEffect(() => {
@@ -453,7 +460,7 @@ export function Workspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: submittedQuestion,
-          history,
+          history: boundedContextHistory(history),
           run_id: runId,
           ...(conversationId ? { conversation_id: conversationId } : {}),
         }),
@@ -465,7 +472,7 @@ export function Workspace({
       const completedAnswer = body as AgentResponse;
       setAnswer(completedAnswer);
       setHistory((current) =>
-        appendConversation(current, submittedQuestion, completedAnswer.answer),
+        appendConversation(current, submittedQuestion, completedAnswer),
       );
       setPendingQuestion(null);
     } catch (cause) {
@@ -1442,6 +1449,21 @@ export function Workspace({
                     {turn.role === "user" ? "你" : "PaperTrail"}
                   </span>
                   <p>{turn.content}</p>
+                  {turn.role === "assistant" && turn.response && (
+                    <button
+                      className="history-evidence-button"
+                      onClick={() => setAnswer(turn.response ?? null)}
+                      type="button"
+                      aria-label={`查看证据：${turn.content}`}
+                    >
+                      查看本轮证据
+                    </button>
+                  )}
+                  {turn.role === "assistant" && turn.response === null && (
+                    <span className="history-evidence-unavailable">
+                      旧对话未保存引用，请重新提问核查来源。
+                    </span>
+                  )}
                 </li>
               ))}
               <li
@@ -1653,13 +1675,17 @@ function CompareRow({ label, values }: { label: string; values: string[] }) {
 function appendConversation(
   current: AgentTurn[],
   question: string,
-  answer: string,
+  answer: AgentResponse,
 ): AgentTurn[] {
-  const turns = [
+  return [
     ...current,
     { role: "user" as const, content: question },
-    { role: "assistant" as const, content: answer },
+    { role: "assistant" as const, content: answer.answer, response: answer },
   ];
+}
+
+function boundedContextHistory(current: AgentTurn[]): AgentTurn[] {
+  const turns = current.map(({ role, content }) => ({ role, content }));
   while (
     turns.length > 8 ||
     turns.reduce((total, turn) => total + turn.content.length, 0) > 8_000

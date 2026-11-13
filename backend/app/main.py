@@ -164,6 +164,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     class ConversationInput(BaseModel):
         title: str = Field(min_length=1, max_length=120)
 
+    class SavedConversationMessage(BaseModel):
+        id: str
+        role: str
+        content: str
+        created_at: str
+        response: AgentResponse | None = None
+
     class PrivateDocumentInfo(BaseModel):
         id: str
         library_entry_id: str | None
@@ -537,13 +544,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"id": conversation_id, "title": title, "updated_at": now}
 
     @application.get("/api/v1/conversations/{conversation_id}/messages", tags=["conversations"])
-    def get_conversation_messages(conversation_id: str, request: Request) -> list[dict[str, str]]:
+    def get_conversation_messages(
+        conversation_id: str, request: Request
+    ) -> list[SavedConversationMessage]:
         owner = _require_user(request, app_settings)
         store = PaperStore(app_settings.resolved_data_storage_path)
         store.migrate()
         with store._connection() as db:
             rows = db.execute(
-                "SELECT m.id,m.role,m.content,m.created_at FROM conversation_messages m "
+                "SELECT m.id,m.role,m.content,m.created_at,m.response_json "
+                "FROM conversation_messages m "
                 "JOIN conversations c ON c.id=m.conversation_id "
                 "WHERE c.id=? AND c.user_id=? ORDER BY m.created_at, m.rowid LIMIT 500",
                 (conversation_id, owner),
@@ -553,7 +563,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ).fetchone()
         if exists is None:
             raise HTTPException(status_code=404, detail="conversation_not_found")
-        return [dict(row) for row in rows]
+        return [
+            SavedConversationMessage(
+                id=row["id"],
+                role=row["role"],
+                content=row["content"],
+                created_at=row["created_at"],
+                response=(
+                    AgentResponse.model_validate_json(row["response_json"])
+                    if row["response_json"]
+                    else None
+                ),
+            )
+            for row in rows
+        ]
 
     @application.delete(
         "/api/v1/conversations/{conversation_id}/messages",
@@ -791,11 +814,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         ),
                     )
                 db.executemany(
-                    "INSERT INTO conversation_messages(id,conversation_id,role,content,created_at) "
-                    "VALUES(?,?,?,?,?)",
+                    "INSERT INTO conversation_messages"
+                    "(id,conversation_id,role,content,created_at,response_json) "
+                    "VALUES(?,?,?,?,?,?)",
                     [
-                        (str(uuid4()), str(body.conversation_id), "user", body.question, now),
-                        (str(uuid4()), str(body.conversation_id), "assistant", result.answer, now),
+                        (str(uuid4()), str(body.conversation_id), "user", body.question, now, None),
+                        (
+                            str(uuid4()),
+                            str(body.conversation_id),
+                            "assistant",
+                            result.answer,
+                            now,
+                            result.model_dump_json(),
+                        ),
                     ],
                 )
                 title = " ".join(body.question.split())[:60]

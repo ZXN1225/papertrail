@@ -29,6 +29,7 @@ def test_personal_migration_preserves_existing_document_and_chunks(tmp_path) -> 
             "CREATE TABLE user_library_entries (id TEXT, user_id TEXT, PRIMARY KEY (id, user_id))"
         )
         db.execute("INSERT INTO user_library_entries VALUES ('TEST-entry','TEST-owner')")
+        db.executescript((migrations / "0012_conversations.sql").read_text())
         db.executescript((migrations / "0015_user_private_documents.sql").read_text())
         db.executescript((migrations / "0016_private_chunker_version.sql").read_text())
         db.executescript((migrations / "0008_agent_runs.sql").read_text())

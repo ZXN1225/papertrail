@@ -2,6 +2,8 @@
 
 ## 2026-11-13 PR 收敛与剩余验收门
 
+- 真实模型合成数据页面验收暴露对话刷新后只恢复回答、丢失引用和逐条主张：schema 24 为每条助手消息保存本轮 `AgentResponse` 快照；用户所有权检查沿用会话查询，页面重开默认显示最近一轮证据，较早的回答可点“查看本轮证据”。旧消息没有可补录的引用快照，页面明确提示重新提问；清空/删除对话仍会删除快照。纯合成 TEST 表格在实际模型上返回正确的 7 和未核验 `table_analysis` 引用，刷新后 375px 页面保留来源卡且无横向溢出。原用户库的只读备份从 schema 22 升至 24 后消息行数不变、外键检查 0 错，原库 SHA-256 不变。全后端 589 passed、Web 全浏览器 75/75、生产构建/Ruff/改动文件 Prettier/OpenAPI 导出通过。合成解析不计为真实 MinerU 质量。
+- 用实际登录页面而非 mock API 完成 MinerU Table 4.8 的隔离库闭环烟测：本机确定性 TEST 模型触发 Plan/Coverage/Draft/Review，检索到第 40 页 `table_analysis` 行，页面在 1440px 和 375px 均显示“MinerU 表格解析 · 未核验”引用，且无横向溢出。原页图像可目视确认 Median 行 Pre 34.00 / Post 31.50 与检索行相符；这是 AI 辅助的单行抽查，不代表全部表格或真实 LLM 回答准确。测试无外部 provider 调用，脚本/截图/隔离库均在 ignored 目录；真实 MinerU 语料仍待实际模型闭环及完整质量验收。
 - 私有 MinerU 文档已有表格 row chunk 入库，但检索 SQL 原先全部排除，导致具体表格数值请求缺证据。现只对 MinerU 表格开放 BM25 候选，并把它们作为独立 `table_analysis` / `parser_generated_unverified` 证据；引用卡、逐条主张和工具说明均标明非原文精确引述，伪造 `source_field=excerpt` 的表格引用会被 Harness 拒绝。五项内置 Skills 同步表格证据边界并更新版本/内容哈希。真实 64 页隔离库中，Table 4.2 和 4.8 的限定文档查询首位均为对应表格行；未测表格单元格准确率，不把解析数字当已核实事实。本轮全后端 589 passed（1 条既有 warning）、Skills/ResearchRuntime 61 passed、Web typecheck/build 与浏览器 72/72 通过，Ruff check/format、OpenAPI 导出、pip-audit 与 pnpm audit 通过。
 - 真实 MinerU advanced 诊断扩展到一份获准本机处理的 64 页私有 PDF：本地解析得到 563 个元素（14 个表格、9 个 figure）和 32 条 warning；隔离数据库索引 643 个 chunk、9 条 `model_generated_unverified` 视觉解读。限定该文档的查询可在 rank 1 找到第 36 页视觉解读；实际后端与 Web 登录页面显示“9 条视觉解读（AI 生成，未核验）”，在 1440px 和 375px 浏览器核对。Provider 调用为 0，原用户数据库不变。这只是解析→索引→检索→页面展示的局部闭环，尚未验证模型回答。
 - 第二复核 Agent 只读检查第 36、40、42 页图像与本机解析：第 36 页第二个面板的原图本身没有可辨的模型类别标签，MinerU 的 Group 编号也无法证明其模型对应关系，需对模型映射拒答；第 40、42 页的箱线和曲线数值仅是目视近似。第 42 页图注的区间连接符在渲染图像可见，但 MinerU 输出与 PDF 原生文字层均为替换字符，不能仅凭文字层安全自动修正。复核为 AI 辅助诊断，不是人工金标；真实图表定位、事实评分及 Agent 回答验收仍未完成。

@@ -1491,6 +1491,22 @@ textarea::placeholder {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.history-evidence-button {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.history-evidence-unavailable {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
 
 .usage-panel {
   max-width: 1296px;

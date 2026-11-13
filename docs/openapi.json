@@ -687,10 +687,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
+                    "$ref": "#/components/schemas/SavedConversationMessage"
                   },
                   "title": "Response Get Conversation Messages Api V1 Conversations  Conversation Id  Messages Get"
                 }
@@ -2748,6 +2745,44 @@
           "indexed_at"
         ],
         "title": "PrivateDocumentInfo"
+      },
+      "SavedConversationMessage": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "SavedConversationMessage"
       },
       "SkillUsage": {
         "properties": {
