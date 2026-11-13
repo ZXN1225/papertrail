@@ -554,7 +554,9 @@ test("shows personal citations with a private page locator and no public link", 
   ).toContainText("MinerU AI 图表解读 · 未核验");
 });
 
-test("distinguishes a disabled model from backend readiness", async ({ page }) => {
+test("distinguishes a disabled model from backend readiness", async ({
+  page,
+}) => {
   await installCommonMocks(page);
   await page.route("**/api/status", (route) =>
     route.fulfill({ json: { status: "ready", checks: { llm: "disabled" } } }),
