@@ -98,6 +98,7 @@ def test_mcp_registry_rejects_unregistered_or_invalid_inputs() -> None:
         assert registry.execute("search_papers", '{"query":"x","limit":999}') == {
             "status": "error",
             "code": "invalid_arguments",
+            "fields": [{"field": "limit", "reason": "less_than_equal"}],
         }
 
 

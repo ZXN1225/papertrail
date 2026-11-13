@@ -64,7 +64,7 @@ jobs:
       - name: Browser E2E
         working-directory: web
         run: |
-          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright install chromium
           pnpm run test:e2e
 
   container:
@@ -75,6 +75,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Compose configuration
         run: docker compose config --quiet
+      - name: Validate production Compose overlay
+        env:
+          PAPERTRAIL_DOMAIN: papertrail.example.com
+          LLM_API_KEY: ci-placeholder
+          LLM_MODEL: ci-placeholder
+        run: docker compose -f compose.yaml -f compose.production.yaml config --quiet
       - name: Build and start isolated stack
         run: docker compose up --build -d
       - name: Smoke test Web-to-API readiness and home page

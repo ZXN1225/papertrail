@@ -1,0 +1,40 @@
+services:
+  backend:
+    environment:
+      APP_ENV: production
+      LLM_PROVIDER: openai
+      LLM_API_KEY: ${LLM_API_KEY:?Set LLM_API_KEY in the server .env file}
+      LLM_MODEL: ${LLM_MODEL:?Set LLM_MODEL in the server .env file}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-45}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-1600}
+      AGENT_MAX_TOTAL_TOKENS: ${AGENT_MAX_TOTAL_TOKENS:-12000}
+      AGENT_DAILY_USER_TOKEN_BUDGET: ${AGENT_DAILY_USER_TOKEN_BUDGET:-24000}
+      AGENT_DEADLINE_SECONDS: ${AGENT_DEADLINE_SECONDS:-120}
+
+  caddy:
+    image: caddy:2.11.9-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      PAPERTRAIL_DOMAIN: ${PAPERTRAIL_DOMAIN:?Set PAPERTRAIL_DOMAIN to a DNS name pointing at this server}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - papertrail-caddy-data:/data
+      - papertrail-caddy-config:/config
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+volumes:
+  papertrail-caddy-data:
+  papertrail-caddy-config:

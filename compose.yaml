@@ -7,6 +7,11 @@ services:
       APP_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATA_STORAGE_PATH: /data/papertrail.sqlite3
+      MINERU_HOME: /models
+      MINERU_MODEL_SOURCE: local
+      MINERU_TELEMETRY_DISABLED: "1"
+      PAPERTRAIL_PDF_PARSER: ${PAPERTRAIL_PDF_PARSER:-mineru}
+      PAPERTRAIL_MINERU_TIER: ${PAPERTRAIL_MINERU_TIER:-standard}
       OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
       LLM_API_KEY: ${LLM_API_KEY:-}
@@ -16,6 +21,7 @@ services:
       AGENT_MAX_STEPS: ${AGENT_MAX_STEPS:-4}
       AGENT_MAX_TOOL_CALLS: ${AGENT_MAX_TOOL_CALLS:-8}
       AGENT_MAX_TOTAL_TOKENS: ${AGENT_MAX_TOTAL_TOKENS:-12000}
+      AGENT_DAILY_USER_TOKEN_BUDGET: ${AGENT_DAILY_USER_TOKEN_BUDGET:-0}
       AGENT_MAX_CONTEXT_CHARS: ${AGENT_MAX_CONTEXT_CHARS:-120000}
       AGENT_DEADLINE_SECONDS: ${AGENT_DEADLINE_SECONDS:-45}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-disabled}
@@ -25,6 +31,7 @@ services:
       EMBEDDING_PRICE_PER_MILLION_USD: ${EMBEDDING_PRICE_PER_MILLION_USD:-}
     volumes:
       - papertrail-data:/data
+      - papertrail-models:/models
     expose:
       - "8000"
     init: true
@@ -54,3 +61,4 @@ services:
 
 volumes:
   papertrail-data:
+  papertrail-models:

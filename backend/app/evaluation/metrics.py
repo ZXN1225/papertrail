@@ -4,30 +4,36 @@ from __future__ import annotations
 
 import math
 
+MAX_RELEVANCE_GRADE = 3
+
 
 def score_query(
     ranking: list[str], relevance: dict[str, int], *, cutoffs: tuple[int, ...] = (1, 3, 5, 10)
 ) -> dict[str, float]:
-    if any(grade < 0 for grade in relevance.values()):
-        raise ValueError("relevance grades must be non-negative")
+    if not cutoffs or any(type(cutoff) is not int or cutoff < 1 for cutoff in cutoffs):
+        raise ValueError("metric cutoffs must be positive integers")
+    if any(
+        type(grade) is not int or not 0 <= grade <= MAX_RELEVANCE_GRADE
+        for grade in relevance.values()
+    ):
+        raise ValueError(f"relevance grades must be integers from 0 to {MAX_RELEVANCE_GRADE}")
     result: dict[str, float] = {}
+    max_cutoff = max(cutoffs)
     first_relevant = next(
         (
             rank
-            for rank, document_id in enumerate(ranking, start=1)
+            for rank, document_id in enumerate(ranking[:max_cutoff], start=1)
             if relevance.get(document_id, 0) > 0
         ),
         None,
     )
     for cutoff in cutoffs:
-        if cutoff < 1:
-            raise ValueError("metric cutoffs must be positive")
         prefix = ranking[:cutoff]
         result[f"hit@{cutoff}"] = float(
             any(relevance.get(document_id, 0) > 0 for document_id in prefix)
         )
         result[f"ndcg@{cutoff}"] = _ndcg(prefix, relevance, cutoff)
-    result[f"mrr@{max(cutoffs)}"] = 1.0 / first_relevant if first_relevant else 0.0
+    result[f"mrr@{max_cutoff}"] = 1.0 / first_relevant if first_relevant else 0.0
     return result
 
 

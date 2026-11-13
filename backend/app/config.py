@@ -24,13 +24,15 @@ class Settings(BaseSettings):
     llm_provider: Literal["disabled", "openai"] = "disabled"
     llm_api_key: SecretStr | None = None
     llm_model: str | None = None
-    llm_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
-    llm_max_output_tokens: int = Field(default=800, ge=64, le=4_096)
+    llm_timeout_seconds: float = Field(default=60.0, gt=0, le=60)
+    llm_max_output_tokens: int = Field(default=8192, ge=64, le=32_768)
+    llm_reasoning_effort: Literal["none", "low", "medium", "high", "xhigh", "max"] | None = None
     agent_max_steps: int = Field(default=4, ge=1, le=8)
     agent_max_tool_calls: int = Field(default=8, ge=1, le=16)
-    agent_max_total_tokens: int = Field(default=12_000, ge=256, le=100_000)
+    agent_max_total_tokens: int = Field(default=300_000, ge=256, le=1_000_000)
+    agent_daily_user_token_budget: int = Field(default=0, ge=0, le=10_000_000)
     agent_max_context_chars: int = Field(default=120_000, ge=4_000, le=500_000)
-    agent_deadline_seconds: float = Field(default=45.0, gt=0, le=120)
+    agent_deadline_seconds: float = Field(default=120.0, gt=0, le=120)
     embedding_provider: Literal["disabled", "openai"] = "disabled"
     embedding_api_key: SecretStr | None = None
     embedding_model: str | None = None
@@ -39,6 +41,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def require_credentials_for_enabled_providers(self) -> "Settings":
+        if (
+            self.agent_daily_user_token_budget > 0
+            and self.agent_daily_user_token_budget < self.agent_max_total_tokens
+        ):
+            raise ValueError("AGENT_DAILY_USER_TOKEN_BUDGET must cover at least one agent run")
         if self.llm_provider == "openai" and (not self.llm_api_key or not self.llm_model):
             raise ValueError("LLM_API_KEY and LLM_MODEL are required when LLM_PROVIDER=openai")
         if self.embedding_provider == "openai" and (

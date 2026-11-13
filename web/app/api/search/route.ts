@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import {
   backendRequest,
   invalidResponse,
@@ -7,7 +8,6 @@ import {
 } from "@/lib/api/backend";
 import {
   normalizeArxiv,
-  normalizeLocalOpenAlex,
   normalizeOpenAlex,
   type Paper,
   type Source,
@@ -59,36 +59,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const encodedQuery = query
-      ? `?q=${encodeURIComponent(query)}&limit=20`
-      : "?limit=20";
-    const [openalexResponse, arxivResponse] = await Promise.all([
-      backendRequest(`/api/v1/catalog/papers${encodedQuery}`),
-      backendRequest(`/api/v1/catalog/arxiv${encodedQuery}`),
-    ]);
-    const [openalex, arxiv] = await Promise.all([
-      openalexResponse.json(),
-      arxivResponse.json(),
-    ]);
-    if (!openalexResponse.ok || !arxivResponse.ok) {
-      return Response.json(
-        {
-          detail: {
-            code: "catalog_unavailable",
-            message: "本地论文目录暂时不可用。",
+    const cookieJar = await cookies();
+    const token = cookieJar.get("papertrail_session")?.value;
+    const response = await backendRequest(
+      `/api/v1/library?limit=50${query ? `&query=${encodeURIComponent(query)}` : ""}`,
+      {
+        headers: token
+          ? { Cookie: `papertrail_session=${encodeURIComponent(token)}` }
+          : {},
+      },
+    );
+    const entries = await response.json();
+    if (!response.ok)
+      return Response.json(entries, { status: response.status });
+    const items = Array.isArray(entries)
+      ? entries.flatMap(
+          (entry: { source?: string; metadata?: Record<string, unknown> }) => {
+            if (!entry.metadata) return [];
+            if (entry.source === "arxiv")
+              return [normalizeArxiv(entry.metadata)];
+            if (entry.source === "openalex")
+              return [normalizeOpenAlex(entry.metadata)];
+            return [];
           },
-        },
-        { status: 503 },
-      );
-    }
-    const items = [
-      ...(Array.isArray(openalex.items)
-        ? openalex.items.map(normalizeLocalOpenAlex)
-        : []),
-      ...(Array.isArray(arxiv.items) ? arxiv.items.map(normalizeArxiv) : []),
-    ].sort((left, right) => (right.year ?? 0) - (left.year ?? 0));
+        )
+      : [];
     return Response.json(
-      { source, total: (openalex.total ?? 0) + (arxiv.total ?? 0), items },
+      { source, total: items.length, items },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch {

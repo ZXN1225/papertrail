@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -13,7 +14,12 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_settings
-from app.retrieval.pdf_parser import PARSER_VERSION, parse_pdf_bytes, read_pdf_bytes
+from app.retrieval.pdf_parser import (
+    PARSER_VERSION,
+    parse_pdf_bytes,
+    parse_pdf_bytes_mineru,
+    read_pdf_bytes,
+)
 from app.sources.arxiv import normalize_arxiv_id
 from app.storage.repository import ALLOWED_FULLTEXT_LICENSES, PaperStore
 
@@ -103,7 +109,16 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("PDF input must use the .pdf extension")
             pdf_bytes = read_pdf_bytes(args.pdf)
             document_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
-            parsed = parse_pdf_bytes(pdf_bytes)
+            parser_engine = os.getenv("PAPERTRAIL_PDF_PARSER", "mineru").strip().lower()
+            if parser_engine == "mineru":
+                parsed = parse_pdf_bytes_mineru(
+                    pdf_bytes,
+                    tier=os.getenv("PAPERTRAIL_MINERU_TIER", "standard").strip().lower(),
+                )
+            elif parser_engine == "pdfplumber":
+                parsed = parse_pdf_bytes(pdf_bytes)
+            else:
+                raise ValueError("PAPERTRAIL_PDF_PARSER must be mineru or pdfplumber")
             elements = parsed["elements"]
             parser_details = {
                 key: parsed[key]
@@ -116,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             }
             text = "\n\n".join(str(item["text"]) for item in elements)
-            parser_version = PARSER_VERSION
+            parser_version = parsed.get("parser_version", PARSER_VERSION)
         else:
             if args.text.suffix.lower() != ".txt" or args.text.stat().st_size > MAX_TEXT_BYTES:
                 raise ValueError("text input must be a .txt file no larger than 8 MB")

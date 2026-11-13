@@ -26,6 +26,7 @@ from app.retrieval.pdf_parser import (
     _table_rows,
     _word_lines,
     parse_pdf,
+    parse_pdf_bytes_mineru,
 )
 
 
@@ -320,6 +321,903 @@ BT /F1 10 Tf 235 565 Td (0.9) Tj ET
         f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
     )
     return bytes(pdf)
+
+
+def test_mineru_adapter_maps_structured_blocks_and_normalizes_page_bbox(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "text"
+        content = "TEST MinerU paragraph"
+        bbox = [0.1, 0.1, 0.5, 0.2]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            assert mode == "json"
+            assert "image_base64" in exclude
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+
+    def fake_parse(*args, **kwargs):
+        assert kwargs["ocr_mode"] == "txt"
+        assert kwargs["image_analysis"] is False
+        return SimpleNamespace(middle_json=middle)
+
+    parser_module.parse = fake_parse
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert result["parser_version"] == "mineru-4.1.test-papertrail-v12"
+    assert result["ocr_mode"] == "txt"
+    assert result["image_analysis_enabled"] is False
+    assert result["page_count"] == 1
+    assert result["elements"][0]["text"] == "TEST MinerU paragraph"
+    assert result["elements"][0]["bbox"] == [61.2, 79.2, 306.0, 158.4]
+    assert result["elements"][0]["structured"]["type"] == "text"
+
+
+def test_mineru_advanced_keeps_visual_analysis_out_of_source_exact_text(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "chart"
+        content = [
+            {"type": "chart_caption", "content": "Figure 1: TEST chart"},
+            {"type": "chart_body", "content": "MODEL DESCRIPTION: TEST line rises"},
+        ]
+        bbox = [0.1, 0.1, 0.5, 0.5]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.7")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+
+    def fake_parse(*args, **kwargs):
+        assert kwargs["tier"] == "advanced"
+        assert kwargs["image_analysis"] is True
+        return SimpleNamespace(middle_json=middle)
+
+    parser_module.parse = fake_parse
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table(), tier="advanced")
+
+    figure = result["elements"][0]
+    assert result["image_analysis_enabled"] is True
+    assert figure["text"] == "Figure 1: TEST chart"
+    assert "MODEL DESCRIPTION" in str(figure["structured"])
+    assert figure["structured"]["papertrail_visual_analysis"] == {
+        "status": "model_generated_unverified",
+        "source": "mineru_advanced",
+    }
+    assert "mineru_visual_analysis_unverified" in figure["warnings"]
+    assert {
+        "page_number": 1,
+        "code": "mineru_visual_analysis_unverified",
+    } in result["warnings"]
+    chunks = chunk_pdf_elements(result["elements"])
+    assert [chunk.text for chunk in chunks] == ["Figure 1: TEST chart"]
+
+
+@pytest.mark.parametrize(
+    ("chart_bbox", "figure_caption_bbox"),
+    [
+        ([0.14, 0.40, 0.70, 0.65], [0.08, 0.34, 0.52, 0.36]),
+        ([0.14, 0.30, 0.70, 0.52], [0.08, 0.54, 0.52, 0.56]),
+    ],
+)
+def test_mineru_reassigns_figure_caption_mislabeled_as_table_caption(
+    monkeypatch, chart_bbox, figure_caption_bbox
+) -> None:
+    import types
+
+    class Block:
+        def __init__(self, kind: str, bbox: list[float], content: list[dict]) -> None:
+            self.type = kind
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    table = Block(
+        "table",
+        [0.08, 0.18, 0.65, 0.30],
+        [
+            {
+                "type": "table_caption",
+                "bbox": [0.08, 0.15, 0.40, 0.17],
+                "content": "Table 1: TEST values",
+            },
+            {
+                "type": "table_body",
+                "bbox": [0.08, 0.18, 0.65, 0.30],
+                "content": "<table><tr><td>Red</td><td>7</td></tr></table>",
+            },
+            {
+                "type": "table_caption",
+                "bbox": figure_caption_bbox,
+                "content": "Figure 1: TEST bar chart",
+            },
+        ],
+    )
+    chart = Block(
+        "chart",
+        chart_bbox,
+        [{"type": "chart_body", "content": "Red: 7"}],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[table, chart])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.7")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *_args, **_kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table(), tier="advanced")
+    table_element = next(row for row in result["elements"] if row["element_type"] == "table")
+    chart_element = next(row for row in result["elements"] if row["element_type"] == "figure")
+    assert "Table 1: TEST values" in table_element["text"]
+    assert "Figure 1" not in table_element["text"]
+    assert chart_element["text"] == "Figure 1: TEST bar chart"
+
+
+def test_mineru_adapter_reclassifies_prose_misidentified_as_equation(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, content):
+            self.type = "equation"
+            self.content = content
+            self.bbox = [0.1, 0.1, 0.5, 0.2]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[
+            SimpleNamespace(
+                page_idx=0,
+                blocks=[
+                    Block(r"\text {COURSE OF STUDY .}"),
+                    Block("(T o b e c o n t i n u e d.)"),
+                    Block("x = 2 + 2"),
+                ],
+            )
+        ],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert [item["element_type"] for item in result["elements"]] == [
+        "paragraph",
+        "paragraph",
+        "formula",
+    ]
+    assert all(
+        "mineru_equation_text_reclassified" in item["warnings"] for item in result["elements"][:2]
+    )
+
+
+def test_mineru_adapter_drops_blank_page_self_description(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "text"
+        bbox = [0.1, 0.1, 0.8, 0.2]
+        content = (
+            "The image contains no text or content to process. It is a blank white background "
+            "with no visible content, text, or symbols."
+        )
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert result["elements"] == []
+    assert result["warnings"] == [{"page_number": 1, "code": "mineru_page_self_description"}]
+
+
+def test_mineru_table_audit_flags_dropped_source_number(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "table"
+        content = [
+            {
+                "type": "table_body",
+                "bbox": [50, 177, 400, 237],
+                "content": "<table><tr><td>Hybrid</td><td>0.8</td></tr></table>",
+            }
+        ]
+        bbox = [50, 177, 400, 237]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    table = result["elements"][0]
+    assert "mineru_table_native_text_missing" in table["warnings"]
+    assert "0.9" in table["structured"]["source_audit"]["unmatched_numeric_examples"]
+
+
+def test_mineru_adapter_keeps_ocr_for_pages_without_text_layer(monkeypatch) -> None:
+    import types
+
+    import pdfplumber
+
+    class EmptyPdf:
+        pages = [SimpleNamespace(width=612, height=792, chars=[])]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+    monkeypatch.setattr(pdfplumber, "open", lambda *_args: EmptyPdf())
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+
+    def fake_parse(*args, **kwargs):
+        assert kwargs["ocr_mode"] == "auto"
+        return SimpleNamespace(middle_json=middle)
+
+    parser_module.parse = fake_parse
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+    assert result["ocr_mode"] == "auto"
+
+
+def test_mineru_figure_audit_flags_misread_source_word(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "chart"
+        content = [
+            {
+                "type": "chart_caption",
+                "bbox": [50, 68, 400, 87],
+                "content": "TEST synxhetic evidence extraction.",
+            }
+        ]
+        bbox = [50, 50, 400, 68]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    figure = result["elements"][0]
+    assert "mineru_caption_native_words_missing" in figure["warnings"]
+    assert "synthetic" in figure["structured"]["source_audit"]["missing_caption_words"]
+
+
+def test_mineru_adapter_rejects_missing_page(monkeypatch) -> None:
+    import types
+
+    middle = SimpleNamespace(pages=[])
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    with pytest.raises(ValueError, match="incomplete PDF pages"):
+        parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+
+def test_mineru_adapter_marks_figure_captions_unverified(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "chart"
+        content = "TEST Figure 1: synthetic caption"
+        bbox = [0.1, 0.1, 0.5, 0.2]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": self.bbox}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert result["elements"][0]["element_type"] == "figure"
+    assert result["elements"][0]["warnings"] == ["mineru_figure_caption_unverified"]
+    assert result["warnings"] == [{"page_number": 1, "code": "mineru_figure_caption_unverified"}]
+
+
+def test_mineru_adapter_attaches_adjacent_caption_paragraph_to_figure(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, block_type, bbox, content):
+            self.type = block_type
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    figure = Block("image", [0.3, 0.3, 0.7, 0.55], [{"type": "image_body", "content": ""}])
+    caption = Block("text", [0.28, 0.56, 0.72, 0.61], ":.—TEST adjacent caption.")
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[figure, caption])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    parsed_figure = result["elements"][0]
+    assert parsed_figure["element_type"] == "figure"
+    assert ":.—TEST adjacent caption." in parsed_figure["text"]
+
+
+def test_mineru_adapter_attaches_distant_numbered_figure_description(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, block_type, bbox, content):
+            self.type = block_type
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    figure = Block(
+        "image", [0.1, 0.2, 0.4, 0.45], [{"type": "image_caption", "content": "Fig. 3."}]
+    )
+    body = Block("text", [0.55, 0.7, 0.95, 0.9], "Fig. 3 represents TEST synthetic figure details.")
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[figure, body])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert result["elements"][0]["element_type"] == "figure"
+    assert "Fig. 3 represents TEST synthetic figure details." in result["elements"][0]["text"]
+    assert result["elements"][1]["text"] == "Fig. 3 represents TEST synthetic figure details."
+
+
+def test_mineru_adapter_classifies_diagram_caption_as_figure(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "table"
+        bbox = [0.1, 0.2, 0.8, 0.9]
+        content = [
+            {"type": "table_caption", "content": "856 EDUCATION REPORT TEST"},
+            {"type": "table_caption", "content": "DIAGRAM 15. TEST synthetic graph"},
+            {"type": "table_body", "content": "<table><tr><td>TEST trend</td></tr></table>"},
+        ]
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert result["elements"][0]["element_type"] == "figure"
+    assert result["table_regions"] == 0
+    assert result["image_regions"] == 1
+    assert result["elements"][0]["text"] == "DIAGRAM 15. TEST synthetic graph"
+
+
+def test_mineru_adapter_uses_nearby_diagram_reference_for_misread_table(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, block_type, bbox, content):
+            self.type = block_type
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    paragraph = Block("text", [0.1, 0.2, 0.8, 0.35], "Diagram 15 shows TEST trend.")
+    table = Block(
+        "table",
+        [0.12, 0.405, 0.8, 0.8],
+        [
+            {"type": "table_caption", "content": "TEST OCR-corrupted caption"},
+            {"type": "table_body", "content": "<table><tr><td>TEST trend</td></tr></table>"},
+        ],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[paragraph, table])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert result["elements"][1]["element_type"] == "figure"
+    assert "Diagram 15 shows TEST trend." in result["elements"][1]["text"]
+    assert result["table_regions"] == 0
+
+
+def test_mineru_adapter_reattaches_nearby_figure_caption(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "chart"
+
+        def __init__(self, bbox, content):
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    first = Block(
+        [0.35, 0.15, 0.65, 0.31],
+        [{"type": "chart_body", "content": "", "image_base64": "TEST-image-data"}],
+    )
+    second = Block(
+        [0.28, 0.39, 0.73, 0.48],
+        [
+            {
+                "type": "chart_caption",
+                "bbox": [0.2, 0.32, 0.8, 0.38],
+                "content": "TEST Figure 2 caption",
+            },
+            {"type": "chart_body", "content": ""},
+            {
+                "type": "chart_caption",
+                "bbox": [0.2, 0.49, 0.8, 0.53],
+                "content": "TEST Figure 3 caption",
+            },
+        ],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[first, second])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert [item["text"] for item in result["elements"]] == [
+        "TEST Figure 2 caption",
+        "TEST Figure 3 caption",
+    ]
+    assert all(
+        "mineru_figure_caption_unverified" in item["warnings"] for item in result["elements"]
+    )
+    assert "image_base64" not in result["elements"][0]["structured"]["content"][0]
+
+
+def test_mineru_adapter_keeps_spanning_panel_caption_as_ambiguous_caption(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "chart"
+
+        def __init__(self, bbox, content):
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    first = Block([0.1, 0.2, 0.4, 0.5], [{"type": "chart_body", "content": ""}])
+    second = Block(
+        [0.45, 0.2, 0.75, 0.5],
+        [
+            {"type": "chart_body", "content": ""},
+            {
+                "type": "chart_caption",
+                "bbox": [0.1, 0.52, 0.75, 0.58],
+                "content": "Figure 9: TEST synthetic grouped panels.",
+            },
+        ],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[first, second])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    figures = [item for item in result["elements"] if item["element_type"] == "figure"]
+    captions = [item for item in result["elements"] if item["element_type"] == "figure_caption"]
+    assert len(figures) == 2
+    assert all("Figure 9:" not in item["text"] for item in figures), [
+        item["text"] for item in figures
+    ]
+    assert len(captions) == 1
+    assert captions[0]["text"] == "Figure 9: TEST synthetic grouped panels."
+    assert captions[0]["structured"]["image_relation"]["status"] == "ambiguous"
+    assert captions[0]["structured"]["image_relation"]["candidate_image_ids"] == [
+        item["element_id"] for item in figures
+    ]
+    assert result["figure_captions"] == 1
+
+
+def test_mineru_adapter_groups_caption_below_wide_and_split_panels(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, bbox, content):
+            self.type = "chart"
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    wide_panel = Block([0.1, 0.1, 0.9, 0.35], [{"type": "chart_body", "content": ""}])
+    left_panel = Block([0.1, 0.38, 0.45, 0.55], [{"type": "chart_body", "content": ""}])
+    right_panel = Block(
+        [0.55, 0.38, 0.9, 0.55],
+        [
+            {"type": "chart_body", "content": ""},
+            {
+                "type": "chart_caption",
+                "bbox": [0.08, 0.57, 0.92, 0.62],
+                "content": "Figure 3: TEST caption for all three panels.",
+            },
+        ],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[wide_panel, left_panel, right_panel])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    figures = [item for item in result["elements"] if item["element_type"] == "figure"]
+    captions = [item for item in result["elements"] if item["element_type"] == "figure_caption"]
+    assert len(figures) == 3
+    assert all("Figure 3:" not in item["text"] for item in figures)
+    assert len(captions) == 1
+    assert captions[0]["structured"]["image_relation"]["status"] == "ambiguous"
+    assert captions[0]["structured"]["image_relation"]["candidate_image_ids"] == [
+        item["element_id"] for item in figures
+    ]
+
+
+def test_mineru_adapter_attaches_explicit_side_by_side_figure_caption(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, block_type, bbox, content):
+            self.type = block_type
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    figure = Block("image", [0.1, 0.2, 0.45, 0.5], [{"type": "image_body", "content": ""}])
+    caption = Block(
+        "text",
+        [0.47, 0.24, 0.9, 0.43],
+        "Supplementary Figure 2: TEST synthetic caption beside the plot.",
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[figure, caption])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    parsed_figure = next(item for item in result["elements"] if item["element_type"] == "figure")
+    assert "Supplementary Figure 2:" in parsed_figure["text"]
+    assert any(
+        item["element_type"] == "paragraph"
+        and item["text"] == "Supplementary Figure 2: TEST synthetic caption beside the plot."
+        for item in result["elements"]
+    )
+
+
+def test_mineru_adapter_prefers_directly_below_figure_over_adjacent_column(monkeypatch) -> None:
+    import types
+
+    class Block:
+        def __init__(self, block_type, bbox, content):
+            self.type = block_type
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    adjacent_column_figure = Block("image", [0.1, 0.52, 0.48, 0.74], "")
+    target_figure = Block("image", [0.6, 0.48, 0.92, 0.53], "")
+    caption = Block(
+        "text",
+        [0.52, 0.535, 0.98, 0.58],
+        "Fig. 33. TEST caption directly below the right-column figure.",
+    )
+    middle = SimpleNamespace(
+        pages=[
+            SimpleNamespace(page_idx=0, blocks=[adjacent_column_figure, target_figure, caption])
+        ],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="TEST")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    figures = [item for item in result["elements"] if item["element_type"] == "figure"]
+    assert "Fig. 33." not in figures[0]["text"]
+    assert "Fig. 33. TEST caption directly below the right-column figure." in figures[1]["text"]
+
+
+def test_mineru_adapter_assigns_side_by_side_table_captions_by_position(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "table"
+
+        def __init__(self, bbox, content):
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    left = Block(
+        [0.1, 0.1, 0.48, 0.3],
+        [
+            {"type": "table_caption", "bbox": [0.1, 0.1, 0.48, 0.15], "content": "TEST Table 2"},
+            {"type": "table_caption", "bbox": [0.52, 0.1, 0.9, 0.15], "content": "TEST Table 3"},
+            {"type": "table_body", "content": "<table><tr><td>TEST-left</td></tr></table>"},
+        ],
+    )
+    right = Block(
+        [0.52, 0.1, 0.9, 0.3],
+        [{"type": "table_body", "content": "<table><tr><td>TEST-right</td></tr></table>"}],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[left, right])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert "TEST Table 2" in result["elements"][0]["text"]
+    assert "TEST Table 3" not in result["elements"][0]["text"]
+    assert "TEST Table 3" in result["elements"][1]["text"]
+    assert "TEST-right" in result["elements"][1]["text"]
+    assert all("mineru_table_cells_unverified" in item["warnings"] for item in result["elements"])
+    assert len(result["warnings"]) == 2
+
+
+def test_mineru_adapter_attaches_between_tables_caption_to_nearest_edge(monkeypatch) -> None:
+    import types
+
+    class Block:
+        type = "table"
+
+        def __init__(self, bbox, content):
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    table_five = Block(
+        [0.113, 0.115, 0.883, 0.332],
+        [
+            {
+                "type": "table_body",
+                "content": "<table><tr><td>TEST-Table5-body</td></tr></table>",
+            }
+        ],
+    )
+    table_six = Block(
+        [0.314, 0.443, 0.685, 0.549],
+        [
+            {
+                "type": "table_caption",
+                "bbox": [0.368, 0.356, 0.629, 0.371],
+                "content": "TEST Table 5: detailed settings",
+            },
+            {
+                "type": "table_body",
+                "content": "<table><tr><td>TEST-Table6-body</td></tr></table>",
+            },
+            {
+                "type": "table_caption",
+                "bbox": [0.263, 0.561, 0.733, 0.577],
+                "content": "TEST Table 6: runtime results",
+            },
+        ],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[table_five, table_six])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
+
+    assert "TEST Table 5" in result["elements"][0]["text"]
+    assert "TEST Table 6" not in result["elements"][0]["text"]
+    assert "TEST Table 5" not in result["elements"][1]["text"]
+    assert "TEST Table 6" in result["elements"][1]["text"]
+
+
+@pytest.mark.parametrize(
+    ("page_idx", "bbox", "error"),
+    [
+        (-1, [0.1, 0.1, 0.5, 0.2], "outside the source PDF"),
+        (0, [0.8, 0.1, 0.2, 0.2], "invalid page geometry"),
+        (0, [0.1, 0.1, float("nan"), 0.2], "invalid page geometry"),
+    ],
+)
+def test_mineru_adapter_rejects_invalid_page_and_bbox(monkeypatch, page_idx, bbox, error) -> None:
+    import types
+
+    class Block:
+        type = "text"
+        content = "TEST synthetic"
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "content": self.content, "bbox": bbox}
+
+    Block.bbox = bbox
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=page_idx, blocks=[Block()])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.test")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *args, **kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    with pytest.raises(ValueError, match=error):
+        parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
 
 
 def test_heading_and_table_guards_reject_layout_noise() -> None:
@@ -1738,3 +2636,33 @@ def test_pdf_parser_extracts_text_from_a_real_minimal_pdf(tmp_path: Path) -> Non
 
     assert result["page_count"] == 1
     assert any("Retrieval evidence on page one." in item["text"] for item in result["elements"])
+
+
+def test_mineru_html_table_chunks_keep_bounded_exact_row_evidence() -> None:
+    text = (
+        "TEST Table 1: Results<table><tr><th>Method</th><th>Score</th></tr>"
+        + "<tr><td>TEST-DATA</td><td>"
+        + " synthetic-value" * 190
+        + "</td></tr><tr><td>TEST-control</td><td>0.7</td></tr></table>"
+    )
+    chunks = chunk_pdf_elements(
+        [
+            {
+                "element_id": "TEST-mineru-table",
+                "element_type": "table",
+                "page_number": 2,
+                "text": text,
+                "structured": {"content": []},
+                "bbox": [1, 2, 30, 40],
+                "section_path": ["TEST Results"],
+            }
+        ]
+    )
+
+    assert len(chunks) > 3
+    assert all(len(chunk.text.encode("utf-8")) <= MAX_CHUNK_TOKEN_UPPER_BOUND for chunk in chunks)
+    assert all(chunk.evidence_text == text[chunk.char_start : chunk.char_end] for chunk in chunks)
+    assert any("TEST-DATA" in chunk.text for chunk in chunks)
+    assert all(
+        chunk.page_number == 2 and chunk.element_id == "TEST-mineru-table" for chunk in chunks
+    )

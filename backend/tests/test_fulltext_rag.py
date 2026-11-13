@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import tempfile
@@ -104,12 +105,27 @@ def test_ingest_is_idempotent_and_returns_license_and_exact_evidence_locator() -
         assert repeat["status"] == "unchanged"
         assert first["content_sha256"] == repeat["content_sha256"]
         assert lineage is not None
+        assert lineage["title"] == "Retrieval augmented generation evaluation"
         assert lineage["current_sha256"] == first["content_sha256"]
         assert lineage["license_id"] == "CC-BY-4.0"
         assert lineage["parser_version"] == "plain-text-v1"
         assert lineage["chunk_count"] == 2
         assert first["chunk_count"] == 2
         assert result["status"] == "ok"
+        current_chunk = store.list_current_fulltext_chunks(
+            source_type="openalex", source_id="W900"
+        )[0]
+        historical_store = PaperStore(store.database_path, readonly=True)
+        historical_chunk = historical_store.get_approved_fulltext_chunk_by_id(
+            source_type="openalex", source_id="W900", chunk_id=current_chunk["chunk_id"]
+        )
+        assert historical_chunk is not None
+        assert historical_chunk["content_sha256"] == first["content_sha256"]
+        assert historical_chunk["source_document_sha256"] == first["source_document_sha256"]
+        with pytest.raises(ValueError, match="read-only"):
+            store.get_approved_fulltext_chunk_by_id(
+                source_type="openalex", source_id="W900", chunk_id=current_chunk["chunk_id"]
+            )
         hit = result["items"][0]
         assert hit["source_type"] == "openalex"
         assert hit["openalex_id"] == "W900"
@@ -272,6 +288,84 @@ def test_arxiv_content_can_be_separately_approved_and_deleted_with_tombstone() -
         temporary.cleanup()
 
 
+def test_readonly_chunk_ablation_snapshot_returns_current_parser_elements_without_writes() -> None:
+    temporary, store = _seed_store()
+    try:
+        store.import_arxiv_page(
+            ArxivPage(
+                total_results=1,
+                start=0,
+                items_per_page=1,
+                works=[
+                    ArxivWork(
+                        arxiv_id="2402.12345",
+                        title="Papertrail TEST parser snapshot",
+                        abstract="TEST abstract",
+                        authors=["TEST Author"],
+                        categories=["cs.IR"],
+                        primary_category="cs.IR",
+                        published_at=datetime(2024, 1, 1, tzinfo=UTC),
+                        updated_at=datetime(2024, 2, 1, tzinfo=UTC),
+                        source_url="https://arxiv.org/abs/2402.12345",
+                    )
+                ],
+                fetched_at=datetime(2026, 9, 23, tzinfo=UTC),
+            ),
+            query="TEST parser snapshot",
+            start=0,
+        )
+        source_text = "TEST parser source paragraph for chunk strategy diagnostics."
+        _ingest(
+            store,
+            source_text,
+            source_type="arxiv",
+            source_id="2402.12345",
+            license_id="CC0-1.0",
+            license_url=CC0_URL,
+            parser_version="pdfplumber-layout-v27",
+            source_document_sha256="a" * 64,
+            parsed_elements=[
+                {
+                    "element_id": "TEST-element-1",
+                    "order_index": 0,
+                    "page_number": 3,
+                    "element_type": "paragraph",
+                    "section_path": ["TEST Results"],
+                    "bbox": [10.0, 20.0, 30.0, 40.0],
+                    "text": source_text,
+                }
+            ],
+        )
+        readonly = PaperStore(store.database_path, readonly=True)
+        before = hashlib.sha256(store.database_path.read_bytes()).hexdigest()
+
+        chunks = readonly.list_current_fulltext_chunks(source_type="arxiv", source_id="2402.12345")
+        elements = readonly.list_current_fulltext_elements(
+            source_type="arxiv", source_id="2402.12345"
+        )
+
+        after = hashlib.sha256(store.database_path.read_bytes()).hexdigest()
+        assert before == after
+        assert len(chunks) == 1
+        assert chunks[0]["element_id"] == "TEST-element-1"
+        assert chunks[0]["page_number"] == 3
+        assert chunks[0]["char_start"] == 0
+        assert chunks[0]["char_end"] == len(source_text)
+        assert elements == [
+            {
+                "element_id": "TEST-element-1",
+                "order_index": 0,
+                "page_number": 3,
+                "element_type": "paragraph",
+                "section_path": ["TEST Results"],
+                "bbox": [10.0, 20.0, 30.0, 40.0],
+                "text": source_text,
+            }
+        ]
+    finally:
+        temporary.cleanup()
+
+
 def test_chunker_bounds_chunks_and_preserves_offsets() -> None:
     source = "# Methods\n\n" + (
         ("A reproducible chunk keeps an evidence locator. " * 80) + "\n\nConclusion."
@@ -368,7 +462,7 @@ def test_pdf_ingest_keeps_parser_metadata_and_page_region_in_retrieved_evidence(
             ).fetchone()
         assert version["parser_version"] == "pdfplumber-layout-v1"
         assert version["source_document_sha256"] == "a" * 64
-        assert version["chunker_version"] == "pdf-element-structure-token-upper-bound-v4"
+        assert version["chunker_version"] == "pdf-element-structure-token-upper-bound-v5"
         with store._connection() as connection:
             assert connection.execute("SELECT COUNT(*) FROM fulltext_elements").fetchone()[0] == 1
     finally:
@@ -494,7 +588,8 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         _ingest(
             store,
             "# Lexical\n\nExact lexical phrase matches this passage.\n\n"
-            "# Semantic\n\nMeaning based retrieval can find this second passage.",
+            "# Semantic\n\nLexical phrase appears here, while meaning based retrieval "
+            "can find this passage.",
         )
         chunks = store.list_current_fulltext_chunks(source_type="openalex", source_id="W900")
         assert len(chunks) == 2
@@ -530,6 +625,14 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
             query_embedding=[0.0, 1.0],
             embedding_model="fake-test-encoder-v1",
         )
+        reranked = store.search_fulltext_evidence(
+            "exact lexical phrase",
+            source_type="openalex",
+            source_id="W900",
+            retrieval_method="bm25_dense_rerank",
+            query_embedding=[0.0, 1.0],
+            embedding_model="fake-test-encoder-v1",
+        )
         assert dense["retrieval_method"] == "dense_cosine_v1"
         assert dense["items"][0]["chunk_id"] == chunks[1]["chunk_id"]
         assert dense["items"][0]["license_id"] == "CC-BY-4.0"
@@ -538,6 +641,8 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         assert all(
             item["content_sha256"] == chunks[0]["content_sha256"] for item in hybrid["items"]
         )
+        assert reranked["retrieval_method"] == "bm25_dense_rerank_v1"
+        assert reranked["items"][0]["chunk_id"] == chunks[1]["chunk_id"]
         store.delete_fulltext("openalex", "W900", reason="acceptance deletion test")
         after_delete = store.search_fulltext_evidence(
             "semantic neighbor query",
@@ -547,6 +652,53 @@ def test_dense_and_hybrid_use_only_current_approved_chunks_and_keep_citations() 
         )
         assert after_delete["status"] == "no_results"
         assert after_delete["scanned_chunks"] == 0
+    finally:
+        temporary.cleanup()
+
+
+def test_current_embedding_diagnostic_lookup_is_read_only_and_model_scoped() -> None:
+    temporary, store = _seed_store()
+    try:
+        _ingest(store, "An approved paragraph for the TEST embedding diagnostic.")
+        chunks = store.list_current_fulltext_chunks(source_type="openalex", source_id="W900")
+        readonly = PaperStore(store.database_path, readonly=True)
+        with pytest.raises(ValueError, match="read-only"):
+            store.list_current_fulltext_embeddings(
+                source_type="openalex",
+                source_ids=["W900"],
+                model="TEST-embedding-v1",
+                dimensions=2,
+            )
+        assert readonly.list_current_fulltext_embeddings(
+            source_type="openalex",
+            source_ids=["W900"],
+            model="TEST-embedding-v1",
+            dimensions=2,
+        ) == {chunk["chunk_id"]: None for chunk in chunks}
+        store.store_fulltext_embeddings(
+            model="TEST-embedding-v1",
+            dimensions=2,
+            items=[
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "content_sha256": chunk["content_sha256"],
+                    "vector": [1.0, 0.0],
+                }
+                for chunk in chunks
+            ],
+        )
+        assert readonly.list_current_fulltext_embeddings(
+            source_type="openalex",
+            source_ids=["W900"],
+            model="TEST-embedding-v1",
+            dimensions=2,
+        ) == {chunk["chunk_id"]: [1.0, 0.0] for chunk in chunks}
+        assert readonly.list_current_fulltext_embeddings(
+            source_type="openalex",
+            source_ids=["W900"],
+            model="TEST-other-model",
+            dimensions=2,
+        ) == {chunk["chunk_id"]: None for chunk in chunks}
     finally:
         temporary.cleanup()
 
@@ -597,6 +749,13 @@ def test_dense_retrieval_reports_incomplete_index_and_refuses_stale_embedding_wr
             embedding_model="new-model-v1",
         )
         assert missing["status"] == "embeddings_missing"
+        missing_reranker = store.search_fulltext_evidence(
+            "replacement",
+            retrieval_method="bm25_dense_rerank",
+            query_embedding=[1.0, 0.0],
+            embedding_model="new-model-v1",
+        )
+        assert missing_reranker["status"] == "embeddings_missing"
         with pytest.raises(ValueError, match="current approved"):
             store.store_fulltext_embeddings(
                 model="fake-test-encoder-v1",
@@ -714,11 +873,16 @@ def test_embedding_index_cli_batches_and_reports_safe_usage(monkeypatch, capsys)
             embedding_price_per_million_usd=0.02,
         )
 
+        provider_instances = []
+
         class FakeEmbeddingClient:
             def __init__(self, client_settings) -> None:
                 assert client_settings.embedding_api_key is not None
+                self.calls = 0
+                provider_instances.append(self)
 
             def embed(self, texts: list[str]) -> EmbeddingBatch:
+                self.calls += 1
                 assert texts == ["An approved text chunk to build an embedding index."]
                 return EmbeddingBatch("fake-test-encoder-v1", [[1.0, 0.0]], 12)
 
@@ -727,8 +891,73 @@ def test_embedding_index_cli_batches_and_reports_safe_usage(monkeypatch, capsys)
 
         monkeypatch.setattr(index_fulltext_embeddings, "get_settings", lambda: settings)
         monkeypatch.setattr(index_fulltext_embeddings, "OpenAIEmbeddingClient", FakeEmbeddingClient)
+        preview_code = index_fulltext_embeddings.main(
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--dry-run",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.01",
+            ]
+        )
+        preview = json.loads(capsys.readouterr().out)
+        assert preview_code == 0
+        assert preview["missing_chunks"] == 1
+        assert preview["input_utf8_bytes_upper_bound"] == len(
+            b"An approved text chunk to build an embedding index."
+        )
+        assert preview["provider_calls"] == 0
+        assert preview["index_written"] is False
+
+        no_consent_code = index_fulltext_embeddings.main(
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.01",
+            ]
+        )
+        assert no_consent_code == 3
+        assert "--confirm-data-transfer" in capsys.readouterr().err
+        assert provider_instances == []
+
+        over_budget_code = index_fulltext_embeddings.main(
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--confirm-data-transfer",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.0000000001",
+            ]
+        )
+        assert over_budget_code == 3
+        assert "upper-bound estimate exceeds" in capsys.readouterr().err
+        assert provider_instances == []
+
         exit_code = index_fulltext_embeddings.main(
-            ["--source-type", "openalex", "--source-id", "W900"]
+            [
+                "--source-type",
+                "openalex",
+                "--source-id",
+                "W900",
+                "--confirm-data-transfer",
+                "--max-chunks",
+                "1",
+                "--max-cost-usd",
+                "0.01",
+            ]
         )
         output = json.loads(capsys.readouterr().out)
         assert exit_code == 0

@@ -1,5 +1,454 @@
 # 进度
 
+## 2026-11-13 PR 收敛与剩余验收门
+
+- 上线准备增加单机 Linux VPS 生产 Compose 覆盖层和 Caddy HTTPS 反向代理，沿用当前持久卷；新增启动/模型准备/验收/备份恢复手册。基础 Compose 现传递每日用户 Agent token 预算，CI 增加用占位值校验生产配置。基础与生产 Compose 本机 `config --quiet` 均通过，`git diff --check` 通过；本机 Docker daemon 不可用，因此容器 build/start 由远端 CI 复核。无服务器、域名与生产凭据，部署本身待接入信息。
+- 修正文档中过时的解析器和个人 PDF embedding 行为描述。生产默认 Agent LLM 必须配置 OpenAI endpoint 凭据；Embedding 保持关闭，BM25 可用。使用私有全文 Hybrid/Dense 需要额外 embedding 配置和授权索引；图表文本质量仍有未完成的人工事实核验限制。
+- 该提交触发 PR #46 CI：backend success；Web 在 Prettier `README.md` 单文件格式检查处失败，container 未运行。按远端日志只修复 README 表格排版，本机该文件 Prettier check 通过；修复后的远端 CI 尚待复跑。
+
+- MinerU 区域复核 Agent 对冻结 9 篇论文抽样 18 页（9 页有预测区域、9 页零预测页）逐图对照，粗略观察到正样本页 11 个可见图表/表格区域；本抽样未见明显零预测页漏检或明显误检。此前将 `2610.10204` p.2 的正文 Figure 1 交叉引用误判为漏检，复核后撤回：图本体在 p.3，MinerU 已识别。复核包、18 张 PNG、9 份 PDF 与解析报告的哈希均匹配，0 外部调用。此结果为 AI 辅助定性检查，不是人工复核、IoU/召回率或图表数值核验，`gold_standard=false`、`quality_claim_allowed=false`；图表事实/漏检总体质量仍未建立。
+- 产品真实 Agent 路径没有独立二阶段 reranker。`retrieve_paper_evidence` 暴露 BM25/Dense/Hybrid；个人文档有向量时可将 BM25 与 dense top-32 以 RRF 融合，无向量时回退 BM25。共享全文底层和评测代码存在 `bm25_dense_rerank`，但 Agent function schema 未开放该模式，因此用户对话不会调用它。当前 MinerU 六种 chunk 配置评测比较的是 BM25；现存六题候选向量 rerank 结果来自 pdfplumber v27 且低于对应 BM25，不能替代 MinerU 评测，故不接入生产默认。
+- 用户已提供冻结集 9 篇 arXiv v1 PDF；逐篇 SHA-256 均与任务集 `source_document_sha256` 一致。仅在 ignored `.local` 本机 MinerU 4.1.7 advanced v12 重解析：217 页、1,906 元素、35 table regions、82 visual regions、205 条 warning；0 duplicate IDs、0 invalid bbox。warning 中 199 条是表格/视觉结果的“未核验”标记，另有 5 页表格 native text 缺失、1 页 caption native words 缺失。隔离数据库按应用真实导入流程重建 2,290 chunks；原数据库未改，0 provider calls。结构计数不表示表格或视觉事实正确。
+- 44 道 AI-authored 可答题的引用锚点重映射：25 个能在单一 MinerU 元素中唯一精确定位，2 个只在页级词序列中出现，17 个最初未通过严格定位。独立 AI 辅助复核直接检查 8 个题目页后，确认其中 8 个题目的内容在 MinerU 文本中保留（含换行/引号归一、LaTeX 与结构化表格格式差异）；另 9 个仍未解决，不计为检索失败。另浏览 217 页低清 contact sheets 和 6 个高清警告页，只用于大型区域漏检初筛；bbox recall/IoU、表格单元格及图表事实准确率未测。复核非人工、非 gold。单一锚点可映射子集的 MinerU v12 BM25 生产 chunk 在 top-8 为 24/25、MRR .820、NDCG .853、完整证据覆盖 20/21（4 道无多跳必要证据标签题不计覆盖）；9/9 不可答问题仍返回检索候选，不能据此评 Agent 拒答。
+- MinerU 同语料六种 BM25 chunk 配置在 25 个映射锚点上比较：900-byte 无重叠 MRR .835、跨度覆盖 .56；1,200-byte 无重叠 MRR .797、覆盖 .72；1,800-byte 无重叠 MRR .820、NDCG .853、覆盖 .96。对照 pdfplumber 44 题：1,200-byte 无重叠 MRR .769 最高，1,800-byte 无重叠跨度覆盖 .886 最高。两套都是同索引派生/子集选择诊断，不能证明通用最优；MinerU rerank 未执行，现有六题真候选向量 rerank 对照偏低，生产配置保持不变。
+- 已冻结 9 篇 PDF 哈希后，对 pdfplumber-v27 的全量 AI-authored BM25 诊断覆盖 53 题（44 可答、9 不可答）：Recall@8 39/44=.886、MRR@8=.705、NDCG@8=.750；table bucket 仅 1/3，临时 table-only 通道在相同 3 题上为 3/3，不能据此选生产策略。9 道不可答题均返回候选，尚未完成答案拒答评测。只读隔离副本、0 provider calls；AI-authored 标签不构成人工金标，质量声明为 false。
+- 先前公开 arXiv v1 部分复核报告的 R101–R127 编号未能对应当前冻结清单，因此不纳入评分；本轮已改用用户提供且哈希匹配的 9 篇 PDF 与当前 AI 题集复核。
+- 收尾核查发现 MinerU advanced 解析会把结构化输出中误标为 `table_caption` 的 `Figure N` 文本并入表格 chunk，令表格检索证据混入图注。解析适配器 v12 现将其移到唯一几何相邻的 figure（图注在上/下方均支持）；不能唯一关联时保留独立图注并记录 warning。真实 MinerU 4.1.7 对本地 `TEST` 合成表格+柱图 PDF 重解析后，table 与 figure 文本分离；双向位置回归 2 passed。当前全后端 591 passed、Ruff check/format 通过，Compose 配置解析通过。未运行 provider。
+- v11→v12 隔离升级已验证：私有文档进入 `failed/reindex_required`，经现有重试路径和 MinerU 4.1.7 重新解析后恢复 `indexed`，写入 parser v12 的 7 个 chunk，表格行和 Figure 1 图注分离。此前一次失败由 smoke 脚本将解析根目录覆盖为相对路径，触发路径安全检查；修正为绝对隔离路径后通过。当前 worktree `.venv` 不含可选 MinerU，使用已有 MinerU 环境的解释器跑完整私有文档处理，故这不是容器运行时验收。Docker daemon 未启动，容器 build/重建 smoke 待完成。AI 辅助视觉抽样与 6/27 题 RAG 探索数据不构成人工金标；图表事实/漏检质量、独立 held-out 策略评测及私有语料真实模型闭环仍未完成。PR #46 CI 通过、Draft、未合并；本轮解析/测评收尾尚未开 PR。
+- 第二复核 Agent 对同一获准本机 PDF 的 64 页 contact sheet 做只读 AI 辅助抽查：9/9 个预测框定性重叠目标区域，零预测页未观察到明显大图漏检，第 64 页 logo 是非图表误检。检查未做正式 IoU、未复核图内事实，也不能排除小图漏检；报告在 ignored `.local/mineru-64page-contact-audit-20261113.md`，不能作为人工 gold 或召回率证明。
+- 评测分支 `44f48f8` 的 GitHub Actions run `43399876974` 全绿：backend、web、container success。Container job 实际通过 Compose 校验、镜像构建/启动、Web `/api/status` readiness 与首页 smoke，随后清理测试 volume。远端容器验证覆盖 PaperTrail 部署栈启动；未挂载获准 PDF，也未在容器内重解析 MinerU 文档。
+
+- 真实模型合成数据页面验收暴露对话刷新后只恢复回答、丢失引用和逐条主张：schema 24 为每条助手消息保存本轮 `AgentResponse` 快照；用户所有权检查沿用会话查询，页面重开默认显示最近一轮证据，较早的回答可点“查看本轮证据”。旧消息没有可补录的引用快照，页面明确提示重新提问；清空/删除对话仍会删除快照。纯合成 TEST 表格在实际模型上返回正确的 7 和未核验 `table_analysis` 引用，刷新后 375px 页面保留来源卡且无横向溢出。原用户库的只读备份从 schema 22 升至 24 后消息行数不变、外键检查 0 错，原库 SHA-256 不变。全后端 589 passed、Web 全浏览器 75/75、生产构建/Ruff/改动文件 Prettier/OpenAPI 导出通过。合成解析不计为真实 MinerU 质量。
+- 用实际登录页面而非 mock API 完成 MinerU Table 4.8 的隔离库闭环烟测：本机确定性 TEST 模型触发 Plan/Coverage/Draft/Review，检索到第 40 页 `table_analysis` 行，页面在 1440px 和 375px 均显示“MinerU 表格解析 · 未核验”引用，且无横向溢出。原页图像可目视确认 Median 行 Pre 34.00 / Post 31.50 与检索行相符；这是 AI 辅助的单行抽查，不代表全部表格或真实 LLM 回答准确。测试无外部 provider 调用，脚本/截图/隔离库均在 ignored 目录；真实 MinerU 语料仍待实际模型闭环及完整质量验收。
+- 私有 MinerU 文档已有表格 row chunk 入库，但检索 SQL 原先全部排除，导致具体表格数值请求缺证据。现只对 MinerU 表格开放 BM25 候选，并把它们作为独立 `table_analysis` / `parser_generated_unverified` 证据；引用卡、逐条主张和工具说明均标明非原文精确引述，伪造 `source_field=excerpt` 的表格引用会被 Harness 拒绝。五项内置 Skills 同步表格证据边界并更新版本/内容哈希。真实 64 页隔离库中，Table 4.2 和 4.8 的限定文档查询首位均为对应表格行；未测表格单元格准确率，不把解析数字当已核实事实。本轮全后端 589 passed（1 条既有 warning）、Skills/ResearchRuntime 61 passed、Web typecheck/build 与浏览器 72/72 通过，Ruff check/format、OpenAPI 导出、pip-audit 与 pnpm audit 通过。
+- 真实 MinerU advanced 诊断扩展到一份获准本机处理的 64 页私有 PDF：本地解析得到 563 个元素（14 个表格、9 个 figure）和 32 条 warning；隔离数据库索引 643 个 chunk、9 条 `model_generated_unverified` 视觉解读。限定该文档的查询可在 rank 1 找到第 36 页视觉解读；实际后端与 Web 登录页面显示“9 条视觉解读（AI 生成，未核验）”，在 1440px 和 375px 浏览器核对。Provider 调用为 0，原用户数据库不变。这只是解析→索引→检索→页面展示的局部闭环，尚未验证模型回答。
+- 第二复核 Agent 只读检查第 36、40、42 页图像与本机解析：第 36 页第二个面板的原图本身没有可辨的模型类别标签，MinerU 的 Group 编号也无法证明其模型对应关系，需对模型映射拒答；第 40、42 页的箱线和曲线数值仅是目视近似。第 42 页图注的区间连接符在渲染图像可见，但 MinerU 输出与 PDF 原生文字层均为替换字符，不能仅凭文字层安全自动修正。复核为 AI 辅助诊断，不是人工金标；真实图表定位、事实评分及 Agent 回答验收仍未完成。
+- 第 26、38、64 页补查显示 9 条视觉解读混合流程图、照片和页尾标志，其中页尾标志并非科研图表。已把检索位置与引用卡的“图表区域/图表解读”统一改为“视觉区域/视觉解读”，避免把非图表内容误标为图表；未核验标记保留。定向后端 8 passed、三种尺寸的浏览器引用测试 3/3 通过；这一标签修正不构成图表分类准确率证明。
+- 真实第 36 页双面板的共同 Figure 4.1 图注被 MinerU 存为独立 `figure_caption`；第 38 页双照片的 Figure 4.2 总图注只附在右 panel。现在仅对同页、近邻的 `(a)/(b)` 子图关联共享图注，保留各自小标题；两个 TEST 回归先红后绿。已许可 64 页解析报告在隔离库重放：限定文档查询 Figure 4.1 时，两项视觉 panel 从前 8 无命中变成第 4、6；查询 Figure 4.2 时，左 panel 从前 8 无命中变成第 3。全后端 589 passed、Ruff check/format 通过。这只是两个具体检索缺口的改进，不证明普遍召回率。
+- 已改私有文档列表 API 与页面，显示可用视觉解读数量及未核验状态，去掉对已生成解读的“图表内容暂不可用于问答”错误提示；OpenAPI 同步。全后端 587 passed，Ruff check/format、Web typecheck/build、浏览器全量 E2E 72/72 通过。Windows 全库 Prettier 因仓库既有 26 个文件的 CRLF 差异不通过，本轮改动的两份 Web 文件单独检查通过。
+- 用户要求以可在页面演示的完整功能为一个 PR，全部测评收敛为一个完成 PR。GitHub 上原有连续堆叠的 #23–#45 共 23 个 Draft PR 已关闭、均未合并；远端分支和提交历史保留，最新累计代码在 `codex/accurate-agent-service-status`，其修正后 PR #45 CI backend/web（含 Browser E2E）/container 全绿。此后不按单一修复或单次测评新建 PR。
+- 剩余三项测评门：①真实 MinerU 解析与图表定位/事实核验（含可复核页面参考和错漏分桶）；②同一 MinerU 语料的检索→证据→Agent 回答端到端验收；③足够规模、独立复核的冻结题集上比较 chunk/BM25/rerank，涵盖延迟和错误案例。现有 6 题 pdfplumber 候选向量诊断只说明当前小样本不应切换生产默认，不能替代这三门。未达门槛前不声称质量达标、不部署上线。
+- 本机首次用标准输入调用 MinerU advanced 时，Windows PDF 渲染子进程因入口不可导入而退出；改用已有 `app.cli.parse_private_pdf` 模块入口后，一份 6 页已入库私有 PDF 在本地完成 `mineru-4.1.7-papertrail-v11` advanced 解析，输出 97 元素、7 个 figure，且 `_extract_visual_evidence` 可提取 7 项 `model_generated_unverified` 描述。结果仅在 ignored `.local`，无外部 provider 调用、不改原数据库；这些页面是图形区域，尚未核定为统计图表或验证描述正确性。
+
+## 2026-11-13 科研助手状态显示修正（PR #45 已关闭、未合并，最终 CI 通过）
+
+- 后端 `/api/health/ready` 只验证应用与 SQLite，`checks.llm=configured` 不探测模型连通性；旧 Web 顶栏却显示“后端已就绪”，容易被理解为 Agent 可用。现在显示“后端已连接 · 模型未验证”；当后端报告 `checks.llm=disabled` 时显示“后端已连接 · 模型未启用”。不添加自动模型探测，避免页面加载产生额外 provider 调用或费用。
+- 浏览器回归先复现旧文案，再验证禁用模型状态显示正确；Web typecheck/build 与 69/69 浏览器 E2E 通过。首个 PR CI 的 Web job 因新增测试的 Prettier 换行格式失败，按 CI 要求修正后新一轮 backend/web（含 Browser E2E）/container CI 全绿。Windows 全库 Prettier 对 27 个文件报格式差异，未因此批量改动无关文件。这个改动只修正状态语义，不代表模型服务实际可用，调用失败仍通过现有错误码显示。
+
+## 2026-11-13 正确单篇范围候选向量实测（PR #44 runner，PR #45 结果记录）
+
+- 用户重新明确授权后，零外传预检核对 9 篇、6 题、2,221 个候选 ID、824 段新文本（690,259 bytes）与 6 题（404 bytes）；`source_scope=exact_arxiv_id_per_task`、最多 14 批、字节费用估算 `$0.01381326`、CLI 上限 `$0.02`。真实执行完成 14 批，provider 返回 170,342 input tokens，按配置价格估算本次 `$0.00340684`；缓存 14/14，原用户库 SHA-256 不变。
+- 六种 chunk 臂的真实候选文本向量 rerank 均低于配对 BM25；1,800-byte/0 overlap 的 MRR@8 `.417` vs `.622`、NDCG@5 `.438` vs `.712`、完整 span coverage `.5` vs `1.0`。36 个 task/arm 的 top 排名逐项核实仅来自该题指定论文，候选列表最多 128。保持 BM25 与现有 chunker 为生产默认。六题是 single-reviewer selected-span、源解析器为 pdfplumber v27；报告 `quality_claim_allowed=false`，不能据此断言一般 RAG、MinerU 或图表质量。旧超时请求费用仍未知。详见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+
+## 2026-11-12 真正候选向量 × Chunk 配对诊断修正（PR #44 已关闭、未合并，CI 通过）
+
+- 用户另行授权同一 9 篇获准来源的 6 道冻结题候选向量评测。第一次本机脚本把九篇全库 BM25 top-128 与 manifest 规定的单篇任务范围混用；虽完成 19 次 provider 调用、214,826 input tokens（按配置价估算 `$0.00429652`），其报告的 rerank 数字**无效，不能与基线配对或选型**。原数据库 SHA-256 不变，报告和脚本仅在 ignored `.local`。
+- 修正后的单篇范围只读预检为 2,221 个候选 ID、824 段新增去重文本 / 690,259 UTF-8 bytes；连同六题 404 bytes 的费用估算上限 `$0.01381326`。真实请求中途 `timeout`，未写报告；旧脚本无分批向量/用量持久化，因此本次已调用批数和费用未知，不在旧上限下盲重试。尚无有效真实候选向量 rerank 分数。
+- 新增正式 `tools.evaluate_true_candidate_rerank`：遵循 manifest 单篇/全库范围，BM25 前 128 候选按精确文本复用活动向量；默认零外传 dry-run，live 要显式确认和题数/文本数/字节/费用上限。每批请求前在 ignored `.local` 写入保守字节预算账本，成功批次原子保存哈希和向量以支持续跑；失败后旧授权余额不足时拒绝盲重试。真实隔离库 dry-run 重得 2,221 候选 / 824 新文本 / 690,259 bytes，0 provider calls；定向 synthetic 4 passed、全后端 587 passed（1 条既有 Starlette warning），Ruff check/format、OpenAPI SHA（未变）、diff check 通过。旧失败脚本的未知用量无法由新缓存恢复，本轮不再外传。独立 Agent 复核因账号使用额度限制未完成，不计为验证；生产默认不变。详见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+
+## 2026-11-12 获准语料实时向量索引与 Rerank 诊断（PR #43 Draft，CI 通过）
+
+- 用户更新本机凭据后，受控问题探针确认 `text-embedding-3-small` 可用；同一已授权的 9 篇 / 3,294 chunks 在忽略目录隔离副本完成 1536 维索引。Provider 返回 212,879 input tokens；按配置价估算 `$0.00425758`，不是实际账单。原始用户 DB SHA-256 仍为 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`。
+- 六条已授权查询一次调用共 92 tokens，估算 `$0.00000184`；隔离报告 `backend/.local/chunk-rerank-live-v1.json`，不提交论文、向量或查询。1800-byte/0 overlap 的 BM25 MRR@8 `.622`、NDCG@5 `.712`、span coverage `1.0`；父 chunk 向量代理 rerank 分别 `.417`、`.439`、`.5`，在此六题退化，不能设为生产默认。报告仍是 single-reviewer selected-span 诊断，`quality_claim_allowed=false`。
+- 其余五个 chunk 臂未得到 rerank 分数：62–132 个候选跨越两个现有父 chunk，严格的一对一 span 映射拒绝把父向量冒充真实子向量。要作有效跨 chunk rerank 对照仍需子 chunk 向量及独立授权/评测；当前结果也不是 MinerU 质量结果。完整记录见 [Chunk 策略评测](research/chunk-strategy-evaluation.md)。
+- 追加只读输入核对：即使在 1800-byte/0 overlap 臂，活动索引 2,946/3,294 个 `text` 与评测候选 `text` 不同，尽管 `evidence_text` 3,294/3,294 相同。当前向量代表被索引的父输入，负面结果不能外推为对真实子 chunk embedding 或 cross-encoder 的否定。
+- 连通性检查时短暂的 `provider_unavailable` 暴露出 chunk 评测 CLI 未捕获 `EmbeddingError`，会输出 traceback；新增先红后绿的 fake-provider 回归，现只输出安全错误码、非零退出且不写报告。定向 CLI 4 passed、全后端 583 passed（1 条既有 Starlette warning），Ruff check/format 与 OpenAPI hash（未变）通过；PR #43 backend/web（含 Browser E2E）/container CI 全绿。独立复核确认报告数字与口径一致，并建议将跨父边界计数标为单独只读审计，已更新说明。
+
+## 2026-11-12 MinerU 图表定位评测（PR #42 Draft，CI 通过）
+
+- 图表 page audit 增加可选的同页归一化预测/人工框，严格校验 0–1 坐标、非零面积与框数等于对应 chart count；review pack 保留预测框来源并导入人工框，现有 reviewed-content hash 检测导入后改动。报告在 IoU ≥ 0.5 下做一对一最大匹配，独立于原 count metrics 给出定位 precision/recall/F1、已评/未评页数和评测覆盖率；缺框时返回 null，不冒称测过定位。
+- TEST 合成数据覆盖同页计数正确但位置错、重复预测只能匹配一个人工框、漏框、越界/无效框；定向 10 passed、全后端 582 passed，PR #42 backend/web/container CI 全绿。独立代码复核未发现 blocker；审阅包哈希只检测内容漂移，不认证人工身份。真实 MinerU 人工框集和图表事实金标尚未建立，不能宣称解析定位准确率。
+
+## 2026-11-12 Rerank 索引预算预览与外传门（PR #41 Draft，CI 通过）
+
+- 增加 parent-embedding rerank dry-run：只读核对当前批准语料向量覆盖、维度和查询数/费用；不建 provider、不写报告、不传数据。隔离副本的 9 篇/3,294 chunks 实测全部缺向量；6 条查询上限为 404 UTF-8 bytes、`$0.00000808`，补索引全文的字节费用估算上限约 `$0.01651788`。两项都未调用 provider；本地原 DB SHA 不变。
+- 给全文向量索引 CLI 加 dry-run、`--confirm-data-transfer`、必填 `--max-chunks` 和 `--max-cost-usd`，只处理缺失向量；UTF-8 字节估算超上限、输入过长或预算/题数未提供时在 provider 前拒绝。dry-run 即使 provider disabled 也可用。无维度配置时预览标为未验证且索引不可执行。
+- 用户授权本次只针对 9 篇获准来源执行外传。初次和用户更新本机 `.env` 后的重试均在首批收到 `authentication_failed` 后停止；服务端未返回 embedding/usage，本地未写入向量。原数据库 SHA 仍为 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`，隔离副本 hash 也未变化。当前 key 对 embeddings endpoint 仍无效或无权限；需在本机配置有效的 embedding API 凭据后继续，不能在聊天中发送。
+- 诊断修复：embedding 客户端先前把 HTTP 401/403 合并成同一错误码；现在分别报告 `authentication_failed` / `permission_denied`，并已将 403 安全码接通 Harness warning，便于确认凭据与项目权限问题，不在本轮额外发请求。
+- 用户再次配置后，隔离库预览仍为 3,294 chunks / 825,894 UTF-8 bytes；本次进程明确使用此前授权的 `text-embedding-3-small`、1536 维及 `$0.02`/百万 tokens，未采用 `.env` 中已改为 `text-embedding-3-large` 的模型。真实首批请求由新错误分类明确返回 HTTP 401 `authentication_failed`；仍无向量或 usage。当前 `.env` 的 key 无法用于 `https://api.openai.com/v1/embeddings`，需用户在本机更换有效的该 endpoint 凭据。
+- 401/403 映射与 Harness 传播回归共 95 项通过；全后端 `580 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format、OpenAPI hash（未变）、pip-audit 与 diff check 通过。PR #40 基础提交及 PR #41 最新错误分类修复提交的 backend/web/Browser E2E/container CI 全绿；PR #41 保持 Draft，未合并。
+- 当前索引及 rerank 臂仍未跑，不能比较 rerank 效果。PR #40 的 overlap 六臂与本次 dry-run 均为探索诊断，不改变线上默认。
+
+## 2026-11-12 Chunk size/overlap 选型对照（PR #40 实现中）
+
+- 评测 evaluator-only 的 0%/最高 10% overlap × 900/1200/1800-byte 六臂；重叠以 UTF-8 bytes 计算并对齐空白边界，仅用于段落/图注文本，不改变默认导入配置，也不重叠结构化表格行。报告 schema 升为 v3，记录 overlap 上限。
+- 本机只读回放冻结 v27 的 9 篇获准来源和 6 个 selected-reference 任务：1800-byte 两臂 span coverage 均 1.0，overlap 仅让 MRR@8/NDCG@5 小幅上升；900-byte overlap 的 NDCG@5/Recall@5 下滑；1200-byte 两臂得分接近。没有足够样本决定生产配置；Rerank 因无 query embeddings 未运行，provider calls=0。
+- 本机报告仅存 ignored `.local`，source DB SHA 保持不变；全后端 `577 passed`（1 条既有 Starlette 弃用 warning），Ruff/OpenAPI/pip-audit 通过。独立 reviewer 已复核 overlap 算法；新增 1200-byte arm 的复核待回。真实 6-task 小样本只支持探索诊断。PR #40 初始 commit 的 backend、web/Browser E2E 与 container CI 全绿；最新矩阵更新待 CI。
+
+## 2026-11-12 MinerU 图表 LLM-as-judge（PR #39 实现中）
+
+- 为人审后的 MinerU chart-task 集新增独立预算化 judge：只对 document-held-out test 的已裁决题运行，限制 judge model 与 candidate model 不同，结构化匹配预测事实与人审 reference IDs，并评价语义相关/事实忠实和 abstention；schema 校验每条预测/参考恰好归类一次。1/3/5 分有明确跨题锚点，Judge 不能改写参考标签，报告永不允许质量声明。
+- `--execute` 默认关闭；实跑另需 `--confirm-data-transfer`、不同模型、调用数和本地预估费用上限。只发送问题、候选事实和人工参考，不送页面图像、PDF 或解析报告；Judge 被要求把 JSON 中所有字段值视作不可信数据。先估计全量运行费用，超过 cap 则 provider 建立前拒绝；执行期间仍逐请求预留预算，cap 不是服务商硬限额。synthetic live 调用失败关闭。
+- 增加预算保护器的明确 halt reason 到 partial 报告，避免只显示泛化 `ModelUnavailable`；7 项定向测试通过（含费用预检触顶且 0 provider calls）；全后端 `576 passed`（1 条既有 Starlette 弃用 warning），Ruff check/format 通过。OpenAPI SHA 与依赖审计此前已通过，本次改动不触及契约/依赖。PR #39 最新 commit backend、web（含 Browser E2E）、container CI 全绿。
+
+## 2026-11-12 MinerU 图表事实评测协议（PR #38 实现中）
+
+- 新增本地离线 chart-task 评测核心：页级图表任务绑定 PDF/解析报告/页面图像 SHA、parser version、页码、element ID 与 bbox；来源需权利确认，页面图像 hash 在导出/导入时核对；同一 PDF 不可跨 dev/test。人工标签区分 answerable、unanswerable、uncertain；按 axis、series、数值（单位 + 人审绝对容差）、trend、comparison 分桶计算一对一 precision/recall/F1 与 abstention accuracy；另有 page-audit 对照人工图表数量，报告计数指标、逐页准确率和漏图页率。
+- 新增严格的人审 pack export/import/evaluate CLI；必须完整审核、显式 `--confirm-human-review`、新文件写入，数据集/报告始终声明 `gold_standard=false`、`quality_claim_allowed=false`。评测校验导入时记录的源 dataset/review pack/评分内容 hash，阻止复核后静默改预测或标签。`rights_attested` 与源 PDF/parser report hash 是 operator 声明，CLI 只校验本地图像 hash，不独立验证原 PDF/许可。synthetic tests 验证指标/容差/不确定样本、论文级隔离、来源和页面 hash；不产生实际 MinerU 质量结果。
+- 定向 8 passed、全后端 569 passed（1 条既有 Starlette 弃用 warning）；Ruff check/format、OpenAPI export（hash 未变）、pip-audit 与 `git diff --check` 通过。独立 reviewer 复核 digest / split 保护后无 blocker；page count 指标不评价图框 localization。
+- 真实图表 qrels 仍未人审；当前 4 个本机 AI-assisted 候选不是金标。本协议当前不做 LLM-as-judge 或外部 provider 调用；后续 judge 必须沿用数据外传确认与费用预算，并且不得替代人工参考标签。
+- 独立复核 Agent 对本机 4 个 AI-assisted 图表候选做了二次审阅：图表关联 4/4 合理、候选事实 2 项支持 / 1 项部分支持 / 1 项仅宜定性估读；未发现无法回答题。该结果仅为 AI-assisted 未核验诊断，未比对像素级 bbox，不能导入成人工标签或宣称图表解析准确率。报告留在 ignored `.local`。
+
+## 2026-11-12 Chunk × Rerank 配对评测（PR #36 Draft，CI 通过）
+
+- Chunk evaluator 增加 900/1,800-byte × BM25/父 chunk embedding proxy rerank 的可选配对诊断；子 chunk 只有在来源、内容 hash、page/element/type 与半开字符区间唯一包含映射到当前 chunk 时才借用其已存向量，候选预算按唯一父 chunk 计算，平分时保留 BM25 顺序。它明确不是 child dense 或 cross-encoder。
+- embedding 路径复用已有显式数据外传确认、题数预算、正费用上限；只向配置的 embedding provider 发送 query，不发送全文/候选 chunk。BM25 默认 0 provider calls。当前未获本轮 query 外传确认，真实 rerank 臂尚未执行。
+- 全后端 561 passed（1 条既有 Starlette 弃用 warning；Windows 系统临时目录 ACL 不允许 pytest 枚举，使用忽略目录 `.local` 作为 basetemp 通过）；Ruff check/format、OpenAPI 导出（SHA-256 `79ae0865e3c382e1f20dfe04b7f1a5573c1d77ac19b45bc439fdbb9d46a585c3`）、pip-audit、`git diff --check` 通过。PR #35 最新 f23a0a7 的 backend/web/container CI 通过。
+- 本轮 BM25 复跑冻结 v27 9 篇许可源 / 6 条 single-reviewer selected-span 任务，排序指标与 PR #35 一致；全候选排序时延本次 mean/p95：1,800-byte 1.03/2.69 ms、900-byte 1.46/4.52 ms，仅作机器诊断。仅在 ignored `.local` 副本迁移 schema 22→23，原库 SHA-256 保持 `C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`。报告 `quality_claim_allowed=false`、query embedding provider calls 0；来源为 pdfplumber，不是 MinerU。
+- 独立 reviewer agent 在本地视觉抽查 3 篇已权利确认的 MinerU v11 私有 PDF：9 个有图页、16 个 figure chunk 的图注、页码、bbox 均可对应，未发现明显漏识别或错页。此项是 `ai_assisted_unverified` spot check；现有条目无图表轴/图例/数值/趋势独立标签，不能称人工金标或 MinerU 图表理解准确率。
+- 独立代码复核对 PR #36 未发现阻断项；最新 `4665b68` backend/web/container CI 全部通过，保持 Draft、未合并 main。图表事实候选集仍仅在本地 ignored 路径，不进入 PR。
+
+## 2026-11-12 私有论文图注检索修复（PR #37 Draft 前验证完成）
+
+- 真实私有语料回放发现：MinerU v11 的 16 个 figure caption chunk 已入库，但 `PrivateDocumentService.search_evidence` 与表格一起排除 figure；该数据库又无 advanced visual evidence，caption 精确查询只有 0/16 自身 figure 命中。
+- 最小修复是把私有 figure 原文图注重新加入只读 BM25 候选，同时继续排除未经结构化许可的 table。TEST 回归覆盖图注检索、工具观测保持原文图注、其他账号不可见、table 仍不可检索；定向 private document 测试 8 passed。全后端 561 passed；Ruff check/format、OpenAPI SHA、pip-audit、diff check 通过。
+- 同一 ignored schema-23 只读副本，3 篇 rights-attested MinerU v11 来源、16 个图注自查询在 limit 5 与 8 下均 16/16 命中；这是检索链路 smoke diagnostic，不是独立相关性金标，也没有图表数值/趋势准确率结论。原始数据库 SHA-256 未变化，未发生 Provider calls。新增高级 MinerU caption-only 回归分别验证 source-exact caption 与 `model_generated_unverified` 视觉解释的类型/ID，及跨账号隔离；独立代码 reviewer 未发现 blocker，并确认两种证据是有意区分展示。PR #37 Draft 已创建，backend、Web Browser E2E、container CI 全部通过，未合并。
+
+## 2026-11-12 真实获准语料 Chunk 对照（PR #35 Draft，CI 通过）
+
+- 本机冻结 v27 快照的 9 篇已批准 CC-BY-4.0 来源、6 条单 reviewer selected-span 任务已在只读快照执行 900/1,800-byte 对照。原 DB schema 22 不能被当前代码只读打开，故只在忽略目录临时副本上迁移到 schema 23；原库 SHA-256 前后不变，0 provider calls。评测 manifest SHA-256 `87db19bece61ca54190b5b634ee0a0f731e3c5c0972acd9fdedf4b3f23e461a5`，本地报告位于 ignored `.local`，不提交。
+- 1,800-byte 对照：3,294 chunks，Hit@1 .500、MRR@8 .622、NDCG@5 .712、Recall@5 1.000、完整选定 span 覆盖 1.000、BM25 mean/p95 1.71/4.70 ms。900-byte：3,575 chunks，分别 .333、.561、.620、.917、.833、2.12/6.15 ms；其 Hit/Precision/Recall@3 更高（.833/.278/.750 vs .667/.222/.667）。小样本 selected-reference 指标不可称 gold 或泛化结论，不据此换线上默认。
+- 发现 1 条历史 chunk anchor 失效；现仅在原 PDF SHA 相同且历史 exact evidence text 能唯一映射到当前同页/同元素类型时安全重定位（1/6），否则失败关闭。定向存储/评测回归覆盖只读和精确唯一映射。当前 local 9 来源均为 `pdfplumber-layout-v27`，因此这不是 MinerU 或图表准确率评测；MinerU parser/图表集与 Chunk×Rerank 联合实验仍未完成。
+- PR #35 的 backend、web 与 container GitHub 检查在 `ad6cfcf` 全部通过；PR 保持 Draft、未合并，基于 PR #34。
+
+## 2026-11-12 Harness 外部检索授权边界（PR #34 Draft，CI 通过）
+
+- 独立复核发现任务分类将“不要联网 / without online search”仍视作联网请求，且 runtime 只要求模型引用问题原句，否定原句也能满足该条件。现共享同一肯定意图解析器，并在 Harness 分类与 runtime 真正执行 OpenAlex/arXiv 前双重校验；模型计划还必须匹配用户明确授权的来源。
+- 覆盖中英文否定、单一拒绝来源与另一来源明确授权，以及拒绝联网/跨来源计划时不调用外部 Registry。先行回归 5/5 复现失败，修复后全后端 552 passed；Ruff check/format、OpenAPI 与 pip-audit 通过，1 条 Starlette 弃用警告为既有项。PR #34 最新代码的 backend/web/container CI 均通过，保持 Draft、未合并。
+- Harness 只读复核另确认 function tool schema 和 Pydantic 双重拒绝额外字段、工具名称白名单、文档范围约束整体成立；否定外部意图是已确认的可执行范围缺口。
+
+## 2026-11-12 Chunk 策略只读对照（PR #33 Draft，CI 通过）
+
+- PDF chunker 增加只读候选参数，默认生产版本仍固定 1,800 UTF-8 bytes；评测在内存比较 900/1,800 两档，不写入数据库、不换当前线上 chunker。引用锚点按来源 hash、page、element/type、bbox 与 element-local 半开字符区间校验，候选 qrel 以同一元素中与选定 span 重叠映射；报告 Hit/MRR/NDCG/Precision/Recall、完整 span 覆盖、chunk/index build 和 BM25 search 时延。
+- `list_current_fulltext_elements` 仅允许只读 store，限制单篇 25 MB、50,000 元素；评测限制总元素 50 MB、总候选 50,000，并校验许可和冻结 parser/hash 清单。MinerU generated visual description 不进入原文切块，精确图注保留；表格仍结构化按行/表头切分。
+- 新增 TEST 合成分块、表格 locator、视觉描述隔离、锚点 span 覆盖和只读 DB hash 不变测试。全后端 542 passed、Ruff check/format、OpenAPI export、pip-audit 通过。格式检查初次发现并修复新模块排版后再次通过。
+- 当前没有可用本地授权全文数据库，不能运行真实对照、选出生产 chunker 或宣称质量收益；任务集仍是单 reviewer selected span，不是 gold。Chunk/Rerank 联合臂和人工复核集仍未完成。设计限制见 [Chunk 策略对照说明](research/chunk-strategy-evaluation.md)。
+
+- 复核发现 900-byte 臂可能被超宽表头阻断，已改为仅将该臂报告 unavailable，并保留 1,800-byte 当前臂；全后端 542 passed，定向 98 passed。PR #33 的 backend、web、container CI 在最新 `def60ff` 全部通过，保持 Draft、未合并。
+
+## 2026-11-12 检索 rerank 实验臂（PR #32 Draft，CI 通过）
+
+- 冻结索引的只读 AI 标注评测现在提供 `bm25_dense_rerank`：BM25 前 128 候选再以已索引 embedding cosine 排序；不新增模型依赖或第二次 provider 调用，候选外证据无法被恢复。它是 dense-vector rerank，不是 cross-encoder，也未改变线上 Agent 的工具协议或默认方法。
+- 报告记录 reranker 类型/候选上限、embedding 模型与不含 query embedding provider 时间的检索时延；AI 标签和 synthetic 测试仍声明 `quality_claim_allowed=false`。真实许可语料尚未在当前 worktree 可用，因此没有真实四臂结果或策略胜者。
+- 本轮定向 37 项、全后端 534 项通过；Ruff check/format、OpenAPI 导出、pip-audit 通过。pytest 必须显式指定仓库忽略的 `backend/.local/pytest-rerank-full-20261112-01` basetemp，Windows 系统 temp ACL 会导致默认路径 setup errors。
+- 实验协议与限制见 [检索 rerank 对照说明](research/retrieval-rerank-experiment.md)。PR #32 backend/web/container GitHub CI 全通过且保持 Draft；Chunk 策略对照现由 PR #33 在只读内存中实现，真实四臂 rerank 对照仍待获准语料。图表解析准确率仍缺获准且人工核对的样本集。
+
+## 2026-11-12 MinerU 视觉证据接入（PR #31 Draft，CI 通过）
+
+- MinerU advanced 的图表/图片生成描述现通过新的独立 SQLite 表按账号、文档、解析器版本、PDF hash、页码和 bbox 保存；仅接受 adapter 添加的 `model_generated_unverified` 标记及 `chart_body`/`image_body` 字段，不把生成结果拼进 source-exact chunk 或 embeddings。每份文档最多保存 128 项，每项描述最多 2,000 字符；检索预算按账号最多 20 篇文件计算为 2,560 项。
+- 私有 BM25 可命中该独立描述；Agent schema 使用 `visual_analysis` / `visual_description`，引用卡片区分“MinerU AI 图表解读 · 未核验”和原文图注，按文档账号隔离，删除时级联清除。Standard 没有生成标记/描述时不会写入该表；表格仍不开放。
+- 新增 TEST 合成端到端回归，确认仅允许的 chart body 字段被检索、base64/其他字段不入索引、其他账号不可见、引用保留未核验类型、最终 claim contract 拒绝未标记的生成内容、删除级联；parser 顶层 warning 也记录未核验视觉内容。独立复核发现并修复了账号聚合视觉候选上限与顶层 warning 遗漏。
+- 仓库全局 `pnpm run format:check` 在 Windows 当前 Prettier 环境仍报告 26 个未修改文件格式不符；本轮触碰的三个前端文件单独检查通过。没有批量格式化无关文件。PR #31（https://github.com/ZXN1225/papertrail/pull/31）Draft 保持未合并；后端、Web、container GitHub CI 均通过。
+- 尚不能把生成图表描述视为经过验证的科学事实；没有真实许可 MinerU 图表集、图表数值读取/趋势识别准确率或 MinerU/pdfplumber 对照结果，因此仍不能据此宣称 MinerU 解析质量达标或部署就绪。
+- Firecrawl 只读参考研究与适配原则见 [Agent 与论文证据设计参考](research/agent-and-evidence-design-references-2026-11-12.md)。
+
+## 2026-11-12 MinerU advanced 图表分析开关（PR #30 草稿，CI 通过）
+
+- MinerU 解析器原来把 `image_analysis` 固定为 false，私有 PDF worker 也忽略 `PAPERTRAIL_MINERU_TIER`。现在仅在显式选择 `advanced` 时开启图像/图表分析，标准档仍关闭；私有 worker 转发所选 tier。解析器返回中的 advanced 视觉输出留在结构化数据并标为 `model_generated_unverified`，不会混入可逐字引用/检索文本；私有索引当前不持久化/检索这类视觉描述，来源 caption 仍作为独立文本。
+- 合成 chart fixture 验证 standard 关闭、advanced 开启、页/区域结构化留存及生成描述不进入 source-exact chunk；私有 worker tier 转发回归通过。定向后端 81 项通过（其中 parser/private worker 80 项、CLI 1 项），Ruff check/format 通过。
+- 全后端 532 passed，OpenAPI 导出、pip-audit 与 diff check 通过；PR #30 backend、web Browser E2E、container CI 全绿，Draft 堆叠于 PR #29、未合并。
+- PR #31 正在实现独立类型化视觉证据检索；真实 MinerU 图表样本的数字/趋势准确率评测仍未完成。
+
+## 2026-11-12 MinerU 评测解析器版本解锁（PR #29 草稿，CI 通过）
+
+- 两套只读全文评测原先仅接受 `pdfplumber-layout-vN`，与 MinerU 实际产生的 `mineru-<version>-papertrail-vN` 不兼容，导致 MinerU 索引无法进入已建的检索评测链路。现统一接受这两类明确版本化的 PaperTrail PDF parser 标识；未知 parser 仍拒绝，且运行时仍逐字比对 manifest 与活动索引版本、许可及内容哈希。
+- 新增 MinerU v4.1.7 / PaperTrail adapter v11 的全文检索与 AI 标注任务回归，并验证未知版本失败关闭。全后端 530 passed，Ruff check/format、OpenAPI 导出、pip-audit 与 diff check 通过；PR #29 backend、web Browser E2E、container 检查全绿，Draft 堆叠于 PR #28、未合并。首次全量 pytest 受系统临时目录 ACL 阻断；改用忽略目录 `backend/.local` 后重跑全绿。既有 Starlette 弃用警告仍存在。
+- 这只是评测兼容性修复，不能证明 MinerU 解析、图表语义或 RAG 检索质量。当前分支未发现可复跑的真实获准 MinerU 语料；真实 R01-R03 manifest 仍固定于 pdfplumber v27。现有 MinerU 图表路径保存图注/区域关系，不等于已读取图表数值。下一步需建立解析器/图表分桶的同源对照集，再比较 chunk 与 rerank；质量门槛之前不部署。
+
+## 2026-11-12 PR #28 公开发现有界分页（实现与验证中）
+
+- 公开论文发现任务支持 OpenAlex 与 arXiv 有界分页，计划最多请求 25 条，每页至多 10 条；每页是独立白名单工具调用，按现有工具预算、trace、取消与超时策略执行。arXiv 精确 ID 查询不做无效翻页；若用户明确要求超过 25 条，返回上限内已取得结果但标为不完整并提示分批检索。
+- 用户要求数量未达到、任一页来源失败或仅部分来源可用时保留已取得的可追溯记录，但任务标为 `insufficient_evidence` 并提示部分结果；成功条件仍要求达到计划数且没有来源失败。
+- 新增 OpenAlex 完整三页、arXiv 空页、来源中页失败、工具预算耗尽后保留已取结果及超过最大结果数时不误报完成的 runtime 回归；后端 526 passed，Ruff/OpenAPI/pip-audit 与 diff check 通过。独立复核发现并修复了预算耗尽时早期结果被丢弃的问题；PR #28 backend、web Browser E2E 和 container CI 全部通过，Draft 堆叠于 PR #27、未合并。
+
+## 2026-11-12 PR #27 同题 BM25/Dense/Hybrid 诊断
+
+- AI 标注任务评测 CLI 支持同题 BM25/Dense/Hybrid；BM25 默认零 Provider 调用。Dense/Hybrid 要求显式确认查询外传、完整题集 embedding 数预算与正费用上限，并在请求前以 UTF-8 字节数预估；报告区分 retrieval 与 embedding provider calls 和按配置单价计算的费用。
+- 对比及单方法报告保留 AI 标签、非金标和 `quality_claim_allowed=false` 限制，向量仅存内存。后端 521 passed，Ruff/OpenAPI/pip-audit 通过，独立复核无 blocker；PR #27 backend/web Browser E2E/container 均通过，Draft 堆叠于 PR #26、未合并。
+- 限制：批次中途 provider 失败时不一定返回已计费用量；费用上限是调用前估算门控，不是提供方账单核验。跨论文多跳仍未建模。
+
+## 2026-11-12 检索评测指标与多证据覆盖
+
+- 修正公共 `MRR@k` 截断语义，k 之后才命中的结果不再被计入；relevance grade/cutoff 限为有限的 0–3 整数与正整数，检索返回非有限分数时失败关闭。为 AI 标注任务报告加入 MRR、NDCG、precision/recall@k 与显式多证据完整覆盖率。unanswerable 结果字段改为“是否返回词法候选”，避免把检索候选误称为生成错误。
+- AI 标签集构建器可带 2–8 个唯一 `required_evidence` 锚点逐个核验来源、版本、位置和原文；缺少这些锚点的旧 multi-hop 任务在报告中标为完整覆盖率未测量，不推断缺失的 qrels。仍明确为 AI 标注诊断，非人工金标或通用检索质量证明。
+- 定向回归验证 MRR cutoff、无效数值拒绝、所有必要 evidence 漏失/覆盖与未测量分母；构建器和当前标签模型只表达单论文内多证据任务，跨论文多跳仍未覆盖。全后端 516 passed；Ruff/OpenAPI/pip-audit 通过，PR #26 GitHub backend/web Browser E2E/container CI 全绿，保持 draft、未合并。
+
+## 2026-11-12 PR #23/#24 与个人研究工作区
+
+- PR #23 的 backend/web Browser E2E/container 检查全部通过；Playwright 改为仅安装 Chromium，避免 runner apt DNS 故障。PR 保持 draft、未合并。
+- PR #24 增加默认零调用的预算化盲评 CLI；后端 361 passed，Ruff/OpenAPI/pip-audit 通过，独立复核无阻断项；GitHub backend/web E2E/container 全部通过。PR 保持 draft、未合并。
+- Agent/个人研究工作区批次已分离至 PR #25 草稿分支，包含账号/会话/个人文档隔离、PDF 导入、任务分类与自适应 Harness、Coverage 缺口服务端披露及相应 Workspace UI。原工作区仍保留所有本地状态。
+- 本批次原工作区验收：后端 497 passed；Web format/typecheck/build、E2E 66/66（375/768/1440px）、audit 通过。Coverage 逻辑独立复核通过。PR 分支复核确认上传配额已由 SQLite `BEGIN IMMEDIATE` 串行保护；新增并发回归，删除改为文件改名暂存、数据库失败时恢复，并在启动恢复中断删除。PR 分支后端 506 passed，Ruff/OpenAPI/pip-audit 通过；Web format/typecheck/build、E2E 66/66（375/768/1440px）和 audit 通过；PR #25 GitHub backend/web Browser E2E/container CI 全绿，保持 draft、未合并。
+
+## 2026-11-11 Agent/RAG 架构改进启动
+
+- 完成对参考仓库 README 与 evaluation 方法文档的审阅：借鉴解析/检索节点化、BM25+dense+RRF+条件重排+证据门、确定性事实层与 LLM 规划表达分离、按桶指标和 judge/DB 双评；暂不直接引入 LangGraph，先比较其 checkpoint/条件图对当前本地许可全文系统的实际维护收益。
+- Agent 增加 coverage 节点与有界补查。复核发现模型可能忽略传入草稿的缺口、预算紧时覆盖检查会跳过、重复补查会误计为已处理；现由服务端标记覆盖阶段状态、去重并在最终回答/状态强制披露未解决缺口。runtime 定向测试 37 passed，Ruff 通过；当前其余工作区代码仍需整合后全量验收。
+- 新增架构/评测复核文档。零人工候选生成标为弱监督，不冒称 gold；评测助手初版可从 chunk 生成检索候选并报 Precision/Recall、MRR/NDCG，但还没有跨文档隔离、多任务桶、LLM judge 端到端和基准集构建闭环。
+- 初始审计发现本地工作区混有 149 项历史变更，现按功能逐批隔离，避免将缓存、全文或复核报告放入 PR。
+
+## 2026-11-11 基于覆盖缺口的补充检索
+
+- 本地分析任务在首次检索后加入 Coverage 判断，模型根据问题与已取片段提出针对缺口的文档限定查询；仅允许原计划内的账号文档，最多一轮、四个补充步骤，并受剩余工具预算约束。保留 Draft/Review 所需的两次模型调用；预算不足时不启动补查。
+- 这解决固定一次检索后直接回答的流程限制，不代表已全文通读。当前仍不提供逐页/整节读取，表格/图片隔离规则保持；复杂任务可能仍有覆盖缺口。34 项 runtime 回归与 Ruff 通过，含补查执行和越界拒绝；本轮未对截图真实两篇论文完成质量评测。
+
+## 2026-11-11 纯论文发现完成条件修复
+
+- 新增内部 discover 计划意图，区别于综述 search。纯公开发现直接渲染本轮来源记录，按请求数量和来源成功情况判断完成，不再以全文缺失、模型生成额外结论未通过复核导致失败。分析和综述保留原证据复核。
+- 截图原句真实复测 completed，2 条 OpenAlex 来源，只有 Plan + search_openalex_works；32 项 runtime 测试与 Ruff 通过。查询匹配结果不等于人工相关性评测。当前单轮发现最多 10 条，未满足数量或来源时明确提示。
+
+## 2026-11-11 模型不可用与旧进程复查
+
+- 使用当前配置真实运行截图中的 OpenAlex 查询，Plan、工具、Draft、Review 均成功；最终为 insufficient_evidence，说明调用链恢复可执行，但该次答案未满足全部证据要求，不作为科研质量通过。
+- 查明本机 8001 后端为无热重载的旧常驻进程，现已重启以加载当前代码，并将 stdout/stderr 写入本机忽略的日志文件；ready 通过。旧进程内存注册表与更新后的 Skill 文件不一致可能导致检索后中断，历史异常栈缺失，不能断言历史根因。
+- Runtime 区分模型认证、限流、连接、超时、请求拒绝和响应异常的提示；SkillLoadError 转为可解释的 workflow_incomplete，不再逃逸为通用中断。45 项 runtime/skills 测试与 Ruff 检查通过；测试临时目录改用本机 .local 以绕过系统临时目录权限故障。
+
+## 2026-11-11 Agent 后端故障复查
+
+- 两张截图中的 OpenAlex 运行在工具阶段恰好耗时约 4 秒后报错；发现 Agent 专用 OpenAlex 客户端设置了 4 秒超时且禁用重试，而发现页使用默认 12 秒超时和重试。当前已将 Agent 调整为 12 秒、最多 1 次重试；用截图相同查询现场调用白名单工具成功返回 5 条记录。该复测不证明历史失败必定全由超时导致，但耗时与配置吻合。
+- 本地稿件运行在全文检索成功后、草稿模型步骤记账前中断；既有运行记录不保存异常栈，无法从历史数据确定该次未捕获异常的具体代码行。后端现在对新中断记录脱敏 traceback 的文件/行号/函数名，不记录异常消息、提示词或文档内容，便于查明剩余根因。
+- 本机后端 readiness 正常，SQLite 可用，模型和 embedding 已配置；论文公开搜索端点可用。未暴露配置值。相关 Harness/运行接口测试 105 passed；Ruff check/format check 通过。仅有既有 Starlette 弃用提示和本机 pytest cache 权限 warning。
+
+## 2026-11-11 Harness 与 Skills 加固
+
+- ResearchRuntime 现在在工具调用前强制覆盖当前问题中精确命中的本地文档 ID/标题；常见明确比较表达必须进入 compare 工作流；明确要求比较本地多篇时，计划至少含两篇不同文档，否则停止为 `workflow_incomplete`。比较任务最终阶段还要求本轮至少有两个不同来源证据。新增 citation-check 规划意图并加载对应 skill。
+- 五个内置 skill 升级为 1.1.0，加入任务前置条件、阶段检查点、停止/澄清和输出验收；compare 使用来源×维度矩阵，citation-check 保留原主张和引用并区分核验状态。固定哈希同步，工具权限未改变。
+- citation-check 单独使用核验 schema，保留未支持原主张；支持项显式携带来源并校验所有 evidence ID 属于该来源，用户明确指定 ID/标题时再与其绑定。只有有证据的支持项能进入普通 claims 且需复核通过。
+- 新增 AI 辅助评测协议和 TEST-* 合成复核样例，均 `ai_assisted_unverified`；没有冒称人工金标或真实质量结论。详见 [Harness 加固记录](research/harness-hardening-2026-11-11.md)。
+- 定向 runtime/skills 测试 45 项通过；全后端 487 项及 Ruff check/format 通过。测试有既有 Starlette 弃用提示和本机 pytest cache 权限 warning。
+
+## 2026-11-11 审计后可靠性改进
+
+- Web 搜索/论文详情请求只允许最新响应更新页面；文档列表请求失败时保留最后成功记录并提示用户。取消流程调用后端取消接口并轮询 run 状态，仅在服务器确认 `cancelled` 后显示“已取消”。新增取消确认 E2E。
+- 登录/注册限速迁移至 SQLite 原子窗口计数，跨同库 app 实例和重启共享；迁移 0022，使用 socket peer 而非未经验证的转发头。数据库迁移版本测试同步到 22。
+- Web 类型/格式/生产构建通过，E2E 66/66；Ruff check/format 通过；后端全量 467 passed。E2E 覆盖取消成功和服务端拒绝取消，以及旧搜索响应晚到；仅有既有 Starlette 弃用提示和本机 pytest cache 权限 warning。
+
+## 2026-11-11 跨进程认证限速
+
+- 注册和登录尝试改为写入 SQLite 窗口表，并在 `BEGIN IMMEDIATE` 内清理、计数和追加；不同 app/worker 实例共享同一数据库限额。客户端地址只使用 ASGI socket peer，不信任任意 `X-Forwarded-For`。迁移 0022 为增量迁移，不重建用户数据。
+- 新增双 app 实例共享限速回归；定向后端测试 5 passed，Ruff check/format 通过。部署层仍需配置可信代理网络边界。
+
+## 2026-11-11 整体审计与发现工作区修复
+
+- 完成后端 Harness/账号文档边界、Web 双工作区主要用户路径和参考 Skills 项目的静态审查；报告见 [整体审计](research/project-audit-2026-11-11.md)。审计确认的前端问题包括搜索/详情竞态、文档轮询失败误显示空列表，以及 Agent 取消状态可能早于服务端停止。
+- 修复搜索和详情过期响应覆盖新状态的问题；文档列表请求失败时保留最近成功结果并显示状态提示。
+- Web typecheck、format:check、workspace E2E 57/57 通过。未运行后端测试；未解决的取消确认、生产跨实例限速、科研语义质量评测仍列为下一步。
+
+## 2026-11-11 结构化运行时改造
+
+已替换生产调度入口、加入文档身份约束、服务器证据绑定、语义复核及持久会话摘要。后端 466 项、Web 57 项通过；真实比较和混合修改均仅调用本地全文检索并输出带证据的部分回答。详见 [改造与未完成项](research/harness-runtime-v2.md)。不将仍有证据缺口的运行标为完全通过。
+
+## 本地来源表述与即时消息修复
+
+- 来源识别的两份规则合并为共享定义，补入“已经入库的我自己的论文”等表述及回归用例。仍为规则式路由，不代表完整语义规划已完成。
+- 用户消息发送后立即显示为待响应消息，成功后由完整消息替换，避免重复；切换及清空对话清除待响应消息。三种视口的延迟响应测试通过。
+- 本轮未完成结构化规划、持久化任务状态及语义评测的整体改造，不能声称截图引用错误或台账全部事项已经解决。
+
+## 2026-11-11 文档身份与混合来源改进
+
+- 从当前账号已索引文档匹配用户明确给出的标题或编号；本地单篇任务的检索强制限定到该身份，冲突目标被拒绝。单篇意图有多个候选时要求用户指定；明确多篇任务不强制锁定单篇。对话额外使用最近 40 条用户问题解析连续指代，遇到不相关话题停止追溯；模型仍只接收最近 4 轮，历史不作为证据。
+- 新增论文库与公开来源联合任务，要求实际检索本地全文及请求的公开来源，并验证回答引用本地私有全文。个人稿件追问真实复测 completed，仅调用本地证据工具。联合来源复测曾出现证据不足与 embedding 失败；随后修复个人稿件范围误用和引用修复提示冲突，一次真实复测 completed、两类工具成功、3 个引用。单次成功不能证明稳定性或语义质量。
+- 修复过大工具结果被替换为错误前已记录为成功的问题：优先丢弃重复上下文及低排名块，保留完整摘录，并在记录状态前处理大小。embedding 异常保留安全错误代码，继续对未知用量失败关闭。
+- 本轮全量后端回归 453 项通过，前端端到端 54 项通过，前端构建和类型检查通过。关键词识别、有限窗口、多来源语义关联、事实和评价的语义支持仍有局限；没有可声称覆盖所有问题的完整评测集，也尚未实现可靠的模型语义验证或持久化任务状态。
+
+## 2026-11-11 对话输入与个人论文追问（进行中）
+
+- 输入框支持 Enter 发送、Shift+Enter 换行，发送后清空；请求失败时仅在输入框仍为空的情况下恢复原文。三种视口的输入端到端测试通过。
+- 个人论文追问沿用前一用户问题中的本地范围，个人论文任务采用 claims 构建显示文本。相关任务与 Harness 回归 100 项通过；这仍是规则匹配，没有建立稳定文档对象状态，不保证多文档消歧和长上下文理解。
+- 结构化任务规划、可靠文档对象状态、混合来源覆盖、长上下文压缩、系统化语义评测仍待完成；不能将此次局部修复视为完整 Harness 改造。
+
+## 2026-11-10 指定公开来源检索与对话审查
+
+- 截图运行把双来源搜索误路由为普通论文问答，反复调用工具直到轮次耗尽；arXiv 客户端另将少于请求页容量的合法末页误判为异常。现按明确指定的来源开放对应搜索工具，分别记录结果、空结果与失败，并保留一次无工具最终回答机会；修正 arXiv 末页解析。
+- 真实问题复测完成：3 次模型调用、8,523 tokens，引用 2 条 OpenAlex 和 1 条 arXiv 记录。该样本不能保证任意问题、外部服务或语义相关性均正确；另一次真实调用曾因来源故障返回部分结果，另一次因证据校验被拒，现增加一次有界修正。
+- 审查并修复同时间戳消息顺序和切换对话时旧请求覆盖界面的问题。后端 443 项测试通过（使用项目内独立临时目录，默认系统临时目录权限不足）；前端 51 项端到端测试通过，格式、类型和构建检查通过；OpenAPI 已导出。
+
+## 2026-11-10 模型输出截断与响应耗时优化
+
+- 截图运行最终模型调用耗时 46,469 ms、输出恰为 4,096 tokens，整体 60,641 ms 后 incomplete；记录没有细分当次推理 token。官方文档说明输出上限包含推理 token，[gpt-5.6-luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna) 支持 low 推理强度。
+- 本机将 `LLM_REASONING_EFFORT=low` 和 `LLM_MAX_OUTPUT_TOKENS=8192`；新设置默认不向未配置的模型发送推理参数，防止不兼容。参数计入保守 token 预估及运行元数据。低推理强度可能损失复杂问题质量，可按需调整回 medium 或清空配置。
+- 论文库及混合来源任务将答案仅写入结构化 claims，服务端基于已校验 claims 构建正文，避免重复生成 answer。仅当提供商明确报告 max_output_tokens 且已有本轮证据时，允许一次无工具的简洁重试；content_filter 不重试，仍受轮次、总预算、时限和证据校验约束。
+- 使用同一问题及最近四条对话真实复测：completed、两篇库内 PDF 与个人稿件共 3 个来源、5 条主张、3 次检索、4 次模型调用、31,707 tokens、30,031 ms；最后一次模型输出 2,197 tokens，其中 124 为推理 tokens。与截图的失败运行不是严格控制条件实验；真实建议质量与语义支持仍需独立复核。后端全量 435 passed；随后增加的 provider 原因解析与输出状态 trace 测试单独运行 80 passed，Web 对应 E2E 3/3，1 条既有 Starlette 弃用 warning。
+- 运行记录将未完成的模型输出标为 incomplete，网页显示“输出未完成”，不再将截断标为 ok。OpenAPI 同步更新。
+
+## 2026-11-10 混合论文库与个人稿件任务
+
+- 截图问题使用“我这论文库”和“我自己稿件”，原规则未识别且单一任务无法表达两个来源，因而落到允许 arXiv 的通用问答；上轮仅测单一来源追问，未覆盖混合写作任务。
+- 新增 mixed-draft-revision 任务：仅在明确联网时开放对应公开元数据工具；本地全文检索在当前账号下按调用参数分别限定论文库 PDF 与个人稿件，保留历史作为不可信上下文。最终回答必须有被主张引用的两类本轮私有全文块，明确要求两篇时需要两篇不同论文；远程元数据不得替代库内全文。仅输出经过结构化校验的 claims。
+- 真实复测截图问题并携带最近 4 条对话：completed，3 个来源（两篇 arXiv 私有 PDF 与一篇 personal 稿件）、2 条主张、仅调用全文检索、128,567 tokens。此单次结果仅代表机械校验通过，未独立审核建议的语义质量或完整性。
+- 本地引入检索零命中 trace 状态，修复把 no_results 显示为 ok 的误导；覆盖混合路由、两类来源、两篇数量、跨账号隔离、联网工具白名单、远程元数据不能充当本地证据。全后端 432 passed；随后新增边界测试的定向回归 94 passed，Web E2E 3/3，Ruff、TypeScript、OpenAPI 导出通过。
+
+## 2026-11-10 论文库追问的工具路由
+
+- Harness 原来只按最新问题关键词选择任务，再将固定白名单发给模型自行选择工具，不计算工具相关性。截图追问只含论文编号，没有“我的论文库”，因此进入通用问答并开放 arXiv；上一轮无历史上下文复测没有覆盖此问题。
+- 新增当前账号已保存论文编号识别，以及仅依据最近用户问题的明确论文追问继承；明确要求联网时使用外部任务。历史仅用于收窄路由，不能充当证据；论文库任务仍在当前账号的已入库 PDF 内重新检索。运行初始元数据与执行阶段使用同一套路由输入。
+- 模拟上一轮论文库对话的真实追问 2511.22858：completed、4 条主张、仅调用 retrieve_paper_evidence、48,292 tokens。引用摘录经机械校验，语义支持程度未经独立评估。全后端 426 passed；后续路由边界调整再跑定向测试。
+
+## 2026-11-10 论文库 Agent 检索修复
+
+- “我的论文库/文献库”此前未命中个人库意图：比较问题被分类为强制 compare_papers 的通用任务，单篇总结允许 get_arxiv_metadata。新增独立 library-paper-qa：仅开放 retrieve_paper_evidence，并在存储层限定当前用户、已保存文献关联的私有 PDF；比较不足两篇核验来源时拒答。个人稿件与共享语料不混入。
+- 修正任务选择后未按 task spec 加载指定 skill 的问题；针对论文库问答，仅显示结构化 claims 中通过来源、逐字摘录及数量/方向检查的文本，丢弃模型 answer 的额外文字，不放宽证据核验。
+- 用户此前已授权 embedding 建索引，本次仅补建缺失的 196 个可检索块，10,395 input tokens；个人库查询走 BM25+dense RRF。新增任务路由、账号隔离和未验证文字不展示回归。
+- 真实无历史上下文复测：指定 2511.22858 总结 completed、2 条主张、122,418 tokens；两篇比较 completed、来源 2411.18583 和 2511.22858、2 条主张、68,347 tokens；两次工具调用均只有 retrieve_paper_evidence。仅说明这两次结构化证据校验通过，尚未对论述与原文的语义一致性做独立评估。后端全量 424 passed（1 条既有 Starlette 弃用 warning），Ruff check/format 通过。
+
+## 2026-11-10 模型不可用排查
+
+- 最近三次 model_unavailable 中两次在模型请求等待恰好 20 秒时失败，之前的多轮模型及检索成功；第三次约 3 秒失败，旧记录未保存错误类别，无法断言原因。短模型连接探测成功，但不证明长任务成功。
+- 模型超时配置提高至 60 秒，Agent 期限提高至 120 秒，Web 代理等待提高至 195 秒，覆盖任务期限和最后一次阻塞模型调用；配置与示例同步。模型适配器区分超时、网络、认证、限流、服务端错误和请求拒绝，不显示服务商响应正文或密钥。
+- 重跑用户比较问题：首次不再超时，但达到上下文字符上限；Agent 工具结果移除仅供索引且重复的 retrieval_context，保留原文摘录和定位，回归 69 passed。再次真实调用未超时及未触发上下文上限，但因 compare-papers 工作流必需 compare_papers 工具而返回 workflow_incomplete，尚未完成比较；不得描述为完整成功。
+
+## 2026-11-10 单轮预算与证据面板
+
+- 单轮总 token 预算默认和本机配置提升至 300,000，可配置上限 1,000,000；日预算 0 仍表示关闭。保留模型上下文、输出、时间和总预算约束。预检使用保守 UTF-8 字节上界，观测消耗低于预算时仍可能因下一请求预留不足而停止。
+- 证据面板移除重复回答和主张正文，保留原文摘录、引用来源及运行信息。正文继续在引用核验后展示；未实现未核验正文流式输出。
+- 验证：后端 Harness 64 项、Web 对话与引用 E2E 6 项、TypeScript 和 Ruff 检查通过；没有发起付费模型请求。
+
+## 2026-11-10 私有 Hybrid 与真实 Agent 联调
+
+- 截图运行最终输出恰为 800 tokens，单次输出上限不足是截断的重要证据；本机与示例 LLM_MAX_OUTPUT_TOKENS 提升至 4096，补充 provider incomplete 状态识别，结构化输出长度约束与本地契约一致。
+- 迁移 0020 增加私有块向量表，按模型、维度和文本哈希匹配，通过 chunk 外键随文档删除。CLI 显式建索引，Agent 只读查询；私有 BM25 与 dense top-32 用 RRF 合并，再返回最多 8 条。未建索引时明确使用 BM25。查询 embedding 用量纳入运行预算。
+- 用户已授权当前账号正文块发送至已配置 embedding 服务；544 块已完成索引，用量 21,378 input tokens。原中文问题真实 Hybrid 命中 8 条。新上传/重解析的块需要重新运行私有索引 CLI；未自动外发其他账号全文。
+- 真实联调发现方向校验误拒绝“同向提高”，已修复；标题页码由引用卡展示，避免将位置数字混入事实校验。私有证据校验失败增加一次有界格式/摘录修正，仍保留精确引用校验。
+- 多次真实调用排查后，原中文问题最终 completed：1 个论文来源、3 条主张、18,915 tokens、3 次模型调用。该单次成功不是通用质量评测。全后端 416 passed（1 条既有弃用警告）。
+
+## 2026-11-10 MinerU 块到 Agent 引用链路实查
+
+- 验证：私有文档与 Harness 定向回归 66 passed；Ruff check/format 通过。
+
+- 直接以失败运行所属账号检查本地私有索引：544 个可检索块；截图中的泛化中文问句命中 0 个，英文概述关键词命中 8 个。当前 BM25 不提供跨语言语义匹配；此前 trace 将 no_results 也记为 ok，不能据此断言检索成功。
+- 本地重现引用收集异常：长章节名导致 locator 超过 EvidenceSpan 的 240 字符限制。检索输出将位置说明限制为 240 字符，保留原数据库及独立页码字段；补充长位置说明回归。
+- 个人问答任务明确 source_id 未知时必须为 null，概述使用英文主题关键词，零命中时尝试翻译/缩短关键词。实际本地块分别经标题及英文关键词检索后，8 个结果均可收集到私有来源，构造的逐字证据答案通过最终校验；这是本地链路检查，未调用真实模型，不代表生成答案质量评测。
+
+## 2026-11-10 私有论文引用校验恢复
+
+- 复核用户截图对应的运行轨迹：运行已正常结束，4,841 observed tokens；第一次 `retrieve_paper_evidence` 返回 error，后续检索成功；最终因模型返回的引用 ID 未被本轮工具结果确认而以 `unverified_citations` 拒答。该历史运行只保留脱敏 trace，不含首次错误码或原始模型输出，因此不能断定首次工具调用错误的具体原因。
+- 对该校验失败增加一次有界修正：仅当已有本轮验证来源且剩余决策轮数足够时重试；仅告知已验证来源 ID，修正轮关闭所有工具。仍无法核验时继续拒答，未减弱引用验证。
+- 新增真实结构化 Harness 回归：个人 UUID 引用错误后可纠正为已核验引用；arXiv 引用同样支持修正；无可用来源时不重试，伪造引用仍失败关闭。后端全量 **414 passed**（1 条既有 Starlette 弃用警告）；Ruff check/format 与根 `git diff --check` 通过。未发起真实模型调用。
+
+## 2026-11-10 Agent 中断诊断与会话删除
+
+- `/api/health/ready` 的“服务可用”只反映 API、数据库及必要配置已就绪，不代表模型提供商本次请求成功。Agent 内部异常此前被统一包装成 503 并隐藏，现后端仅记录异常类型与运行编号（不记录提示词、论文内容、异常消息或 traceback）；界面显示执行中断和运行编号。当前历史运行记录没有异常类型，具体底层故障需在下一次失败时从后端日志确认。
+- 会话 API 代理新增 DELETE；侧栏提供逐条确认删除。删除后自动切换到剩余会话；删除最后一条时尝试创建空白会话。
+- 验收通过：后端 **413 passed**；Ruff check/format；Web E2E **45/45**、Prettier、TypeScript、Next 生产构建；根 `git diff --check`。`/api/health/ready` 返回 `ready`（LLM/embedding configured）。存在 Starlette 弃用和 pytest 本机缓存权限 warning，不影响测试结果。没有发起真实模型请求。
+- 仍需真实复现一次 Agent 失败，才能根据新日志确定底层异常类型；现有失败记录没有保存该信息。
+
+## 2026-11-10 新对话创建与个人 RAG 预算修复
+
+- 新对话失败根因是 Web→API 代理把 `Headers` 实例按普通对象展开，漏掉 JSON Content-Type。统一改为 `new Headers(init.headers)` 并保留 Cookie；无登录状态下有效 JSON POST 现返回预期 401（而不是错误的 422 请求体类型）。
+- 个人 RAG 失败根因是参数契约强制 `source_type=personal` 必须同时提供文档 UUID；用户按标题提问时模型没有该 UUID，工具反复返回 `invalid_arguments`，四轮后才被误报为 token 预算耗尽。personal 查询现在允许不指定 UUID，仍仅检索当前账号的私有索引。
+- 当前单轮预算设为 100,000（配置上限），`AGENT_DAILY_USER_TOKEN_BUDGET=0` 保持关闭。无上限不可取：Provider 上下文、运行时长和费用仍需要硬边界。
+- 直接用当前本地索引验证 `Master Thesis` 检索：`status=ok`、8 个结果、扫描 544 个片段；未调用语言模型。运行配置读到单轮 100,000。
+- 验收通过：后端全量 **412 passed**（1 条既有 Starlette/AnyIO 弃用警告）、Ruff check/format、OpenAPI 导出；Web E2E **42/42**、Prettier、TypeScript、Next 生产构建及根 `git diff --check` 通过。后端重启与健康确认已完成。
+
+## 2026-11-10 个人论文检索与对话管理
+
+- 根因：普通 paper-qa 技能同时允许元数据 API 工具；“根据我已入库论文”未形成确定的本地文档意图，模型因而调用 arXiv。新增个人论文问答任务：识别已入库/本地论文/我的稿件等明确表达，只注册 `retrieve_paper_evidence`，要求 `source_type=personal` 并强制完成检索阶段；不足时报告证据缺失。
+- 科研助手加入左侧常驻对话栏（单对话时也显示）；支持新建、切换和重命名。新增 owner-scoped PATCH 接口，使用原会话表并保留各会话独立消息。
+- 验收：后端全量 **411 passed**（1 条既有 Starlette/AnyIO 弃用警告）；Ruff check/format、OpenAPI 导出通过。Web E2E **42/42**（375/768/1440px），Prettier、TypeScript、Next 生产构建通过。真实付费模型调用未触发；本地分类与工具白名单由回归测试验证。
+
+## 2026-11-10 Agent 请求超时与个人库按钮修正
+
+- 将 Agent 专用 Web→后端代理等待时间从 15 秒提高到 60 秒，覆盖后端最长 45 秒执行期限；其余 API 请求超时保持 15 秒。用户取消仍沿用请求的 AbortSignal。
+- Agent 后端返回 `model_unavailable` 等错误时，界面现在展示后端的具体答复，不再统一误报为网络连接失败。
+- 个人库检索结果不再显示“加入个人库”；仍可查看详情。补充对应 E2E 回归断言。
+- 验收通过：Web Prettier、TypeScript、E2E **39/39**（375/768/1440px）、Next 生产构建及根目录 `git diff --check`；本地 `/api/status` 返回 `ready`，LLM 与 embedding 显示已配置。本轮没有触发真实模型调用。
+
+## 2026-11-10 个人库搜索与 Agent 预算修正
+
+- 修复个人库搜索只按整段连续子串匹配的问题；现按词项匹配元数据、来源 ID 和来源类型，标题中的连字符不再造成漏搜。论文库卡片将来源 ID、标题和操作按钮排成有间距的可换行行。
+- 将 Agent 默认单轮 token 上限从 12,000 调至 30,000；预算预检未发起模型请求时显示配置建议。当前本机 `.env` 仍为 12,000，需按用户意愿调整后重启才能应用。
+- 为截图中的问句和单个已存来源复算 UTF-8 保守输入上界为 12,164；该预算错误发生在首次模型调用前。新增搜索和预算边界回归检查。
+
+## 2026-11-10 工作区界面与真实 Agent 验收说明
+
+- 发现论文页改为单栏，移除侧栏助手与重复装饰；科研助手改为左侧对话、右侧按需显示引用和证据，并在窄屏纵向排列。对话输入固定在底部区域，历史记录可滚动。
+- 精简顶部状态和检索/对话文案；“使用说明”补充检索来源、个人库、授权上传、云端模型数据流和服务端配置说明。
+- 更新网页 E2E 断言，覆盖发现页不显示助手、说明面板和助手提问入口；补充从网页进行真实 Agent 烟测的服务端配置步骤。当前验收后端仍以 LLM disabled 运行，未发起真实模型调用。
+
+## 2026-11-09 扫描卷 250 页 v9 全量解析与 v10 图注定向修复
+
+- 对本机临时拆分的 JAMA 扫描卷前 250 页完成 MinerU 4.1.7 standard/auto + `papertrail-v9` 解析。原始 PDF 未修改；全量报告在忽略目录。250/250 页返回，249 页含元素（第 2 页为空），4,792 元素、5,360 chunks、123 warnings；VLM+OCR 共耗时约 50.6 分钟。图 86、表 15、独立组图注 1；图/表继续隔离于 Agent 证据。
+- 对比上一份 v5 全量基线：元素 4,791→4,792；p52 的 DIAGRAM 15 现为 figure；总图注按 v9 保留独立且 ambiguous。警告数仍为 123，其中 86 figure、15 table 未核验，另有 15 caption 原生词差异、7 table 原生文字差异；差异是风险提示，不是确认 OCR 漏字/错值的金标。扫描卷约一半页面可能无可解析元素，需另行判断空白/图像页合理性。
+- 本机复看 p52/p66/p183/p241：DIAGRAM 15 分类、Fig.3/Fig.4 长说明关联及 p183 图注位置符合预期；p241 Fig.33 caption 在跨栏布局中被“并列图注”规则错挂到左栏 Fig.31。新增回归先复现此误关联，再将明确贴近唯一图块且间距很小的编号 caption 优先于跨栏并列候选；MinerU adapter 升至 `papertrail-v10`，防止旧索引版本误用新关联。
+- 在真实 p241 单页用 v10 standard 定向重跑：1/1 页、21 元素、21 chunks、5 个图未核验 warning、19.2 秒；caption 已进入对应的空 figure 块，不再误挂 Fig.31。OCR 仍将标签读成 `:.`、将 `outer` 误成 `onter`，所以只修复几何关联，不宣称 OCR 文本已正确。该页按现有逐页文字层策略使用 `txt`。
+- 全量 v9 报告：`backend/reports/live_eval/mineru/TEST-jama-pages-001-250-papertrail-v9-standard.json`；v10 单页输出和 4 张局部检查图均留在 Git 忽略目录。没有外发 PDF/页面或调用远程模型；250 页结果不是准确率评测或人工金标。
+- 验收完成：后端全量 **407 passed**（1 条既有 Starlette/AnyIO 弃用提示）；Ruff check/format、OpenAPI 导出、根目录 `git diff --check` 通过。没有修改 Web。
+- 后续工作：扫描页 OCR 仍需按风险候选复核；公式/表格单元格没有逐项真值校验，不能宣称解析准确率通过。
+
+## 2026-11-09 p243 图组与 p51 图注定向复核
+
+- 对原页 243 重新执行 v11 单页本机 MinerU。它返回一个纵向图像 bbox，内部带 Fig.36/Fig.37 标签；扫描图像无法可靠确认二者边界，因此不新增自动拆分规则。v9 抽样登记中相关判断由 `possible_issue` 更正为 `uncertain` 并重新按协议登记；16 页、25 项总数不变，现为 5 `possible_issue`、7 `no_issue_observed`、13 `uncertain`，accuracy metric 仍为空。
+- 对 p51 DIAGRAM 13 的原图注分别做 600 DPI 裁切放大、900 DPI 对比度/锐化/二值化增强，再由本机 MinerU 解析。增强输入仍将 “Showing” 误读（分别输出 “Shoncing” 等），没有可安全替换原 OCR 的结果；不把字典纠错或页面手写覆盖加入生产解析器。相关 PDF/JSON 均留在忽略目录，原 PDF 未改动。
+- 又以隔离的 `uv run --with rapidocr --with onnxruntime` 临时环境做 RapidOCR PP-OCRv6 small/medium 及 PP-OCRv5 English/mobile 对照；没有修改项目依赖/锁文件或上传论文。各路都把图注识错（如 `Shocing`、`Shoncing`、`Shocing enn'lm nt...`，行置信分数约 0.80–0.88），不比 MinerU 更可靠，因此不做 OCR 文本自动融合。
+- 按用户授权只将图注紧裁切发送给 OpenAI GPT-5.4 mini 一次；请求显式 `store=false`，共 445 input / 29 output tokens，没有发送整页或 PDF，也未修改 `.env`、项目配置或锁文件。模型输出首词为 “Showing”，与本机视觉读取一致；但它读成 `1880-90`，而 MinerU v9 为 `1856-90`，RapidOCR 也未能清楚识别年份。因此仅确认首词的视觉疑点得到另一模型支持，数字仍不确定，不自动覆盖 OCR。原始响应和 crop SHA 记录于忽略目录 `TEST-jama-p51-openai-vision-crosscheck.json`。
+- 当前扫描 OCR 的已知边界：单个多模态结果虽读出 `Showing`，不能解决年份分歧；密集表格仍未逐格核验。若继续提升，应先获得可审计的多页多模型对照，再决定是否融合；图/表仍有未核验 warning 且排除 Agent 证据。
+
+## 2026-11-10 RapidOCR medium 16 页候选对照
+
+- 复用 v9 固定 seed 自动抽出的 16 页复核包，在隔离 `uv run --with` 环境以 RapidOCR PP-OCRv6 medium 对 16 张本地页面图逐页识别；输出 2,979 行，平均约 19.5 秒/页。候选输出及 bbox/scores 留在忽略目录 `TEST-jama-pages-001-250-papertrail-v9-rapidocr-medium-review.json`，未改项目依赖、代码或锁文件。
+- 初步差异筛查看到 p51 图注仍错读为 `Shoncing...`；p243 的 Fig.36/37/38 标签与说明可见，和 MinerU 结果接近。该自动对照未做逐行金标核验，不计算准确率，也不足以支持 OCR 自动融合。页面图像和全文均未再次外发。
+- 后续：若引入替代 OCR，先选更适合历史印刷体的模型并在同一自动风险集上对照；没有可重复改善时继续维持 MinerU 为唯一生产解析器，图/表证据隔离不变。
+
+### Kraken 英文旧印刷体 OCR 本机候选
+
+- 在 WSL2 的独立用户缓存环境安装 Kraken 7.1.1 与 CPU-only PyTorch，并从 [Kraken 官方模型库](https://zenodo.org/records/2577813) 下载 2.9 MB 英文印刷体模型；模型说明为现代印刷英文训练集增加约 10,000 行历史文本训练数据。没有修改项目依赖、系统 Python 或项目文件，也没有上传扫描页。
+- Kraken 自动基线分割识别 p51 紧裁图时触发 WSL OOM，内核记录该进程 RSS 峰值约 6.1 GiB。给两行图注手动提供 bbox 后单独调用识别器，结果为 `oan-omnon.en`、`cccczzzLzzcL` 等乱码。手工分行仅用于诊断，不是可复用的自动分割路径；候选没有改善 MinerU/RapidOCR 输出。
+- 结论：不把 Kraken 接入生产解析，也不从单个候选页推断整体准确率。该样本仍无可安全替换 OCR 的独立输出；图表证据继续隔离。后续若继续提升 OCR 质量，需要适配当前资源限制的分割/推理实现，或取得独立核验样本；不通过猜词修补原文。
+
+## 2026-11-09 MinerU 风险页复核与 v11 文本类型修正
+
+- 从 v9 的 249 个已解析页面按固定 seed 和 11 个分层自动选取 16 页，在本机逐页对照渲染图与解析块，生成 25 条协议登记的 AI 辅助观察：6 `possible_issue`、7 `no_issue_observed`、12 `uncertain`。问题样例包括 p3 空白扫描被写成“这是空白图像”的描述、p51 图注 `Showing`→`Shorting`、p50/p51/p186/p243 图注/图组关系及多页密集表格仅能判不确定。汇总 accuracy metric 为空；全部是 `ai_assisted_unverified`，不是人工金标。未调用远程 API。
+- 修正 v9 全量结果里 p241 Fig.33 caption 错挂跨栏左图的问题（v10）：唯一且紧邻正下方图块的短编号图注优先于水平并列候选。真实 p241 单页 v10 重跑确认 caption 进入正确图块，不再进入 Fig.31；标签仍识别为 `:.`、`outer` 仍读作 `onter`，故只验证关联修复。
+- 适配器升至 `papertrail-v11`：过滤 MinerU 将空白页生成的“图像没有文字/内容”自描述，留下 `mineru_page_self_description` warning；将没有数字或数学运算符的短文本型 equation 块保守重分类为 paragraph，并留下 `mineru_equation_text_reclassified` warning。合成回归先复现两项失误后通过。真实四页样本确认 p3 无虚构正文，p88/p114 的 “To be continued” 不再作为公式；另对 p51 单页验证 LaTeX `\\text{COURSE OF STUDY}` 现为 paragraph。由于完整扫描卷 v11 重跑成本高，250 页全量统计仍属于 v9，未将 v11 局部试跑伪称全量通过。
+- 后端全量 **409 passed**（1 条既有 Starlette/AnyIO 弃用提示）；Ruff check/format、OpenAPI 导出、根目录 `git diff --check` 通过。图、表及 OCR疑点仍不进入 Agent 证据。
+
+## 2026-11-09 继续验收：五篇论文视觉复核与解析器定向修复
+
+- 对五篇获准私有处理的论文自动选取 10 页，登记 17 条图、公式、表观察；固定提示和 provenance 均通过协议校验，全部记录为 `ai_assisted_unverified`，不报告准确率或人工金标。可能问题：4 条图注/图块关联、1 条表格标题关联；其余为“未观察到问题”。
+- 适配器升至 `papertrail-v9`：多面板总图注保留为单独 caption、关联状态为 ambiguous；按图注与相邻图块组整体宽度判定。五篇论文全部完成本机 standard 重解析；07517 p4、07928 p10、08390 p12、08483 p18 的图注关系及 08054 p10/p13 的图表结构均做了局部检查。08483 侧置 caption 曾触发空候选异常，已加保护并重跑成功。无外部调用。表格单元格仍标记未核验，图表仍不进入 Agent 证据。
+- 用更新后的 v9 报告为原先同一组自动选定的 10 页重新生成本机复核包并逐页查看，登记 16 项 `ai_assisted_unverified`：figure 7、formula 3、layout 2 项 no issue observed；table 4 项因未逐格核验记 uncertain。总结在忽略目录 `backend/reports/live_eval/mineru/TEST-five-papers-papertrail-v9-review-summary.json`；没有准确率指标、人工金标或远程 API 调用。
+- 后端最终全量 **406 passed**（保留 1 条既有 Starlette/AnyIO 弃用提示）；Ruff check/format、OpenAPI 导出、根 `git diff --check` 通过。Web format/type/build 通过；本机 Chrome E2E **36/36 通过**（375/768/1440px）；两端依赖审计无已知漏洞。账号日 token 限额默认关闭；美元 Provider 账单硬限制未实现。
+
+## 2026-11-09 MinerU 自动候选集与 Agent Harness 架构
+
+- 新增 `backend/app/evaluation/mineru_review_set.py` 与 `backend/tools/build_mineru_review_set.py`：按布局、figure/table/formula 和 warning 分层、固定 seed 自动选页；manifest 只含 PDF SHA/大小、解析报告文件名+SHA、解析/OCR 版本、页码、元素计数和 warning code，不输出论文正文或图像。现有忽略文件仍是从 250 页 v5 报告选出的 33 个候选页（11 个 strata）；并未伪装成 v8 结果、gold 或准确率评测。
+- 新增本机 MinerU 复核协议、输入包导出和结果登记 CLI；渲染候选页图并绑定对应解析元素、source/report/candidate/image SHA 与固定 review prompt SHA。结果 schema 拒绝额外金标字段，登记状态固定 `ai_assisted_unverified`。基于忽略目录中的 250 页报告生成 18 页本机包并完成工具 smoke；没有调用外部模型、没有复核标签或准确率结论，图像/解析正文均留在 Git 忽略目录。
+- 新增 `docs/AGENT_HARNESS_ARCHITECTURE.md`，定义能力层、连接层、构建层、运行管理层及 TaskSpec、工作流阶段、运行状态/预算/trace 安全边界和 H1–H5 实施验收。代码审查认为现有 AgentHarness 的工具安全与证据验证基础合适，不应整体换成通用框架；已落地任务契约与必要工具阶段门槛、持久取消/lease、逐调用预算/trace、run 创建时的版本快照、可选的账号 UTC 日 token 预算及进程退出/并发恢复验收；按供应商价格计算的美元成本上限和 provider-side 硬限额仍未实现。
+- Web `format:check`、`typecheck`、`build` 通过。Playwright 自带 Chromium 缺失且 CDN 下载无响应，改用本机 Chrome 的临时配置运行同一套 E2E：**33/33 通过**，覆盖 375/768/1440px。临时配置已移除，正式 Playwright 配置未修改。
+- 本轮 Web 回归再次通过：Prettier、TypeScript、生产构建及本机 Chrome 临时配置 E2E **33/33**；临时配置已自动清理。
+- Harness H1 增加五类 `TaskSpec` 和必要阶段门槛（compare、research brief、citation check），复用 hash-pinned Skills 与现有只读工具交集；H2 已持久化 run phase/cancel request、worker ID 与 30 秒 lease，活 worker 每 5 秒续租，过期状态由新实例回收为 interrupted/cancelled 且不重放请求，取消/恢复转换原子化。H3 增加 per-run token 上限/预留/实际 ledger；模型/embedding 请求边界持久化脱敏 trace、用量与 heartbeat，usage 不明时保留 reservation。可选的跨 run 账号 UTC 创建日 token 预算已实现（默认关闭）；真实子进程退出恢复与取消/恢复并发竞争均已通过隔离测试。按供应商价目计算的美元费用硬上限仍需要后续实现及 provider 约束。
+- 验收：后端全量 **398 passed**；Ruff check/format 与 OpenAPI 导出通过。Web format/type/build 与 Chrome E2E **33/33** 通过。Starlette 上游 AnyIO alias 弃用警告保留。
+- H4 run 版本追踪已补强：创建时即保存任务/Skill registry 哈希、工作流、模型 ID 和 PDF parser/chunker 版本；正常完成时补 system+skill prompt SHA 与实际 usage；中断 run 保留启动版本。账本未保存论文/会话正文。
+
+## 2026-11-08 MinerU 扫描页定向修复复核
+
+- 定向修复实跑发现的两个问题，将适配器升至 `papertrail-v7`：p52 的 DIAGRAM 15 在 MinerU 将其伪表格化且 caption OCR 损坏时，使用紧邻且明确提及 Diagram/Chart 的正文句子作为图描述并改标 figure；p241 的 Fig.33 无标签短图注 OCR 为 `:.—Bandage...`，现在按唯一紧邻图体、水平重叠和极小垂直间距关联。原 paragraph 保留；图表仍带未核验告警且不进入 Agent 证据。
+- 后续升至 `papertrail-v8`：当同页图块与说明段落都明确带相同 `Fig. n` 编号且目标唯一时，跨栏/远距离关联说明。真实 p66 在 2 页 `auto` OCR 样本中恢复 Fig.3/Fig.4 图块编号，两段 200+ 字说明各自关联正确；仅含 p66 的 `txt` 样本未识别图号，因此不误关联。原 paragraph 保留。
+- 为能复现 MinerU 标准档，在本机用户模型目录补齐官方 ModelScope ONNX 权重包与 MinerU 2.5 Pro 1.2B GGUF/mmproj；`mineru-kit models verify --tier standard --small-backend onnx --vlm-engine llama-cpp` 两个模型包均正常。论文始终在本机解析，无文档上传到外部服务。
+- p52/p241 两页真实样本用 v7 适配器重跑成功：2/2 页、33 元素（paragraph 23、heading 1、figure 6、table 3）、60 chunks、9 个未核验图表告警、0 个原生文字差异告警，约 25 秒。DIAGRAM 15 输出 figure，Fig.33 图注进入对应 figure；其旁 paragraph 仍保留同一 OCR 文字以满足来源保真。
+- p1+p66 两页真实样本强制选择 `auto` OCR，v8 输出 2/2 页、21 元素、21 chunks、3 个未核验图警告，约 25 秒；Fig.3/Fig.4 长说明分别进入相应图元素，源 paragraph 保留。相同 p66 单页因文字层选择 `txt` 时图号 OCR 丢失，因此编号关联规则不触发。
+- p1+p52 两页 `auto` OCR 输出 2/2 页、17 元素、44 chunks、4 个未核验图表告警，约 24 秒。DIAGRAM 15 的标题与图体被正确识别；右上表四个地区列头及 11/6/2/7、20/11/8/15 两行数值均在结构化输出中。对照本机原页图，旧复核记录“地区列头缺失”更正为 OCR 轻微错字（`South Atlantic` 误作 `South Arlantic`）；表格仍未逐格人工核验，不进入 Agent 证据。
+- 尝试全量重跑前 250 页 v8；standard/VLM 批次含 1,204 个块，约 3 分钟仅完成约 127 个，速度显著慢于之前约 37 分钟基线，故中止且未覆盖 v6 全量报告。后端全量 **371 passed**；Ruff check/format、OpenAPI 导出及根目录 `git diff --check` 通过。局部通过不证明 250 页整体准确率，图表证据继续隔离。
+
+## 2026-11-06 多用户科研助手改造（首版完成）
+
+- 根据用户最新要求，新增总体方案 `docs/General_Plan.md` 和分阶段代码计划 `docs/IMPLEMENTATION_PLAN.md`。计划覆盖账号+密码唯一注册、用户隔离、双工作区、MinerU 解析迁移、结构感知 chunk + BM25/Dense/RRF、私有会话、按任务 Skills、异常边界和质量门。
+- 采用“MinerU 为目标主解析器、版本化切换旧索引”的路线；明确全文需逐篇许可，元数据加入个人库不自动下载 PDF。外部 Skills 仅经审查后使用，不能改变 Agent 工具白名单。
+- 已完成：账号+密码认证（Argon2id、唯一账号、哈希 session cookie、限流）、用户个人库及来源元数据快照、会话/消息隔离与清空/删除、Agent run 所有权、用户库 ID 作为不可信检索线索、MinerU SDK 适配与模型配置、文稿修订/引用核验 Skills、双工作区 UI 与会话列表；私有 PDF 失败状态显示具体原因。
+- 数据迁移 `0011`–`0017` 覆盖账号/会话/Agent owner/个人库元数据、私有 PDF/chunk、chunker 版本和未发表个人稿件；0017 迁移测试确认旧文档/片段与删除级联保留。登录用户可将 PDF 关联到个人库条目，也可只填标题上传自己的未发表稿件；逐篇声明版权/授权后进入仅限本人访问的私有存储。MinerU 异步解析、结构 chunk、owner-filtered BM25 和共享/私有 RRF 已接入；登录态 Agent 不调用 embedding provider。私有 MinerU 任务通过本机子进程执行，最长 30 分钟；远程 VLM 配置拒绝，超时/崩溃保留可重试失败状态。私有全文授权不赋予共享语料导入许可。
+- 解析器质量修复：五篇 PDF 各页都有可抽取原生文字，因此新增按页文字层检测后选择 MinerU `ocr_mode=txt`，无文字层页继续 `auto` OCR。对 2611.08054 p10/p24 的定向试跑恢复 `macro` 下标。新增图注原生词、表格数字及标识符差异警告；p6 的 Mistral 标识符不一致和 p13 Table 5 的多个数值 token 不一致被检测到。PDF 文字层本身也有字符错序，差异数不是确认漏值数。版本升至 `papertrail-v5` 使旧索引重解析。试跑和合成回归通过；表格/图元素仍未核验并排除 Agent 引用。
+- Table 5 放大复测：将原始第 13 页表格区域以 300 DPI 本机渲染为 PNG，MinerU 4.1.7 的 standard/advanced 均得到 51 行，但 Whole-meal 末组仍为 2 列（原页为 3），无法补回末列。高分辨率输入没有解决该结构缺陷，继续隔离表格证据；下一步应以 PDF 原生字符坐标和版面网格作独立重建，并逐格校验后再考虑入库。
+- pdfplumber v27 对照重新处理 39 页原文耗时约 80 秒，第 13 页识别为 `table_structure_unavailable_visual_lines_only`。可见文字序列包含 `65.4`，但表头/行结构不可信，因此也不能作为 MinerU 的自动回退来源。
+- 额外检查了 `pdfplumber.extract_text(layout=True)`：它能恢复部分字间距错乱，但多列值仍有粘连，且跨行/跨列标签不能稳定归到每个模型行。没有把它升级为表格回退。五篇样本全是带原生文字层的数字 PDF，真实扫描 OCR 仍缺可验收输入。
+- 新扫描样本已到：`paper_test/Journal_-_American_Medical_Association_(IA_journalamericanm20ameruoft).pdf` 是 72.7 MiB、726 页的整卷扫描件/数字化卷册，超过私有解析当前 40 MB/500 页上限，且不是单篇论文。抽查发现第 11 页正文有扫描图并带既有 OCR 文字层；强制用 MinerU 4.1.7 `standard` + `ocr_mode=ocr` 对原 PDF 第 11 页单页解析成功，输出包含双栏正文和标题。第 1 页为图像封面，识别只得到少量污渍/标签文字；第 66 页虽可由 Poppler 正常渲染并含 Fig. 3–5，MinerU 通过原 PDF 页范围和渲染图输入均遇到本地 PDF render worker exit 1，尚未验证该页图注 OCR。整卷不导入索引；需用户确认目标文章的页码范围后才能设计受限拆页/分批验收。
+- 用户指定先检查前 250 页。将其复制到 26.2 MB 临时 PDF（忽略目录，原卷未改），MinerU 4.1.7 standard/auto 完成 250/250 页，249 页产生元素，4,791 元素、5,367 chunks、123 warnings，耗时约 36.9 分钟；原生文字差异告警 22。AI 视觉复核 p52/p66/p183/p241：p52 的 DIAGRAM 15 被误判 table；右上真表地区列头后由 v8 `auto` OCR 定向重跑恢复（有一处轻微 OCR 拼写错误）。p66 Fig.3–5 图号标签配图正确但长说明未关联；p183 Fig.3–6 图注位置正确；p241 Fig.33 图注落在相邻 paragraph。后续适配器 v6/v7/v8 分别补充图表重分类、相邻图注及同页唯一图号跨栏关联。两类元素仍有未核验警告并从 Agent 证据检索排除。AI 抽查非人工金标；不逐格的统计输出不代表 250 页质量通过。
+- 私有视觉抽查覆盖五篇 PDF 的选定页面：2611.07517 p1、2611.07928 p10、2611.08054 p10/p13、2611.08390 p8、2611.08483 p4。只使用本地渲染的选页图片，没有将整篇 PDF 发送到远程 API。AI 辅助查看不是人工金标；这些版面页也没有验证扫描页 OCR 准确率。五篇全页人工盲审和冻结检索题集尚未完成，不能宣称解析质量全面通过。
+- 后端全量 **367 passed**（pytest cache 禁用、项目内 basetemp）；Ruff check、format check、OpenAPI 导出和根目录 `git diff --check` 通过。Web Prettier、TypeScript、Next 生产构建、E2E **33/33** 为上一轮结果；本轮未改 Web 或依赖。后台任务重启失败保留 `reindex_required` 行为。
+- 开发阶段对个人稿件的后端与前端使用分工明确的子 Agent，并独立只读复核迁移与引用边界；业务 Agent 生产路径仍为单 Agent，默认不启用 multi-agent。
+- 子进程路径已用一篇 8 页真实 PDF 验证，得到 8/8 页、128 元素、13 条图表未核验警告；模拟超时进入 `mineru_timeout`，远程 VLM 配置在读取 PDF 前以专用状态拒绝。尚未添加操作系统级网络/内存隔离；本机解析应在受控运行环境中使用。
+- 个人稿件联通验收另用自生成 `TEST-*` 合成 PDF 在隔离的忽略目录运行真实 MinerU 子进程：状态 `indexed`、9 个片段、本人 `personal` BM25 检索成功、来源 URL 为空，未把用户提供的五篇 PDF 作权利声明后入库。
+- 当前保护既有用户改动：`docs/portfolio/resume-facts.md`、`.tmp_fetch/`、`interview_prep/`；未删除旧测试/研究材料，未触碰现有 SQLite/PDF。
+
 ## 2026-10-15 AI 标注真实语料评测（R01/R03）与简历材料刷新
 
 用户要求尽快产出可写进简历的整块成果。本轮做 A1（真实语料评测）+ A3（简历材料刷新），A2（R04 账单硬上限/重启续跑）**因优先级调整暂缓**——它是开放式工程且简历价值低于评测结果。

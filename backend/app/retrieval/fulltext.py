@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from html import unescape
 from typing import Any
 
 CHUNKER_VERSION = "paragraph-utf8-token-upper-bound-v3"
-PDF_CHUNKER_VERSION = "pdf-element-structure-token-upper-bound-v4"
+PDF_CHUNKER_VERSION = "pdf-element-structure-token-upper-bound-v5"
 MAX_CHUNK_TOKEN_UPPER_BOUND = 1_800
 # Backward-compatible name for callers/tests; this limit is now UTF-8 bytes, not characters.
 MAX_CHUNK_CHARS = MAX_CHUNK_TOKEN_UPPER_BOUND
@@ -30,6 +31,10 @@ class TextChunk:
     bbox: str | None = None
     element_id: str | None = None
     evidence_text: str | None = None
+
+
+class ChunkSizeInfeasibleError(ValueError):
+    """A structured table cannot fit the selected chunk size without losing its headers."""
 
 
 def _trimmed_span(text: str, start: int, stop: int) -> tuple[int, int, str]:
@@ -189,6 +194,76 @@ def _format_source_rows(rows: list[int]) -> str:
     return ",".join(parts)
 
 
+def _chunk_mineru_html_table(
+    text: str,
+    page: int,
+    section_path: list[str],
+    bbox: str | None,
+    element_id: str | None,
+    ordinal_start: int,
+    max_chunk_bytes: int,
+) -> list[TextChunk]:
+    """Split MinerU HTML by source rows while keeping exact evidence offsets."""
+    rows = list(re.finditer(r"<tr(?:\s[^>]*)?>.*?</tr\s*>", text, re.I | re.S))
+    if not rows:
+        return []
+
+    def readable(source: str) -> str:
+        source = re.sub(r"</t[dh]\s*>", " | ", source, flags=re.I)
+        return " ".join(unescape(re.sub(r"<[^>]*>", " ", source)).split())
+
+    header = readable(text[: rows[0].start()] + rows[0].group())
+    header = header[
+        : _choose_stop(
+            header,
+            0,
+            400,
+        )
+    ]
+    prefix = f"{header}\n" if header else ""
+    available = max_chunk_bytes - len(prefix.encode("utf-8"))
+    if available < 1:
+        raise ChunkSizeInfeasibleError("MinerU table header exceeds the configured chunk size")
+    chunks: list[TextChunk] = []
+    spans = [(0, rows[0].start(), "标题")]
+    spans.extend(
+        (
+            row.start(),
+            rows[index + 1].start() if index + 1 < len(rows) else len(text),
+            str(index + 1),
+        )
+        for index, row in enumerate(rows)
+    )
+    for span_start, span_end, label in spans:
+        position = span_start
+        while position < span_end:
+            stop = min(span_end, _choose_stop(text, position, available))
+            if stop <= position:
+                raise ChunkSizeInfeasibleError("MinerU table fragment cannot fit in a chunk")
+            excerpt = text[position:stop]
+            body = readable(excerpt)
+            if body:
+                chunks.append(
+                    TextChunk(
+                        ordinal=ordinal_start + len(chunks),
+                        locator=f"第 {page} 页 · table · HTML 行 {label} · 字符 {position}-{stop}",
+                        char_start=position,
+                        char_end=stop,
+                        text=prefix + body if label != "标题" else body,
+                        evidence_text=excerpt,
+                        page_number=page,
+                        element_type="table",
+                        section_path=json.dumps(
+                            section_path, ensure_ascii=False, separators=(",", ":")
+                        ),
+                        bbox=bbox,
+                        element_id=element_id,
+                    )
+                )
+            position = stop
+    return chunks
+
+
 def _chunk_table(
     element: dict[str, Any],
     text: str,
@@ -197,11 +272,18 @@ def _chunk_table(
     bbox: str | None,
     element_id: str | None,
     ordinal_start: int,
+    max_chunk_bytes: int,
 ) -> list[TextChunk]:
     lines = _line_positions(text)
     structured = element.get("structured")
     structured = structured if isinstance(structured, dict) else {}
     rows_value = structured.get("rows")
+    if not rows_value and "<table" in text.lower():
+        html_chunks = _chunk_mineru_html_table(
+            text, page, section_path, bbox, element_id, ordinal_start, max_chunk_bytes
+        )
+        if html_chunks:
+            return html_chunks
     title = lines[0][0] if lines else ""
     header = ""
     data_rows: list[tuple[str, int, int, list[int]]] = []
@@ -279,8 +361,10 @@ def _chunk_table(
 
     if not header and len(lines) > 1:
         header, header_start, header_end = lines[1]
-    if len(header.encode("utf-8")) > MAX_CHUNK_TOKEN_UPPER_BOUND:
-        raise ValueError("PDF table header exceeds the 1,800 UTF-8 byte chunk limit")
+    if len(header.encode("utf-8")) > max_chunk_bytes:
+        raise ChunkSizeInfeasibleError(
+            "PDF table header exceeds the configured UTF-8 byte chunk limit"
+        )
 
     # Some PDF table extractors split a hyphenated word across two physical rows,
     # leaving the continuation in an otherwise empty row. Join only that unambiguous
@@ -321,8 +405,10 @@ def _chunk_table(
         if not pending:
             return
         content = _table_chunk_text(title, header, [row[0] for row in pending])
-        if len(content.encode("utf-8")) > MAX_CHUNK_TOKEN_UPPER_BOUND:
-            raise ValueError("PDF table row exceeds the 1,800 UTF-8 byte chunk limit")
+        if len(content.encode("utf-8")) > max_chunk_bytes:
+            raise ChunkSizeInfeasibleError(
+                "PDF table row exceeds the configured UTF-8 byte chunk limit"
+            )
         source_start = pending[0][1] if pending else header_start
         source_end = pending[-1][2] if pending else header_end
         source_row_label = _format_source_rows(
@@ -352,22 +438,22 @@ def _chunk_table(
 
     for row in data_rows:
         candidate = _table_chunk_text(title, header, [item[0] for item in pending] + [row[0]])
-        if pending and len(candidate.encode("utf-8")) > MAX_CHUNK_TOKEN_UPPER_BOUND:
+        if pending and len(candidate.encode("utf-8")) > max_chunk_bytes:
             flush()
             candidate = _table_chunk_text(title, header, [row[0]])
-        if len(candidate.encode("utf-8")) > MAX_CHUNK_TOKEN_UPPER_BOUND:
+        if len(candidate.encode("utf-8")) > max_chunk_bytes:
             prefix = _table_chunk_text(title, header, []) + "\n"
-            available = MAX_CHUNK_TOKEN_UPPER_BOUND - len(prefix.encode("utf-8"))
+            available = max_chunk_bytes - len(prefix.encode("utf-8"))
             if available < 1:
-                raise ValueError(
-                    "PDF table title and header exceed the 1,800 UTF-8 byte chunk limit"
+                raise ChunkSizeInfeasibleError(
+                    "PDF table title and header exceed the configured chunk size"
                 )
             part_start = 0
             part_index = 1
             while part_start < len(row[0]):
                 part_stop = _choose_stop(row[0], part_start, available)
                 if part_stop <= part_start:
-                    raise ValueError(
+                    raise ChunkSizeInfeasibleError(
                         "PDF table row contains a character that cannot fit "
                         "with its repeated header"
                     )
@@ -424,15 +510,31 @@ def _chunk_table(
     return chunks
 
 
-def chunk_pdf_elements(elements: list[dict[str, object]]) -> list[TextChunk]:
+def chunk_pdf_elements(
+    elements: list[dict[str, object]],
+    *,
+    max_chunk_bytes: int = MAX_CHUNK_TOKEN_UPPER_BOUND,
+    max_overlap_bytes: int = 0,
+) -> list[TextChunk]:
     """Chunk PDF elements while retaining element lineage, local offsets and table headers.
 
     ``char_start`` and ``char_end`` are half-open offsets into the source element's
     ``text``. For paragraphs/headings/captions, the chunk text is that source slice.
     Table chunks repeat the title/header as retrieval context; their offsets identify
     the contiguous source data-row span named in ``locator`` (the repeated header is
-    contextual text and is not included in that span).
+    contextual text and is not included in that span). ``max_chunk_bytes`` and
+    ``max_overlap_bytes`` support offline ablation; ingestion continues to use the versioned
+    defaults. Overlap applies to text elements, not structured table rows.
     """
+    if (
+        type(max_chunk_bytes) is not int
+        or not 800 <= max_chunk_bytes <= MAX_CHUNK_TOKEN_UPPER_BOUND
+    ):
+        raise ValueError("max_chunk_bytes must be an integer between 800 and 1,800")
+    if type(max_overlap_bytes) is not int or not 0 <= max_overlap_bytes <= max_chunk_bytes // 2:
+        raise ValueError(
+            "max_overlap_bytes must be an integer between zero and half the chunk size"
+        )
     chunks: list[TextChunk] = []
     for element in elements:
         if not isinstance(element, dict):
@@ -464,6 +566,7 @@ def chunk_pdf_elements(elements: list[dict[str, object]]) -> list[TextChunk]:
                 bbox,
                 element_id,
                 len(chunks),
+                max_chunk_bytes,
             )
             chunks.extend(table_chunks)
             if len(chunks) > MAX_CHUNKS:
@@ -472,7 +575,7 @@ def chunk_pdf_elements(elements: list[dict[str, object]]) -> list[TextChunk]:
 
         start = 0
         while start < len(text):
-            stop = _choose_stop(text, start, MAX_CHUNK_TOKEN_UPPER_BOUND)
+            stop = _choose_stop(text, start, max_chunk_bytes)
             actual_start, actual_end, body = _trimmed_span(text, start, stop)
             if body:
                 chunks.append(
@@ -493,7 +596,31 @@ def chunk_pdf_elements(elements: list[dict[str, object]]) -> list[TextChunk]:
                         element_id=element_id,
                     )
                 )
-            start = stop
+            next_start = stop
+            if max_overlap_bytes and stop < len(text):
+                candidate = actual_end
+                overlap_size = 0
+                while candidate > actual_start:
+                    char_size = len(text[candidate - 1].encode("utf-8"))
+                    if overlap_size + char_size > max_overlap_bytes:
+                        break
+                    candidate -= 1
+                    overlap_size += char_size
+                boundaries = [
+                    boundary
+                    for boundary in (
+                        text.find(" ", candidate, actual_end),
+                        text.find("\n", candidate, actual_end),
+                    )
+                    if boundary >= 0
+                ]
+                if boundaries:
+                    candidate = min(boundaries) + 1
+                while candidate < actual_end and text[candidate].isspace():
+                    candidate += 1
+                if start < candidate < stop:
+                    next_start = candidate
+            start = next_start
             while start < len(text) and text[start].isspace():
                 start += 1
             if len(chunks) > MAX_CHUNKS:

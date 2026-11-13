@@ -84,6 +84,72 @@ def chunk_row(
     return None if row is None else (row[0], row[1], row[2], row[3], row[4])
 
 
+def validate_evidence_anchors(
+    connection: sqlite3.Connection,
+    source_id: str,
+    source: dict[str, str],
+    task: dict[str, Any],
+) -> tuple[list[dict[str, Any]] | None, str | None]:
+    primary = task.get("evidence")
+    raw_required = task.get("required_evidence")
+    if not isinstance(primary, dict):
+        return None, "invalid_evidence_anchor"
+    if raw_required is None:
+        raw_anchors = [primary]
+    elif (
+        not isinstance(raw_required, list)
+        or not 2 <= len(raw_required) <= 8
+        or any(not isinstance(anchor, dict) for anchor in raw_required)
+    ):
+        return None, "invalid_required_evidence"
+    else:
+        raw_anchors = raw_required
+        anchor_ids = [anchor.get("chunk_id") for anchor in raw_anchors]
+        if (
+            any(not isinstance(anchor_id, str) or not anchor_id for anchor_id in anchor_ids)
+            or len(anchor_ids) != len(set(anchor_ids))
+            or primary.get("chunk_id") not in anchor_ids
+        ):
+            return None, "invalid_required_evidence"
+
+    validated: list[dict[str, Any]] = []
+    for anchor in raw_anchors:
+        chunk_id = anchor.get("chunk_id")
+        quote = anchor.get("quote")
+        page = anchor.get("page_number")
+        element_type = anchor.get("element_type")
+        if (
+            anchor.get("source_id") != source_id
+            or not isinstance(chunk_id, str)
+            or type(page) is not int
+            or page < 1
+            or not isinstance(element_type, str)
+            or not isinstance(quote, str)
+            or not quote.strip()
+        ):
+            return None, "invalid_evidence_anchor"
+        chunk = chunk_row(connection, chunk_id)
+        if chunk is None:
+            return None, "unknown_chunk_id"
+        chunk_source, actual_page, actual_type, content_hash, text = chunk
+        if chunk_source != source_id or content_hash != source["content_sha256"]:
+            return None, "source_mismatch"
+        if actual_page != page or actual_type != element_type:
+            return None, "locator_mismatch"
+        if normalize(quote) not in normalize(text):
+            return None, "quote_not_verbatim"
+        validated.append(
+            {
+                "source_id": source_id,
+                "chunk_id": chunk_id,
+                "page_number": actual_page,
+                "element_type": actual_type,
+                "quote": quote,
+            }
+        )
+    return validated, None
+
+
 def full_corpus_text(connection: sqlite3.Connection, hashes: list[str]) -> str:
     placeholders = ",".join("?" for _ in hashes)
     parts = [
@@ -129,43 +195,46 @@ def main() -> None:
             for group in batch["batches"]:
                 source_id = group["source_id"]
                 for task in group["answerable_tasks"]:
-                    evidence = dict(task["evidence"])
-                    chunk = chunk_row(connection, evidence["chunk_id"])
-                    if chunk is None:
-                        rejected.append({"task_id": task["task_id"], "reason": "unknown_chunk_id"})
-                        continue
-                    chunk_source, page, element_type, content_hash, text = chunk
-                    if chunk_source != source_id or content_hash != sources.get(source_id, {}).get(
-                        "content_sha256"
-                    ):
-                        rejected.append({"task_id": task["task_id"], "reason": "source_mismatch"})
-                        continue
-                    if page != evidence["page_number"] or element_type != evidence["element_type"]:
-                        rejected.append({"task_id": task["task_id"], "reason": "locator_mismatch"})
-                        continue
                     if task["challenge_type"] not in ALLOWED_CHALLENGE_TYPES:
                         rejected.append(
                             {"task_id": task["task_id"], "reason": "bad_challenge_type"}
                         )
                         continue
-                    if element_type == "table" and task["challenge_type"] != "table_lookup":
+                    source = sources.get(source_id)
+                    anchors, reason = (
+                        validate_evidence_anchors(connection, source_id, source, task)
+                        if source is not None
+                        else (None, "unknown_source")
+                    )
+                    if reason is not None or not anchors:
                         rejected.append(
-                            {"task_id": task["task_id"], "reason": "table_type_mismatch"}
+                            {
+                                "task_id": task["task_id"],
+                                "reason": reason or "invalid_evidence_anchor",
+                            }
                         )
                         continue
-                    if (
-                        element_type == "figure_caption"
-                        and task["challenge_type"] != "figure_caption"
-                    ):
-                        rejected.append(
-                            {"task_id": task["task_id"], "reason": "caption_type_mismatch"}
-                        )
-                        continue
-                    if normalize(evidence["quote"]) not in normalize(text):
-                        rejected.append(
-                            {"task_id": task["task_id"], "reason": "quote_not_verbatim"}
-                        )
-                        continue
+                    primary_chunk_id = task["evidence"]["chunk_id"]
+                    primary = next(
+                        anchor for anchor in anchors if anchor["chunk_id"] == primary_chunk_id
+                    )
+                    if task["challenge_type"] != "multi_hop":
+                        if (
+                            primary["element_type"] == "table"
+                            and task["challenge_type"] != "table_lookup"
+                        ):
+                            rejected.append(
+                                {"task_id": task["task_id"], "reason": "table_type_mismatch"}
+                            )
+                            continue
+                        if (
+                            primary["element_type"] == "figure_caption"
+                            and task["challenge_type"] != "figure_caption"
+                        ):
+                            rejected.append(
+                                {"task_id": task["task_id"], "reason": "caption_type_mismatch"}
+                            )
+                            continue
                     if task["task_id"] in seen_ids:
                         rejected.append({"task_id": task["task_id"], "reason": "duplicate_task_id"})
                         continue
@@ -178,13 +247,12 @@ def main() -> None:
                             "question": task["question"].strip(),
                             "answer": task["answer"].strip(),
                             "expected_answerable": True,
-                            "evidence": {
-                                "source_id": source_id,
-                                "chunk_id": evidence["chunk_id"],
-                                "page_number": page,
-                                "element_type": element_type,
-                                "quote": evidence["quote"],
-                            },
+                            "evidence": primary,
+                            **(
+                                {"required_evidence": anchors}
+                                if task.get("required_evidence") is not None
+                                else {}
+                            ),
                         }
                     )
             for task in batch["unanswerable_tasks"]:

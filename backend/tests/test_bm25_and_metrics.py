@@ -82,8 +82,32 @@ def test_metric_values_for_graded_relevance_and_empty_ranking() -> None:
     assert metrics["mrr@3"] == 1.0
     assert metrics["ndcg@3"] == pytest.approx((1 + 7 / math.log2(3)) / (7 + 1 / math.log2(3)))
     assert score_query([], {"W1": 2}, cutoffs=(1,))["ndcg@1"] == 0.0
-    with pytest.raises(ValueError, match="non-negative"):
+    with pytest.raises(ValueError, match="grades"):
         score_query([], {"W1": -1})
+
+
+def test_mrr_does_not_count_hits_beyond_its_cutoff() -> None:
+    ranking = [f"D{index}" for index in range(1, 16)]
+    assert score_query(ranking, {"D15": 1}, cutoffs=(1, 5, 10))["mrr@10"] == 0.0
+    assert score_query(ranking, {"D5": 1}, cutoffs=(1, 5, 10))["mrr@10"] == 0.2
+
+
+def test_metric_cutoffs_must_be_nonempty_and_positive() -> None:
+    with pytest.raises(ValueError, match="cutoffs"):
+        score_query([], {}, cutoffs=())
+    with pytest.raises(ValueError, match="cutoffs"):
+        score_query([], {}, cutoffs=(1, 0))
+    with pytest.raises(ValueError, match="cutoffs"):
+        score_query([], {}, cutoffs=(1.5,))  # type: ignore[arg-type]
+
+
+def test_relevance_grades_must_be_non_negative_integers() -> None:
+    with pytest.raises(ValueError, match="grades"):
+        score_query([], {"D1": float("nan")})  # type: ignore[dict-item]
+    with pytest.raises(ValueError, match="grades"):
+        score_query([], {"D1": 1.5})  # type: ignore[dict-item]
+    with pytest.raises(ValueError, match="grades"):
+        score_query([], {"D1": 10})
 
 
 def test_runner_uses_exact_frozen_snapshot_and_is_explicitly_exploratory() -> None:

@@ -7,8 +7,11 @@ are pdfplumber points with a top-left origin: ``[x0, top, x1, bottom]``.
 from __future__ import annotations
 
 import hashlib
+import html
 import io
 import json
+import math
+import os
 import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -28,10 +31,24 @@ from app.retrieval.pdf_table_refinement import (
 PARSER_VERSION = "pdfplumber-layout-v27"
 MAX_PDF_BYTES = 40_000_000
 MAX_PDF_PAGES = 500
+MINERU_ADAPTER_VERSION = "papertrail-v12"
 MAX_PDF_TEXT_CHARS = 2_000_000
+MAX_PDF_ELEMENTS = 20_000
 
 _HEADING = re.compile(r"^(?P<number>\d+(?:\.\d+)*)(?:[.)])?\s+(?P<title>[A-Za-z][^.!?]{1,120})$")
 _CAPTION = re.compile(r"^(?:fig(?:ure)?\.?|图)\s*\d+[A-Za-z]?(?:\s*[:.)-]\s*|$)", re.I)
+_MINERU_FIGURE_CAPTION = re.compile(
+    r"^(?:supplementary\s+)?fig(?:ure)?\.?\s*\d+[A-Za-z]?(?:\s*[:.)—–-]\s*|$)",
+    re.I,
+)
+_MINERU_FIGURE_NUMBER = re.compile(
+    r"^\s*(?:supplementary\s+)?[\[(]?\s*fig(?:ure)?\.?\s*(?P<number>\d+[a-z]?)\b",
+    re.I,
+)
+_MINERU_DIAGRAM_CAPTION = re.compile(r"^(?:diagram|chart)\s+\d+\b", re.I)
+_MINERU_PAGE_SELF_DESCRIPTION = re.compile(
+    r"^(?:the\s+)?image\s+contains\s+no\s+(?:text|content)\b", re.I
+)
 _TABLE_CAPTION = re.compile(r"^table\s*(?P<number>\d+[A-Za-z]?|[IVXLCDM]+)\s*[:.)-]", re.I)
 _TEXT_X_TOLERANCE = 2
 _WORD_X_TOLERANCE = 1
@@ -1986,6 +2003,702 @@ def parse_pdf_bytes(pdf_bytes: bytes) -> dict[str, Any]:
         "page_count": page_count,
         "table_regions": table_regions,
         "image_regions": image_regions,
+        "figure_captions": figure_captions,
+        "warnings": warnings,
+    }
+
+
+def _bbox_edge_gap(first: Sequence[float], second: Sequence[float]) -> float:
+    horizontal_gap = max(0.0, first[0] - second[2], second[0] - first[2])
+    vertical_gap = max(0.0, first[1] - second[3], second[1] - first[3])
+    return horizontal_gap + vertical_gap
+
+
+def _is_textual_equation(text: str) -> bool:
+    """Catch short prose labels that layout models sometimes emit as equations."""
+    normalized = re.sub(r"\\text\s*\{(.*?)\}", r"\1", text, flags=re.S).strip()
+    if len(normalized) > 200 or re.search(r"[\d=+*/^_{}<>≤≥≈∑∫√×÷∂∇]", normalized):
+        return False
+    return len(re.findall(r"[A-Za-z]+", normalized)) >= 3
+
+
+def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[str, Any]:
+    """Parse a bounded PDF with the optional local MinerU SDK into PaperTrail elements."""
+    if len(pdf_bytes) > MAX_PDF_BYTES or not pdf_bytes.startswith(b"%PDF-"):
+        raise ValueError("MinerU input must be a valid PDF no larger than 40 MB")
+    if tier not in {"basic", "standard", "advanced"}:
+        raise ValueError("MinerU tier must be basic, standard, or advanced")
+    image_analysis_enabled = tier == "advanced"
+    import tempfile
+
+    try:
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as source_pdf:
+            if not source_pdf.pages or len(source_pdf.pages) > MAX_PDF_PAGES:
+                raise ValueError("PDF must contain between 1 and 500 pages")
+            page_sizes = [(float(page.width), float(page.height)) for page in source_pdf.pages]
+            # MinerU's native-text path preserves small scientific subscripts that
+            # its OCR path can misread. Keep OCR for scans and mixed PDFs.
+            ocr_mode = (
+                "txt"
+                if all(
+                    sum(str(char.get("text", "")).isalnum() for char in page.chars) >= 30
+                    for page in source_pdf.pages
+                )
+                else "auto"
+            )
+    except ValueError:
+        raise
+    except Exception as error:
+        raise ValueError("could not verify source PDF geometry") from error
+
+    previous_source = os.environ.get("MINERU_MODEL_SOURCE")
+    os.environ.setdefault("MINERU_MODEL_SOURCE", "local")
+    try:
+        try:
+            from mineru.parser import parse
+        except ImportError as error:
+            raise ValueError(
+                "MinerU is not installed; install the pdf-mineru optional dependency"
+            ) from error
+        with tempfile.TemporaryDirectory(prefix="papertrail-mineru-") as temporary_dir:
+            source_path = Path(temporary_dir) / "source.pdf"
+            source_path.write_bytes(pdf_bytes)
+            result = parse(
+                source_path,
+                tier=tier,
+                ocr_mode=ocr_mode,
+                image_analysis=image_analysis_enabled,
+            )
+    finally:
+        if previous_source is None:
+            os.environ.pop("MINERU_MODEL_SOURCE", None)
+
+    middle = result.middle_json
+    if len(middle.pages) != len(page_sizes):
+        raise ValueError("MinerU returned incomplete PDF pages")
+    elements: list[dict[str, Any]] = []
+    section_path: list[str] = []
+    total_chars = 0
+    table_count = 0
+    image_count = 0
+    figure_captions = 0
+    warnings: list[dict[str, Any]] = []
+    seen_pages: set[int] = set()
+
+    def text_value(value: Any) -> str:
+        if isinstance(value, str):
+            return value
+        if hasattr(value, "model_dump"):
+            return text_value(value.model_dump(mode="json"))
+        if isinstance(value, list):
+            return "".join(text_value(item) for item in value)
+        if isinstance(value, dict):
+            for key in ("content", "text", "latex", "html"):
+                if key in value:
+                    return text_value(value[key])
+        return ""
+
+    def without_image_data(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: without_image_data(item)
+                for key, item in value.items()
+                if key != "image_base64"
+            }
+        if isinstance(value, list):
+            return [without_image_data(item) for item in value]
+        return value
+
+    kind_map = {
+        "text": "paragraph",
+        "ref_text": "paragraph",
+        "doc_title": "title",
+        "paragraph_title": "heading",
+        "equation": "formula",
+        "table": "table",
+        "image": "figure",
+        "chart": "figure",
+        "code": "code",
+        "list": "list",
+        "page_footnote": "footnote",
+    }
+    for page in middle.pages:
+        if not isinstance(page.page_idx, int) or not 0 <= page.page_idx < len(page_sizes):
+            raise ValueError("MinerU returned a page outside the source PDF")
+        if page.page_idx in seen_pages:
+            raise ValueError("MinerU returned duplicate PDF pages")
+        seen_pages.add(page.page_idx)
+        page_number = page.page_idx + 1
+        page_width, page_height = page_sizes[page.page_idx]
+        block_data = [
+            without_image_data(block.model_dump(mode="json", exclude={"image_base64"}))
+            for block in page.blocks
+        ]
+        figure_indices = [
+            index for index, block in enumerate(page.blocks) if block.type in {"image", "chart"}
+        ]
+        assigned_figure_captions: dict[int, list[str]] = {index: [] for index in figure_indices}
+        group_figure_captions: list[dict[str, Any]] = []
+        table_indices = [index for index, block in enumerate(page.blocks) if block.type == "table"]
+        positioned_tables = [
+            index
+            for index in table_indices
+            if isinstance(page.blocks[index].bbox, (list, tuple))
+            and len(page.blocks[index].bbox) == 4
+        ]
+        assigned_captions: dict[int, list[str]] = {index: [] for index in table_indices}
+        reassigned_table_captions: set[int] = set()
+        for origin in table_indices:
+            content = block_data[origin].get("content")
+            for item in content if isinstance(content, list) else []:
+                if not isinstance(item, dict) or item.get("type") != "table_caption":
+                    continue
+                caption = text_value(item.get("content")).strip()
+                if not caption:
+                    continue
+                caption_bbox = item.get("bbox")
+                if _MINERU_FIGURE_CAPTION.match(caption):
+                    reassigned_table_captions.add(origin)
+                    if isinstance(caption_bbox, list) and len(caption_bbox) == 4:
+                        candidates = [
+                            index
+                            for index in figure_indices
+                            if isinstance(page.blocks[index].bbox, (list, tuple))
+                            and len(page.blocks[index].bbox) == 4
+                            and (
+                                0 <= page.blocks[index].bbox[1] - caption_bbox[3] <= 0.08
+                                or 0 <= caption_bbox[1] - page.blocks[index].bbox[3] <= 0.08
+                            )
+                            and min(caption_bbox[2], page.blocks[index].bbox[2])
+                            > max(caption_bbox[0], page.blocks[index].bbox[0])
+                        ]
+                        if len(candidates) == 1:
+                            assigned_figure_captions[candidates[0]].append(caption)
+                        else:
+                            group_figure_captions.append(
+                                {
+                                    "origin": origin,
+                                    "text": caption,
+                                    "bbox": caption_bbox,
+                                    "candidate_indices": candidates,
+                                    "source": item,
+                                }
+                            )
+                    continue
+                if (
+                    not isinstance(caption_bbox, list)
+                    or len(caption_bbox) != 4
+                    or not positioned_tables
+                ):
+                    assigned_captions[origin].append(caption)
+                    continue
+
+                target = min(
+                    [
+                        (_bbox_edge_gap(caption_bbox, page.blocks[index].bbox), index)
+                        for index in positioned_tables
+                    ]
+                )[1]
+                assigned_captions[target].append(caption)
+        for origin in figure_indices:
+            content = block_data[origin].get("content")
+            for item in content if isinstance(content, list) else []:
+                if not isinstance(item, dict) or item.get("type") not in {
+                    "image_caption",
+                    "chart_caption",
+                }:
+                    continue
+                caption = text_value(item.get("content")).strip()
+                if not caption:
+                    continue
+                caption_bbox = item.get("bbox")
+                if not isinstance(caption_bbox, list) or len(caption_bbox) != 4:
+                    assigned_figure_captions[origin].append(caption)
+                    continue
+                if _MINERU_FIGURE_CAPTION.match(caption):
+                    group_candidates = [
+                        index
+                        for index in figure_indices
+                        if isinstance(page.blocks[index].bbox, (list, tuple))
+                        and len(page.blocks[index].bbox) == 4
+                        and 0 <= caption_bbox[1] - page.blocks[index].bbox[3] <= 0.08
+                        and min(caption_bbox[2], page.blocks[index].bbox[2])
+                        > max(caption_bbox[0], page.blocks[index].bbox[0])
+                    ]
+                    if group_candidates:
+                        adjacent_group_candidates = set(group_candidates)
+                        while True:
+                            adjacent_to_group = {
+                                index
+                                for index in figure_indices
+                                if index not in adjacent_group_candidates
+                                and any(
+                                    _bbox_edge_gap(
+                                        page.blocks[index].bbox,
+                                        page.blocks[group_index].bbox,
+                                    )
+                                    <= 0.05
+                                    for group_index in adjacent_group_candidates
+                                )
+                            }
+                            if not adjacent_to_group:
+                                break
+                            adjacent_group_candidates.update(adjacent_to_group)
+                        group_candidates = sorted(adjacent_group_candidates)
+                        caption_width = caption_bbox[2] - caption_bbox[0]
+                        group_left = min(page.blocks[index].bbox[0] for index in group_candidates)
+                        group_right = max(page.blocks[index].bbox[2] for index in group_candidates)
+                        group_width = group_right - group_left
+                        if len(group_candidates) >= 2 and caption_width >= 0.8 * group_width:
+                            group_figure_captions.append(
+                                {
+                                    "origin": origin,
+                                    "text": caption,
+                                    "bbox": caption_bbox,
+                                    "candidate_indices": group_candidates,
+                                    "source": item,
+                                }
+                            )
+                            continue
+                candidates = [
+                    index
+                    for index in figure_indices
+                    if isinstance(page.blocks[index].bbox, (list, tuple))
+                    and len(page.blocks[index].bbox) == 4
+                    and 0 <= caption_bbox[1] - page.blocks[index].bbox[3] <= 0.05
+                    and min(caption_bbox[2], page.blocks[index].bbox[2])
+                    > max(caption_bbox[0], page.blocks[index].bbox[0])
+                ]
+                target = (
+                    min(candidates, key=lambda index: caption_bbox[1] - page.blocks[index].bbox[3])
+                    if candidates
+                    else origin
+                )
+                assigned_figure_captions[target].append(caption)
+        for block in page.blocks:
+            if block.type not in {"text", "ref_text"} or not block.bbox or len(block.bbox) != 4:
+                continue
+            caption = text_value(block.content).strip()
+            if len(caption) > 1200:
+                continue
+            candidates = [
+                index
+                for index in figure_indices
+                if isinstance(page.blocks[index].bbox, (list, tuple))
+                and len(page.blocks[index].bbox) == 4
+                and 0 <= block.bbox[1] - page.blocks[index].bbox[3] <= 0.05
+                and min(block.bbox[2], page.blocks[index].bbox[2])
+                > max(block.bbox[0], page.blocks[index].bbox[0])
+            ]
+            is_labeled_caption = bool(_MINERU_FIGURE_CAPTION.match(caption))
+            if (
+                is_labeled_caption
+                and len(candidates) == 1
+                and block.bbox[1] - page.blocks[candidates[0]].bbox[3] <= 0.012
+            ):
+                assigned_figure_captions[candidates[0]].append(caption)
+                continue
+            if is_labeled_caption:
+                side_by_side_candidates = []
+                for index in figure_indices:
+                    figure_bbox = page.blocks[index].bbox
+                    if not isinstance(figure_bbox, (list, tuple)) or len(figure_bbox) != 4:
+                        continue
+                    vertical_overlap = min(block.bbox[3], figure_bbox[3]) - max(
+                        block.bbox[1], figure_bbox[1]
+                    )
+                    minimum_height = min(
+                        block.bbox[3] - block.bbox[1], figure_bbox[3] - figure_bbox[1]
+                    )
+                    horizontal_gap = max(
+                        0.0,
+                        block.bbox[0] - figure_bbox[2],
+                        figure_bbox[0] - block.bbox[2],
+                    )
+                    if (
+                        vertical_overlap > 0
+                        and minimum_height > 0
+                        and vertical_overlap / minimum_height >= 0.5
+                        and horizontal_gap <= 0.05
+                    ):
+                        side_by_side_candidates.append(index)
+                if len(side_by_side_candidates) == 1:
+                    assigned_figure_captions[side_by_side_candidates[0]].append(caption)
+                    continue
+            is_compact_adjacent_text = (
+                len(caption) <= 240
+                and len(candidates) == 1
+                and block.bbox[1] - page.blocks[candidates[0]].bbox[3] <= 0.012
+            )
+            if len(candidates) == 1 and (is_labeled_caption or is_compact_adjacent_text):
+                assigned_figure_captions[candidates[0]].append(caption)
+            numbered_caption = _MINERU_FIGURE_NUMBER.match(caption)
+            if numbered_caption:
+                figure_number = numbered_caption.group("number").casefold()
+                labelled_figures = [
+                    index
+                    for index in figure_indices
+                    if (
+                        label := _MINERU_FIGURE_NUMBER.match(
+                            text_value(block_data[index].get("content")).strip()
+                        )
+                    )
+                    and label.group("number").casefold() == figure_number
+                ]
+                if len(labelled_figures) == 1:
+                    assigned_figure_captions[labelled_figures[0]].append(caption)
+
+        # Some scanned diagrams are emitted as fake table grids. If a nearby
+        # paragraph explicitly names a diagram/chart and the next block is a
+        # single horizontally aligned table candidate, retain it as a figure.
+        diagram_references: dict[int, list[str]] = {}
+        for block in page.blocks:
+            if block.type not in {"text", "ref_text"} or not block.bbox or len(block.bbox) != 4:
+                continue
+            reference = re.search(
+                r"\b(?:diagram|chart)\s+\d+\b[^.!?]{0,900}[.!?]?",
+                text_value(block.content),
+                re.I,
+            )
+            if not reference:
+                continue
+            candidates = [
+                index
+                for index in table_indices
+                if isinstance(page.blocks[index].bbox, (list, tuple))
+                and len(page.blocks[index].bbox) == 4
+                and 0 <= page.blocks[index].bbox[1] - block.bbox[3] <= 0.07
+                and min(block.bbox[2], page.blocks[index].bbox[2])
+                > max(block.bbox[0], page.blocks[index].bbox[0])
+            ]
+            if len(candidates) == 1:
+                diagram_references.setdefault(candidates[0], []).append(reference.group(0).strip())
+        mineru_block_elements: dict[int, dict[str, Any]] = {}
+        page_figure_caption_count = 0
+        for block_index, block in enumerate(page.blocks):
+            if len(elements) >= MAX_PDF_ELEMENTS:
+                raise ValueError("MinerU output exceeds the 20,000 element limit")
+            element_type = kind_map.get(block.type, "paragraph")
+            text = text_value(block.content).strip()
+            if block.type in {"text", "ref_text"} and _MINERU_PAGE_SELF_DESCRIPTION.match(text):
+                warnings.append(
+                    {"page_number": page_number, "code": "mineru_page_self_description"}
+                )
+                continue
+            equation_text_reclassified = block.type == "equation" and _is_textual_equation(text)
+            if equation_text_reclassified:
+                element_type = "paragraph"
+            source_content = block_data[block_index].get("content")
+            if block.type == "table" and isinstance(source_content, list):
+                diagram_caption = next(
+                    (
+                        text_value(item.get("content")).strip()
+                        for item in source_content
+                        if isinstance(item, dict)
+                        and item.get("type") == "table_caption"
+                        and _MINERU_DIAGRAM_CAPTION.match(text_value(item.get("content")).strip())
+                    ),
+                    None,
+                )
+                if diagram_caption:
+                    element_type = "figure"
+                    text = diagram_caption
+                    assigned_captions.pop(block_index, None)
+                elif block_index in diagram_references:
+                    element_type = "figure"
+                    text = "\n".join(dict.fromkeys(diagram_references[block_index]))
+                    assigned_captions.pop(block_index, None)
+            if block_index in assigned_captions and isinstance(source_content, list):
+                body = [
+                    item
+                    for item in block_data[block_index]["content"]
+                    if not isinstance(item, dict) or item.get("type") != "table_caption"
+                ]
+                text = "".join(assigned_captions[block_index]) + text_value(body)
+            if block_index in assigned_figure_captions:
+                captions = "\n".join(dict.fromkeys(assigned_figure_captions[block_index]))
+                if isinstance(source_content, list):
+                    body = [
+                        item
+                        for item in source_content
+                        if not isinstance(item, dict)
+                        or item.get("type") not in {"image_caption", "chart_caption"}
+                    ]
+                    body_text = text_value(body)
+                else:
+                    body_text = text
+                text = f"{captions}\n{body_text}".strip() if captions else body_text.strip()
+            if image_analysis_enabled and block.type in {"image", "chart"}:
+                # Keep advanced-tier VLM output out of source-exact text. Preserve its
+                # payload in structured data for a future typed visual-evidence path.
+                text = "\n".join(dict.fromkeys(assigned_figure_captions.get(block_index, [])))
+            if not text and block.type not in {"image", "chart"}:
+                continue
+            raw_bbox = list(block.bbox) if block.bbox is not None else [0.0, 0.0, 1.0, 1.0]
+            bbox = (
+                [
+                    raw_bbox[0] * page_width,
+                    raw_bbox[1] * page_height,
+                    raw_bbox[2] * page_width,
+                    raw_bbox[3] * page_height,
+                ]
+                if len(raw_bbox) == 4 and max(abs(float(value)) for value in raw_bbox) <= 1
+                else raw_bbox
+            )
+            if (
+                len(bbox) != 4
+                or not all(math.isfinite(float(value)) for value in bbox)
+                or bbox[0] < 0
+                or bbox[1] < 0
+                or bbox[2] > page_width
+                or bbox[3] > page_height
+                or bbox[0] > bbox[2]
+                or bbox[1] > bbox[3]
+            ):
+                raise ValueError("MinerU returned invalid page geometry")
+            if element_type == "heading" and text:
+                section_path = (section_path + [text])[-8:]
+            element_warnings = []
+            if equation_text_reclassified:
+                element_warnings.append("mineru_equation_text_reclassified")
+                warnings.append(
+                    {"page_number": page_number, "code": "mineru_equation_text_reclassified"}
+                )
+            if element_type == "table":
+                element_warnings.append("mineru_table_cells_unverified")
+                if block_index in reassigned_table_captions:
+                    element_warnings.append("mineru_table_caption_reassigned_to_figure")
+                    warnings.append(
+                        {
+                            "page_number": page_number,
+                            "code": "mineru_table_caption_reassigned_to_figure",
+                        }
+                    )
+            elif element_type == "figure":
+                element_warnings.append("mineru_figure_caption_unverified")
+                if image_analysis_enabled and block.type in {"image", "chart"}:
+                    element_warnings.append("mineru_visual_analysis_unverified")
+            if block.bbox is None:
+                element_warnings.append("mineru_bbox_missing_page_fallback")
+            if element_type in {"table", "figure"}:
+                warnings.append({"page_number": page_number, "code": element_warnings[0]})
+            if "mineru_visual_analysis_unverified" in element_warnings:
+                warnings.append(
+                    {"page_number": page_number, "code": "mineru_visual_analysis_unverified"}
+                )
+            element = {
+                "element_id": _stable_element_id(page_number, element_type, text, bbox),
+                "order_index": len(elements),
+                "page_number": page_number,
+                "page_width": round(page_width, 2),
+                "page_height": round(page_height, 2),
+                "bbox": [round(float(value), 2) for value in bbox],
+                "element_type": element_type,
+                "section_path": section_path.copy(),
+                "text": text,
+                "structured": {
+                    **block_data[block_index],
+                    **(
+                        {
+                            "papertrail_visual_analysis": {
+                                "status": "model_generated_unverified",
+                                "source": "mineru_advanced",
+                            }
+                        }
+                        if image_analysis_enabled and block.type in {"image", "chart"}
+                        else {}
+                    ),
+                },
+                "warnings": element_warnings,
+            }
+            elements.append(element)
+            mineru_block_elements[block_index] = element
+            total_chars += len(text)
+            table_count += element_type == "table"
+            image_count += element_type == "figure"
+            if total_chars > MAX_PDF_TEXT_CHARS:
+                raise ValueError("MinerU output exceeds the 2 million character limit")
+        for caption in group_figure_captions:
+            raw_bbox = caption["bbox"]
+            caption_box = (
+                [
+                    raw_bbox[0] * page_width,
+                    raw_bbox[1] * page_height,
+                    raw_bbox[2] * page_width,
+                    raw_bbox[3] * page_height,
+                ]
+                if max(abs(float(value)) for value in raw_bbox) <= 1
+                else raw_bbox
+            )
+            if (
+                len(caption_box) != 4
+                or not all(math.isfinite(float(value)) for value in caption_box)
+                or caption_box[0] < 0
+                or caption_box[1] < 0
+                or caption_box[2] > page_width
+                or caption_box[3] > page_height
+                or caption_box[0] >= caption_box[2]
+                or caption_box[1] >= caption_box[3]
+            ):
+                continue
+            candidate_ids = [
+                mineru_block_elements[index]["element_id"]
+                for index in caption["candidate_indices"]
+                if index in mineru_block_elements
+            ]
+            elements.append(
+                {
+                    "element_id": _stable_element_id(
+                        page_number, "figure_caption", caption["text"], caption_box
+                    ),
+                    "order_index": len(elements),
+                    "page_number": page_number,
+                    "page_width": round(page_width, 2),
+                    "page_height": round(page_height, 2),
+                    "bbox": [round(float(value), 2) for value in caption_box],
+                    "element_type": "figure_caption",
+                    "section_path": section_path.copy(),
+                    "text": caption["text"],
+                    "structured": {
+                        "image_relation": {
+                            "status": "ambiguous",
+                            "image_element_id": None,
+                            "confidence": 0.0,
+                            "candidate_image_ids": candidate_ids,
+                        },
+                        "source": without_image_data(caption["source"]),
+                    },
+                    "warnings": [],
+                }
+            )
+            total_chars += len(caption["text"])
+            page_figure_caption_count += 1
+            if total_chars > MAX_PDF_TEXT_CHARS or len(elements) > MAX_PDF_ELEMENTS:
+                raise ValueError("MinerU output exceeds an element or text limit")
+        figure_captions += page_figure_caption_count
+    # A plausible-looking table can omit a numeric column, and OCR can corrupt a
+    # figure caption. Compare local source words only within each element's own
+    # region. Differences remain warnings because the PDF layer has no grid.
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as source_pdf:
+        for element in elements:
+            if element["element_type"] not in {"table", "figure"}:
+                continue
+            content = element["structured"].get("content")
+            if element["element_type"] == "figure":
+                for item in content if isinstance(content, list) else []:
+                    if not isinstance(item, dict) or item.get("type") not in {
+                        "chart_caption",
+                        "image_caption",
+                    }:
+                        continue
+                    caption = text_value(item.get("content"))
+                    if "\ufffd" in caption:
+                        element["warnings"].append("mineru_caption_replacement_character")
+                        warnings.append(
+                            {
+                                "page_number": element["page_number"],
+                                "code": "mineru_caption_replacement_character",
+                            }
+                        )
+                    caption_bbox = item.get("bbox")
+                    if not isinstance(caption_bbox, list) or len(caption_bbox) != 4:
+                        continue
+                    page = source_pdf.pages[element["page_number"] - 1]
+                    box = [float(value) for value in caption_bbox]
+                    if max(abs(value) for value in box) <= 1:
+                        box = [
+                            box[0] * page.width,
+                            box[1] * page.height,
+                            box[2] * page.width,
+                            box[3] * page.height,
+                        ]
+                    if not (
+                        0 <= box[0] < box[2] <= page.width and 0 <= box[1] < box[3] <= page.height
+                    ):
+                        continue
+                    source_words = page.crop(tuple(box)).extract_words(x_tolerance=1)
+                    normalized_caption = re.sub(r"[^a-z0-9]", "", caption.casefold())
+                    missing = [
+                        word["text"]
+                        for word in source_words
+                        if len(re.sub(r"[^a-z0-9]", "", word["text"].casefold())) >= 5
+                        and re.sub(r"[^a-z0-9]", "", word["text"].casefold())
+                        not in normalized_caption
+                    ]
+                    if missing:
+                        element["structured"].setdefault("source_audit", {})[
+                            "missing_caption_words"
+                        ] = missing[:8]
+                        element["warnings"].append("mineru_caption_native_words_missing")
+                        warnings.append(
+                            {
+                                "page_number": element["page_number"],
+                                "code": "mineru_caption_native_words_missing",
+                            }
+                        )
+                continue
+            bodies = [
+                item
+                for item in (content if isinstance(content, list) else [])
+                if isinstance(item, dict) and item.get("type") == "table_body"
+            ]
+            if not bodies:
+                continue
+            body = bodies[0]
+            body_bbox = body.get("bbox")
+            if not isinstance(body_bbox, list) or len(body_bbox) != 4:
+                continue
+            page = source_pdf.pages[element["page_number"] - 1]
+            box = [float(value) for value in body_bbox]
+            if max(abs(value) for value in box) <= 1:
+                box = [
+                    box[0] * page.width,
+                    box[1] * page.height,
+                    box[2] * page.width,
+                    box[3] * page.height,
+                ]
+            if not (0 <= box[0] < box[2] <= page.width and 0 <= box[1] < box[3] <= page.height):
+                continue
+            source_words = page.crop(tuple(box)).extract_words(x_tolerance=1)
+            number = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])")
+            native = Counter(
+                word["text"] for word in source_words if number.fullmatch(word["text"])
+            )
+            body_text = html.unescape(re.sub(r"<[^>]+>", " ", text_value(body.get("content"))))
+            parsed = Counter(number.findall(body_text))
+            missing = list((native - parsed).elements())
+            normalized_body = re.sub(r"[^a-z0-9]", "", body_text.casefold())
+            missing_identifiers = [
+                word["text"]
+                for word in source_words
+                if len(re.sub(r"[^a-z0-9]", "", word["text"].casefold())) >= 8
+                and any(char.isdigit() for char in word["text"])
+                and any(char.isalpha() for char in word["text"])
+                and re.sub(r"[^a-z0-9]", "", word["text"].casefold()) not in normalized_body
+            ]
+            if missing or missing_identifiers:
+                element["structured"]["source_audit"] = {
+                    "unmatched_numeric_token_count": len(missing),
+                    "unmatched_numeric_examples": missing[:8],
+                    "missing_identifier_examples": missing_identifiers[:8],
+                }
+                element["warnings"].append("mineru_table_native_text_missing")
+                warnings.append(
+                    {
+                        "page_number": element["page_number"],
+                        "code": "mineru_table_native_text_missing",
+                    }
+                )
+    return {
+        "parser_version": f"mineru-{middle.metadata.producer.version}-{MINERU_ADAPTER_VERSION}",
+        "ocr_mode": ocr_mode,
+        "image_analysis_enabled": image_analysis_enabled,
+        "page_count": len(middle.pages),
+        "elements": elements,
+        "table_regions": table_count,
+        "image_regions": image_count,
         "figure_captions": figure_captions,
         "warnings": warnings,
     }

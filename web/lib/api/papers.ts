@@ -25,24 +25,32 @@ export type Evidence = {
   chunk_id: string;
   locator: string;
   excerpt: string;
+  evidence_type?: "fulltext" | "visual_analysis" | "table_analysis";
+  visual_description?: string | null;
+  table_text?: string | null;
+  verification_status?:
+    "model_generated_unverified" | "parser_generated_unverified" | null;
+  parser_version?: string | null;
 };
 
 export type Citation = {
-  source: "openalex" | "arxiv";
+  source: "openalex" | "arxiv" | "personal";
   openalex_id: string | null;
   arxiv_id: string | null;
+  personal_id?: string | null;
   title: string;
   source_url: string;
   license_id: string | null;
   license_url: string | null;
   attribution: string | null;
+  private_processing: boolean;
   evidence: Evidence[];
 };
 
 export type ClaimEvidence = {
   source_id: string;
   quote: string;
-  evidence_type: "metadata" | "fulltext";
+  evidence_type: "metadata" | "fulltext" | "visual_analysis" | "table_analysis";
   source_field: string;
   chunk_id: string | null;
 };
@@ -55,9 +63,16 @@ export type Claim = {
 export type AgentTurn = {
   role: "user" | "assistant";
   content: string;
+  response?: AgentResponse | null;
 };
 
 export type AgentResponse = {
+  context_state?: {
+    objective?: string;
+    summary?: string;
+    catalog?: Record<string, { title: string }>;
+    plan?: { intent: string; steps: { scope: string; query: string }[] };
+  };
   status: string;
   answer: string;
   citations: Citation[];

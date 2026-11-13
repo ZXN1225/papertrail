@@ -115,7 +115,12 @@ class _ReadOnlyStore:
             )
         return {
             "status": "ok" if items else "no_results",
-            "retrieval_method": "bm25_fulltext_v3",
+            "retrieval_method": {
+                "bm25": "bm25_fulltext_v3",
+                "dense": "dense_cosine_v1",
+                "hybrid": "hybrid_rrf_v3",
+                "bm25_dense_rerank": "bm25_dense_rerank_v1",
+            }[kwargs["retrieval_method"]],
             "scanned_chunks": 3,
             "truncated": False,
             "items": items,
@@ -136,9 +141,47 @@ def test_synthetic_fixture_scores_and_keeps_ai_labeling_visible() -> None:
     assert report["summary"]["evidence_hit_at_1"]["count"] == 0
     assert report["summary"]["evidence_hit_at_2"]["count"] == 1
     negative = next(row for row in report["tasks"] if not row["expected_answerable"])
-    assert negative["false_answer"] is True
+    assert negative["retrieval_candidate_returned"] is True
     assert negative["top1_score"] == 9.5
     assert report["summary"]["top1_score_separability"]["answerable_mean"] == 9.5
+
+
+def test_multihop_measures_all_required_evidence_coverage() -> None:
+    dataset = _dataset()
+    task = dataset["tasks"][0]
+    task["challenge_type"] = "multi_hop"
+    task["question"] = "TEST which results list the study parameters?"
+    task["required_evidence"] = [
+        task["evidence"],
+        {
+            "source_id": "2608.20519",
+            "chunk_id": OTHER_CHUNK_ID,
+            "page_number": 13,
+            "element_type": "paragraph",
+            "quote": "TEST additional evidence anchor",
+        },
+    ]
+
+    report = run_evaluation(_ReadOnlyStore(), dataset, DATASET_SHA)
+
+    answerable = report["tasks"][0]
+    assert answerable["required_evidence_count"] == 2
+    assert answerable["required_evidence_retrieved_count"] == 1
+    assert answerable["complete_evidence_coverage"] is False
+    assert answerable["evidence_metrics"]["recall_at_k"] == 0.5
+    assert report["dataset"]["multi_hop_without_required_evidence"] == 0
+    assert report["summary"]["answerable_retrieval_metrics"]["complete_evidence_coverage"] == 0.0
+
+
+def test_multihop_without_required_evidence_is_reported_as_unmeasured() -> None:
+    dataset = _dataset()
+    dataset["tasks"][0]["challenge_type"] = "multi_hop"
+
+    report = run_evaluation(_ReadOnlyStore(), dataset, DATASET_SHA)
+
+    assert report["tasks"][0]["complete_evidence_coverage"] is None
+    assert report["dataset"]["multi_hop_without_required_evidence"] == 1
+    assert report["summary"]["answerable_retrieval_metrics"]["complete_evidence_denominator"] == 0
 
 
 def test_dataset_claiming_human_review_or_gold_status_is_rejected() -> None:
@@ -164,6 +207,11 @@ def test_unanswerable_task_with_evidence_or_without_absent_fact_is_rejected() ->
         validate_dataset(dataset)
 
     dataset = _dataset()
+    dataset["tasks"][1]["required_evidence"] = [dataset["tasks"][0]["evidence"]]
+    with pytest.raises(AiLabeledTaskError, match="must not carry evidence"):
+        validate_dataset(dataset)
+
+    dataset = _dataset()
     dataset["tasks"][1]["absent_fact"] = "   "
     with pytest.raises(AiLabeledTaskError):
         validate_dataset(dataset)
@@ -177,12 +225,61 @@ def test_evidence_anchor_from_a_foreign_source_is_rejected() -> None:
         validate_dataset(dataset)
 
 
+def test_required_evidence_must_be_unique_and_include_primary_anchor() -> None:
+    dataset = _dataset()
+    task = dataset["tasks"][0]
+    task["required_evidence"] = [task["evidence"], task["evidence"]]
+    with pytest.raises(AiLabeledTaskError, match="unique"):
+        validate_dataset(dataset)
+
+    dataset = _dataset()
+    task = dataset["tasks"][0]
+    task["required_evidence"] = [
+        {
+            "source_id": "2608.20519",
+            "chunk_id": OTHER_CHUNK_ID,
+            "page_number": 13,
+            "element_type": "paragraph",
+            "quote": "TEST different anchor only",
+        },
+        {
+            "source_id": "2608.20519",
+            "chunk_id": f"arxiv:2608.20519:{CONTENT_SHA[:16]}:2",
+            "page_number": 15,
+            "element_type": "paragraph",
+            "quote": "TEST another anchor",
+        },
+    ]
+    with pytest.raises(AiLabeledTaskError, match="include the primary"):
+        validate_dataset(dataset)
+
+
 def test_active_lineage_must_match_the_dataset() -> None:
     store = _ReadOnlyStore()
     store.metadata = {**store.metadata, "parser_version": "pdfplumber-layout-v26"}
 
     with pytest.raises(AiLabeledTaskError, match="lineage"):
         run_evaluation(store, _dataset(), DATASET_SHA)
+
+
+def test_ai_labeled_evaluation_accepts_pinned_mineru_lineage() -> None:
+    store = _ReadOnlyStore()
+    dataset = _dataset()
+    mineru_version = "mineru-4.1.7-papertrail-v11"
+    dataset["sources"]["2608.20519"]["parser_version"] = mineru_version
+    store.metadata = {**store.metadata, "parser_version": mineru_version}
+
+    report = run_evaluation(store, dataset, DATASET_SHA)
+
+    assert report["sources"]["2608.20519"]["parser_version"] == mineru_version
+
+
+def test_ai_labeled_evaluation_rejects_unrecognized_parser_lineage() -> None:
+    dataset = _dataset()
+    dataset["sources"]["2608.20519"]["parser_version"] = "custom-parser-v1"
+
+    with pytest.raises(AiLabeledTaskError, match="lineage or license"):
+        validate_dataset(dataset)
 
 
 def test_partial_corpus_scan_is_rejected() -> None:
@@ -196,6 +293,95 @@ def test_partial_corpus_scan_is_rejected() -> None:
 
     with pytest.raises(AiLabeledTaskError, match="complete approved corpus"):
         run_evaluation(store, _dataset(), DATASET_SHA)
+
+
+def test_non_finite_retrieval_scores_fail_closed() -> None:
+    store = _ReadOnlyStore()
+    original_search = store.search_fulltext_evidence
+
+    def non_finite_score(query: str, **kwargs):
+        response = original_search(query, **kwargs)
+        response["items"][0]["score"] = float("nan")
+        return response
+
+    store.search_fulltext_evidence = non_finite_score  # type: ignore[method-assign]
+    with pytest.raises(AiLabeledTaskError, match="non-finite score"):
+        run_evaluation(store, _dataset(), DATASET_SHA)
+
+
+def test_dense_retrieval_uses_frozen_query_vectors() -> None:
+    store = _ReadOnlyStore()
+    task_ids = [task["task_id"] for task in _dataset()["tasks"]]
+    vectors = {task_id: [0.5, 0.5] for task_id in task_ids}
+
+    report = run_evaluation(
+        store,
+        _dataset(),
+        DATASET_SHA,
+        retrieval_method="dense",
+        query_embeddings=vectors,
+        embedding_model="TEST-embedding-model",
+    )
+
+    assert report["retrieval"]["method"] == "dense_cosine_v1"
+    assert report["retrieval"]["query_embedding_count"] == 2
+    assert store.search_calls[0]["retrieval_method"] == "dense"
+    assert store.search_calls[0]["query_embedding"] == [0.5, 0.5]
+    assert store.search_calls[0]["embedding_model"] == "TEST-embedding-model"
+
+
+def test_dense_rerank_uses_frozen_query_vectors_and_keeps_quality_claim_disabled() -> None:
+    store = _ReadOnlyStore()
+    task_ids = [task["task_id"] for task in _dataset()["tasks"]]
+    vectors = {task_id: [0.5, 0.5] for task_id in task_ids}
+
+    report = run_evaluation(
+        store,
+        _dataset(),
+        DATASET_SHA,
+        retrieval_method="bm25_dense_rerank",
+        query_embeddings=vectors,
+        embedding_model="TEST-embedding-model",
+    )
+
+    assert report["retrieval"]["method"] == "bm25_dense_rerank_v1"
+    assert report["retrieval"]["reranker"] == {
+        "type": "dense_embedding_cosine",
+        "candidate_generator": "bm25",
+        "candidate_limit": 128,
+    }
+    assert report["retrieval"]["retrieval_latency_ms"]["mean"] >= 0
+    assert (
+        report["retrieval"]["retrieval_latency_ms"]["includes_query_embedding_provider_latency"]
+        is False
+    )
+    assert report["quality_claim_allowed"] is False
+    assert store.search_calls[0]["retrieval_method"] == "bm25_dense_rerank"
+    assert store.search_calls[0]["query_embedding"] == [0.5, 0.5]
+
+
+def test_dense_retrieval_requires_complete_finite_vectors() -> None:
+    task_id = _dataset()["tasks"][0]["task_id"]
+    with pytest.raises(AiLabeledTaskError, match="one embedding per task"):
+        run_evaluation(
+            _ReadOnlyStore(),
+            _dataset(),
+            DATASET_SHA,
+            retrieval_method="dense",
+            query_embeddings={task_id: [1.0]},
+            embedding_model="TEST-model",
+        )
+
+    task_ids = [task["task_id"] for task in _dataset()["tasks"]]
+    with pytest.raises(AiLabeledTaskError, match="finite vectors"):
+        run_evaluation(
+            _ReadOnlyStore(),
+            _dataset(),
+            DATASET_SHA,
+            retrieval_method="hybrid",
+            query_embeddings={task_id: [float("nan")] for task_id in task_ids},
+            embedding_model="TEST-model",
+        )
 
 
 def test_evaluation_requires_a_read_only_store() -> None:

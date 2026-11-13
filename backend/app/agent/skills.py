@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-SKILL_REGISTRY_VERSION = "1.0.0"
+SKILL_REGISTRY_VERSION = "1.1.0"
 
 # These names describe the existing bounded, read-only tool surface. A selected
 # skill can recommend a subset; the harness remains responsible for intersecting
@@ -77,7 +77,7 @@ class SkillLoadError(RuntimeError):
 _DEFINITIONS: tuple[SkillDefinition, ...] = (
     SkillDefinition(
         skill_id="paper-qa",
-        version="1.0.0",
+        version="1.3.0",
         description="Answer a focused research question from traceable paper evidence.",
         filename="paper-qa.SKILL.md",
         triggers=("paper-qa", "论文问答", "论文问题", "研究问题", "paper question"),
@@ -88,20 +88,20 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_arxiv_metadata",
             "get_arxiv_metadata",
         ),
-        content_sha256="1eacc79e1a5caa97eb1fd9e32117d57d280f4665a9ce438c2af8d5cc8d84e160",
+        content_sha256="33e513a37fb0191b9cb0b72e7bcbb4f90c30f87545e4e7fd34b994ef73a9a7ed",
     ),
     SkillDefinition(
         skill_id="compare-papers",
-        version="1.0.0",
+        version="1.2.0",
         description="Compare selected papers while keeping metadata and findings distinct.",
         filename="compare-papers.SKILL.md",
         triggers=("compare-papers", "比较论文", "对比论文", "论文异同", "compare papers"),
         recommended_tools=("compare_papers", "get_paper_details", "retrieve_paper_evidence"),
-        content_sha256="23956415131a859928e9b4efc3e81d9c265df26e3b2f130c1c194085927b2d10",
+        content_sha256="bc0496a47ceffe9363bee80b689c7e165f2f9b9ee0d0a24706f7fd996cb36a11",
     ),
     SkillDefinition(
         skill_id="research-brief",
-        version="1.0.0",
+        version="1.3.0",
         description="Create a concise, evidence-linked research brief or literature overview.",
         filename="research-brief.SKILL.md",
         triggers=("research-brief", "研究简报", "文献综述", "研究综述", "literature review"),
@@ -113,7 +113,29 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_openalex_works",
             "search_arxiv_metadata",
         ),
-        content_sha256="0d504fc8a996a8c1dc69307347f55a26a39ea4bf41924efda103d929d2cfdb61",
+        content_sha256="385df5238593c5c4daeb018debed08d35c956a00e4666763585e371043477855",
+    ),
+    SkillDefinition(
+        skill_id="draft-revision",
+        version="1.2.0",
+        description=(
+            "Revise research prose while preserving meaning and separating edits from evidence."
+        ),
+        filename="draft-revision.SKILL.md",
+        triggers=("draft-revision", "修改论文", "润色论文", "改写论文", "revise my draft"),
+        recommended_tools=("retrieve_paper_evidence", "search_papers", "get_paper_details"),
+        content_sha256="30e6f8dd199d5059f1e8deaa1c69a398036ecf76adb3769841c3d63b5190675f",
+    ),
+    SkillDefinition(
+        skill_id="citation-check",
+        version="1.2.0",
+        description=(
+            "Check whether citations and nearby claims are supported by retrieved paper evidence."
+        ),
+        filename="citation-check.SKILL.md",
+        triggers=("citation-check", "核验引用", "检查引用", "引用是否支持", "check citations"),
+        recommended_tools=("retrieve_paper_evidence", "search_papers", "get_paper_details"),
+        content_sha256="111fb2e4ffdabda74a44fb936ff6ce6fc9b72baa93c178c9f35cfc7144a2cf71",
     ),
 )
 
@@ -148,6 +170,14 @@ _COMPARE_PATTERNS = re.compile(
 )
 _BRIEF_PATTERNS = re.compile(
     r"文献综述|研究综述|研究简报|综述|literature\s+review|research\s+brief", re.IGNORECASE
+)
+_CITATION_PATTERNS = re.compile(
+    r"核验引用|检查引用|引用是否支持|引用核查|citation[- ]check|check citations?",
+    re.IGNORECASE,
+)
+_REVISION_PATTERNS = re.compile(
+    r"修改论文|润色论文|改写论文|修改这段|润色这段|改写这段|revise my draft|proofread",
+    re.IGNORECASE,
 )
 
 
@@ -187,7 +217,9 @@ def load_skill(selection: SkillSelection) -> LoadedSkill:
     try:
         if _SKILL_DIRECTORY.is_symlink() or path.is_symlink():
             raise SkillLoadError("skill spec path is not a regular built-in file")
-        raw = path.read_bytes()
+        # Git's core.autocrlf may rewrite built-in Markdown checkouts on Windows.
+        # Pins cover canonical UTF-8/LF bytes so identical skills load cross-platform.
+        raw = path.read_bytes().replace(b"\r\n", b"\n")
     except OSError as error:
         raise SkillLoadError("built-in skill spec could not be read") from error
     if hashlib.sha256(raw).hexdigest() != definition.content_sha256:
@@ -230,6 +262,10 @@ def prepare_skill(task_text: str, *, requested_skill: str | None = None) -> Load
 
 def _select_from_text(task_text: str) -> tuple[SkillDefinition, str]:
     normalized = task_text.strip().casefold()
+    if _CITATION_PATTERNS.search(normalized):
+        return SKILL_REGISTRY["citation-check"], "matched_citation_check_cue"
+    if _REVISION_PATTERNS.search(normalized):
+        return SKILL_REGISTRY["draft-revision"], "matched_draft_revision_cue"
     if _BRIEF_PATTERNS.search(normalized):
         return SKILL_REGISTRY["research-brief"], "matched_research_brief_cue"
     if _COMPARE_PATTERNS.search(normalized):

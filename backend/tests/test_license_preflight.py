@@ -78,6 +78,7 @@ def test_pdf_hash_and_parser_use_the_same_single_byte_snapshot(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    monkeypatch.setenv("PAPERTRAIL_PDF_PARSER", "pdfplumber")
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(_manifest().model_dump()), encoding="utf-8")
     pdf_path = tmp_path / "paper.pdf"

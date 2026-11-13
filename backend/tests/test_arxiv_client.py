@@ -81,6 +81,20 @@ def test_arxiv_client_identifies_python_runtime_for_export_gateway() -> None:
     assert b"retrieval%20augmented%20generation" in seen[0].url.query
 
 
+def test_arxiv_short_final_page_allows_requested_page_size() -> None:
+    arxiv_module._LAST_REQUEST_AT = None
+    body = _feed().replace(
+        b"<opensearch:itemsPerPage>1</opensearch:itemsPerPage>",
+        b"<opensearch:itemsPerPage>10</opensearch:itemsPerPage>",
+    )
+    with ArxivClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, content=body))
+    ) as client:
+        page = client.search("TEST short page", max_results=10)
+    assert page.items_per_page == 10
+    assert len(page.works) == 1
+
+
 def test_id_normalization_handles_version_and_rejects_untrusted_hosts() -> None:
     assert normalize_arxiv_id("https://arxiv.org/abs/2401.12345v3") == "2401.12345"
     assert normalize_arxiv_id("hep-ex/0307015v2") == "hep-ex/0307015"
