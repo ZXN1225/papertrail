@@ -4,6 +4,7 @@
 
 - 收尾复核：MinerU v12 修复了 advanced 解析将 `Figure N` 图注并入 table chunk 的错配；同页几何唯一的邻近 figure 无论图注在图上方或下方都可关联，歧义时保留独立图注并发 warning。真实本机 MinerU 对 `TEST` 合成表格+柱图 PDF 重解析后，表格行与 Figure 1 图注分开。隔离 SQLite 中 v11 文档经 `reindex_required` 重试恢复为 `indexed`、v12、7 个 chunk；使用本机已安装 MinerU 的解释器，因为当前 worktree `.venv` 未安装该可选依赖。全后端 591 passed（1 条既有 warning），Ruff check/format 通过。Docker daemon 当前未启动，容器内验收待完成。
 - 第二复核 Agent 已对同一获准本机 PDF 的全部 64 页生成低分辨率 contact sheet 并查看零预测页：9 个预测框定性覆盖对应对象；零预测页未见明显大型漏图；页尾标志为非图表误检。低清审核不能排除小图漏检，无 IoU、人工复核或 recall 估计；报告只留 ignored `.local`。该结果是解析诊断，不是质量通过证据。
+- 已推送评测分支提交 `44f48f8` 以运行远程 CI（未创建 PR）；GitHub Actions run `43399876974` 的 backend、web、container 全部 success。Web job 包含 Browser E2E；container job 已完成 Compose config/build/start、Web-to-API readiness 与首页 smoke，并清理隔离卷。它证明部署栈可启动，不是实际 MinerU 重解析准确率评测。
 - 当前仍未满足最终验收：真实 MinerU 图表事实/漏检率没有人工金标；RAG 六题和 27 题均是小样本、单 reviewer 或索引派生参考，不能选出通用策略胜者；私有真实 PDF 的模型端到端调用没有本轮数据外传授权。已有合成数据实际模型页面闭环和真实 MinerU 的本地页面烟测，不替代上述质量证据。#46 是页面功能累计 Draft PR，CI 通过且未合并；评测收尾 PR 尚未创建。
 
 - 真实模型合成 TEST 文档已完成页面发送→检索→表格引用→刷新恢复；修复了历史回答只存文本而丢引用的问题（新增消息快照迁移、旧历史缺引用提示、逐轮证据选择）。历史展示保留全部回合，发送给 Agent 的上下文仍按原预算裁剪。原用户库只读备份迁移 22→24 后消息数量不变、外键检查 0 错；全后端 589 passed、Web E2E 75/75。页面功能达到单个综合 PR 的演示门槛；合成数据不证明真实 MinerU 图表事实或独立 RAG 质量门通过。
