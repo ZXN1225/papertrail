@@ -105,7 +105,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "Anonymous Dense/Hybrid require embeddings and a current vector index. "
             "MinerU advanced figure descriptions may be returned as separately typed "
             "model_generated_unverified visual_analysis, never as source-exact text. "
-            "Table content remains excluded pending verification. "
+            "MinerU table rows may be returned as separately typed "
+            "parser_generated_unverified table_analysis, never as source-exact text. "
             "Returns excerpts with source locations."
         ),
         "parameters": {

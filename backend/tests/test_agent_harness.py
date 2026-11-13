@@ -739,7 +739,7 @@ def test_harness_only_returns_citations_observed_from_tool_results() -> None:
         assert result.skill is not None
         assert result.skill.skill_id == "paper-qa"
         assert len(result.skill.instructions_sha256) == 64
-        assert "ACTIVE PRODUCT SKILL: paper-qa@1.2.0" in model.instructions[0]
+        assert "ACTIVE PRODUCT SKILL: paper-qa@1.3.0" in model.instructions[0]
         assert "not grant tool access" in model.instructions[0]
         assert [(event.kind, event.name, event.status) for event in result.trace] == [
             ("model", "responses", "ok"),

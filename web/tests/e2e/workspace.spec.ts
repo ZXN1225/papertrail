@@ -503,6 +503,14 @@ test("shows personal citations with a private page locator and no public link", 
                 visual_description: "TEST unverified line rises",
                 verification_status: "model_generated_unverified",
               },
+              {
+                chunk_id: "private:TEST-PERSONAL:TEST-TABLE",
+                locator: "Page 4 · TEST table row",
+                excerpt: "",
+                evidence_type: "table_analysis",
+                table_text: "TEST method | TEST score 0.8",
+                verification_status: "parser_generated_unverified",
+              },
             ],
           },
         ],
@@ -524,6 +532,13 @@ test("shows personal citations with a private page locator and no public link", 
                 source_field: "visual_description",
                 chunk_id: "visual:TEST-PERSONAL:TEST-FIGURE",
               },
+              {
+                source_id: personalId,
+                quote: "TEST score 0.8",
+                evidence_type: "table_analysis",
+                source_field: "table_text",
+                chunk_id: "private:TEST-PERSONAL:TEST-TABLE",
+              },
             ],
           },
         ],
@@ -543,6 +558,8 @@ test("shows personal citations with a private page locator and no public link", 
   await expect(citation).toContainText("MinerU AI 视觉解读 · 未核验");
   await expect(citation).toContainText("TEST original caption");
   await expect(citation).toContainText("TEST unverified line rises");
+  await expect(citation).toContainText("MinerU 表格解析 · 未核验");
+  await expect(citation).toContainText("TEST method | TEST score 0.8");
   await expect(citation.getByRole("link")).toHaveCount(0);
   await expect(
     page.getByRole("region", { name: "逐条主张与证据" }),

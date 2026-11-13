@@ -816,6 +816,18 @@ class ResearchRuntime:
             for key, item in bank.items()
             if item["evidence_type"] == "visual_analysis"
         ][:12]
+        material["table_evidence_notes"] = [
+            {
+                "evidence_id": key,
+                "status": "parser_generated_unverified",
+                "instruction": (
+                    "Structured extraction only; check the source page before "
+                    "asserting exact values."
+                ),
+            }
+            for key, item in bank.items()
+            if item["evidence_type"] == "table_analysis"
+        ][:12]
         citation_checks: list[CitationCheckItem] = []
         check_claim_indices: dict[int, int] = {}
         if plan.intent == "citation_check":

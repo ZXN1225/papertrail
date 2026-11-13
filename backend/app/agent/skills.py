@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-SKILL_REGISTRY_VERSION = "1.0.0"
+SKILL_REGISTRY_VERSION = "1.1.0"
 
 # These names describe the existing bounded, read-only tool surface. A selected
 # skill can recommend a subset; the harness remains responsible for intersecting
@@ -77,7 +77,7 @@ class SkillLoadError(RuntimeError):
 _DEFINITIONS: tuple[SkillDefinition, ...] = (
     SkillDefinition(
         skill_id="paper-qa",
-        version="1.2.0",
+        version="1.3.0",
         description="Answer a focused research question from traceable paper evidence.",
         filename="paper-qa.SKILL.md",
         triggers=("paper-qa", "论文问答", "论文问题", "研究问题", "paper question"),
@@ -88,20 +88,20 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_arxiv_metadata",
             "get_arxiv_metadata",
         ),
-        content_sha256="b9368dcefa395262c507af5f49facf27421f41e6a850b0c89f72d66f123bb04e",
+        content_sha256="33e513a37fb0191b9cb0b72e7bcbb4f90c30f87545e4e7fd34b994ef73a9a7ed",
     ),
     SkillDefinition(
         skill_id="compare-papers",
-        version="1.1.0",
+        version="1.2.0",
         description="Compare selected papers while keeping metadata and findings distinct.",
         filename="compare-papers.SKILL.md",
         triggers=("compare-papers", "比较论文", "对比论文", "论文异同", "compare papers"),
         recommended_tools=("compare_papers", "get_paper_details", "retrieve_paper_evidence"),
-        content_sha256="ef02de92e0812208ca7e2a7139f9cf1e7965f7881b21bb1069e59921aad05337",
+        content_sha256="bc0496a47ceffe9363bee80b689c7e165f2f9b9ee0d0a24706f7fd996cb36a11",
     ),
     SkillDefinition(
         skill_id="research-brief",
-        version="1.2.0",
+        version="1.3.0",
         description="Create a concise, evidence-linked research brief or literature overview.",
         filename="research-brief.SKILL.md",
         triggers=("research-brief", "研究简报", "文献综述", "研究综述", "literature review"),
@@ -113,29 +113,29 @@ _DEFINITIONS: tuple[SkillDefinition, ...] = (
             "search_openalex_works",
             "search_arxiv_metadata",
         ),
-        content_sha256="0ab5016b566ddce7a78a8108dd58ed617207a5b815c09494f1fa3e2e843cbd2a",
+        content_sha256="385df5238593c5c4daeb018debed08d35c956a00e4666763585e371043477855",
     ),
     SkillDefinition(
         skill_id="draft-revision",
-        version="1.1.0",
+        version="1.2.0",
         description=(
             "Revise research prose while preserving meaning and separating edits from evidence."
         ),
         filename="draft-revision.SKILL.md",
         triggers=("draft-revision", "修改论文", "润色论文", "改写论文", "revise my draft"),
         recommended_tools=("retrieve_paper_evidence", "search_papers", "get_paper_details"),
-        content_sha256="bff82dabadd46382f12ed6637827074c61edfbe541567479cf72dd96f14cf00f",
+        content_sha256="30e6f8dd199d5059f1e8deaa1c69a398036ecf76adb3769841c3d63b5190675f",
     ),
     SkillDefinition(
         skill_id="citation-check",
-        version="1.1.0",
+        version="1.2.0",
         description=(
             "Check whether citations and nearby claims are supported by retrieved paper evidence."
         ),
         filename="citation-check.SKILL.md",
         triggers=("citation-check", "核验引用", "检查引用", "引用是否支持", "check citations"),
         recommended_tools=("retrieve_paper_evidence", "search_papers", "get_paper_details"),
-        content_sha256="2ffd46a89fc5b97055076c5f2a499169128e8c819ee03187fc99011ece4cc900",
+        content_sha256="111fb2e4ffdabda74a44fb936ff6ce6fc9b72baa93c178c9f35cfc7144a2cf71",
     ),
 )
 

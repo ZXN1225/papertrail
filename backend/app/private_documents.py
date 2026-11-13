@@ -625,7 +625,7 @@ class PrivateDocumentService:
             "c.user_id=?",
             "d.user_id=c.user_id",
             "d.state='indexed'",
-            "c.element_type!='table'",
+            "(c.element_type!='table' OR d.parser_version LIKE 'mineru-%')",
         ]
         params: list[Any] = [user_id]
         if library_only:
@@ -639,7 +639,8 @@ class PrivateDocumentService:
         with self.store._connection() as db:
             rows = db.execute(
                 f"SELECT c.*,d.source_type,d.source_id,d.title,d.source_url,d.document_sha256,"
-                f"d.rights_attested_at FROM user_document_chunks c JOIN user_documents d "
+                "d.rights_attested_at,d.parser_version "
+                "FROM user_document_chunks c JOIN user_documents d "
                 f"ON d.id=c.document_id WHERE {' AND '.join(clauses)} "
                 "ORDER BY c.document_id,c.ordinal LIMIT ?",
                 [*params, MAX_PRIVATE_USER_CHUNKS + 1],
@@ -774,6 +775,15 @@ class PrivateDocumentService:
                 "content_sha256": row["document_sha256"],
                 "parser_warnings": [],
             }
+            if row["element_type"] == "table":
+                item["excerpt"] = ""
+                item["table_analysis"] = {
+                    "text": row["retrieval_text"][:1_800],
+                    "status": "parser_generated_unverified",
+                    "source": "mineru_structured_table",
+                    "parser_version": row["parser_version"],
+                }
+                item["parser_warnings"] = ["mineru_table_cells_unverified"]
             identifier_key = {
                 "openalex": "openalex_id",
                 "arxiv": "arxiv_id",

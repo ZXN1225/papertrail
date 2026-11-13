@@ -25,9 +25,11 @@ export type Evidence = {
   chunk_id: string;
   locator: string;
   excerpt: string;
-  evidence_type?: "fulltext" | "visual_analysis";
+  evidence_type?: "fulltext" | "visual_analysis" | "table_analysis";
   visual_description?: string | null;
-  verification_status?: "model_generated_unverified" | null;
+  table_text?: string | null;
+  verification_status?:
+    "model_generated_unverified" | "parser_generated_unverified" | null;
   parser_version?: string | null;
 };
 
@@ -48,7 +50,7 @@ export type Citation = {
 export type ClaimEvidence = {
   source_id: string;
   quote: string;
-  evidence_type: "metadata" | "fulltext" | "visual_analysis";
+  evidence_type: "metadata" | "fulltext" | "visual_analysis" | "table_analysis";
   source_field: string;
   chunk_id: string | null;
 };

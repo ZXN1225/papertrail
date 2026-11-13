@@ -313,15 +313,90 @@ def test_private_document_index_and_evidence_are_scoped_to_owner(tmp_path, monke
     assert owned["items"][0]["private_processing"] is True
     assert owned["items"][0]["excerpt"].startswith("TEST private evidence")
     assert hidden == {"status": "no_results", "items": [], "scanned_chunks": 0}
+    table_result = service.search_evidence(
+        "tableonlyunitvalue",
+        user_id=owner,
+        source_type="arxiv",
+        source_id="2401.12345",
+        limit=5,
+    )
+    assert table_result["status"] == "ok"
+    table_item = next(item for item in table_result["items"] if item["element_type"] == "table")
+    assert table_item["excerpt"] == ""
+    assert table_item["table_analysis"]["status"] == "parser_generated_unverified"
+    assert "tableonlyunitvalue" in table_item["table_analysis"]["text"]
     assert (
         service.search_evidence(
             "tableonlyunitvalue",
-            user_id=owner,
+            user_id=other,
             source_type="arxiv",
             source_id="2401.12345",
             limit=5,
         )["status"]
         == "no_results"
+    )
+    table_citations, table_quotes = {}, {}
+    _collect_citations(table_result, table_citations, table_quotes)
+    table_span = next(
+        span
+        for span in table_citations["arxiv:2401.12345"].evidence
+        if span.evidence_type == "table_analysis"
+    )
+    assert table_span.table_text and "tableonlyunitvalue" in table_span.table_text
+    assert table_span.verification_status == "parser_generated_unverified"
+    assert not any(
+        span.evidence_type == "fulltext" and span.chunk_id == table_item["chunk_id"]
+        for span in table_citations["arxiv:2401.12345"].evidence
+    )
+    table_answer = {
+        "answer": "",
+        "cited_openalex_ids": [],
+        "cited_arxiv_ids": ["2401.12345"],
+        "cited_personal_ids": [],
+        "claims": [
+            {
+                "text": "The parsed table provisionally lists tableonlyunitvalue.",
+                "evidence": [
+                    {
+                        "source_id": "2401.12345",
+                        "quote": "tableonlyunitvalue",
+                        "evidence_type": "table_analysis",
+                        "source_field": "table_text",
+                        "chunk_id": table_item["chunk_id"],
+                    }
+                ],
+            }
+        ],
+        "insufficient_evidence": False,
+    }
+    assert (
+        AgentHarness._finalize(
+            json.dumps(table_answer),
+            table_citations,
+            table_quotes,
+            [],
+            1,
+            1,
+            0,
+            0,
+            use_claim_text_only=True,
+        ).status
+        == "completed"
+    )
+    table_answer["claims"][0]["evidence"][0]["source_field"] = "excerpt"
+    assert (
+        AgentHarness._finalize(
+            json.dumps(table_answer),
+            table_citations,
+            table_quotes,
+            [],
+            1,
+            1,
+            0,
+            0,
+            use_claim_text_only=True,
+        ).status
+        == "unverified_evidence"
     )
     figure_caption = service.search_evidence(
         "figureonlycaptionvalue",

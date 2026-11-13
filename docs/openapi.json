@@ -2402,7 +2402,8 @@
             "enum": [
               "metadata",
               "fulltext",
-              "visual_analysis"
+              "visual_analysis",
+              "table_analysis"
             ],
             "title": "Evidence Type"
           },
@@ -2494,7 +2495,8 @@
             "type": "string",
             "enum": [
               "fulltext",
-              "visual_analysis"
+              "visual_analysis",
+              "table_analysis"
             ],
             "title": "Evidence Type",
             "default": "fulltext"
@@ -2511,11 +2513,26 @@
             ],
             "title": "Visual Description"
           },
+          "table_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1800
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Text"
+          },
           "verification_status": {
             "anyOf": [
               {
                 "type": "string",
-                "const": "model_generated_unverified"
+                "enum": [
+                  "model_generated_unverified",
+                  "parser_generated_unverified"
+                ]
               },
               {
                 "type": "null"

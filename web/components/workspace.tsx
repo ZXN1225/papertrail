@@ -1698,6 +1698,9 @@ function AgentResult({ answer }: { answer: AgentResponse }) {
                   {evidence.evidence_type === "visual_analysis" && (
                     <p className="license-badge">MinerU AI 视觉解读 · 未核验</p>
                   )}
+                  {evidence.evidence_type === "table_analysis" && (
+                    <p className="license-badge">MinerU 表格解析 · 未核验</p>
+                  )}
                   <p>{evidence.quote}</p>
                   <cite>
                     {evidence.source_id} ·{" "}
@@ -1828,6 +1831,11 @@ function CitationCard({
               <p className="license-badge">MinerU AI 视觉解读 · 未核验</p>
               {span.excerpt && <p>原文图注：{span.excerpt}</p>}
               <p>{span.visual_description}</p>
+            </>
+          ) : span.evidence_type === "table_analysis" ? (
+            <>
+              <p className="license-badge">MinerU 表格解析 · 未核验</p>
+              <p>{span.table_text}</p>
             </>
           ) : (
             <p>{span.excerpt}</p>

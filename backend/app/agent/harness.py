@@ -63,8 +63,12 @@ MinerU visual_analysis evidence is generated, unverified interpretation, never a
 from the paper. Cite it only with evidence_type="visual_analysis" and
 source_field="visual_description"; describe it as provisional and retain the separate original
 figure caption shown by the application.
-The application displays each cited paper's title, page locator and original excerpt in citation
-cards. Do not repeat page numbers, chunk IDs or bibliographic headings in claims.text; those are
+MinerU table_analysis is parser-generated, unverified table text, not an exact quote from
+the PDF. Cite it only with evidence_type="table_analysis" and source_field="table_text";
+describe table values as provisional until the original page has been checked.
+The application displays each cited paper's title, page locator and available source excerpt or
+marked parser output in citation cards. Do not repeat page numbers, chunk IDs or headings in
+claims.text; those are
 location metadata, not facts supported by the quoted body text. For a general research-purpose
 question, give two or three concise claims about the purpose, with exact supporting excerpts."""
 MAX_OBSERVATION_CHARS = 40_000
@@ -570,7 +574,8 @@ class AgentHarness:
                         (ref.source_id, ref.chunk_id)
                         for claim in result.claims
                         for ref in claim.evidence
-                        if ref.evidence_type in {"fulltext", "visual_analysis"} and ref.chunk_id
+                        if ref.evidence_type in {"fulltext", "visual_analysis", "table_analysis"}
+                        and ref.chunk_id
                     }
                     has_library_evidence = any(
                         c.private_processing
@@ -612,7 +617,7 @@ class AgentHarness:
                         (ref.source_id, ref.chunk_id)
                         for claim in result.claims
                         for ref in claim.evidence
-                        if ref.evidence_type in {"fulltext", "visual_analysis"}
+                        if ref.evidence_type in {"fulltext", "visual_analysis", "table_analysis"}
                         and ref.chunk_id
                         and ref.chunk_id.startswith("private:")
                     }
@@ -958,7 +963,7 @@ class AgentHarness:
                     and steps < self.max_steps
                     and any(c.private_processing and c.evidence for c in citations_seen.values())
                     and not any(
-                        ref.evidence_type in {"fulltext", "visual_analysis"}
+                        ref.evidence_type in {"fulltext", "visual_analysis", "table_analysis"}
                         and ref.chunk_id
                         and ref.chunk_id.startswith("private:")
                         for claim in result.claims
@@ -1328,6 +1333,9 @@ class AgentHarness:
                 elif reference.evidence_type == "visual_analysis":
                     if reference.chunk_id is None or reference.source_field != "visual_description":
                         return _unverified_evidence(tool_calls, steps, input_tokens, output_tokens)
+                elif reference.evidence_type == "table_analysis":
+                    if reference.chunk_id is None or reference.source_field != "table_text":
+                        return _unverified_evidence(tool_calls, steps, input_tokens, output_tokens)
                 elif (
                     reference.chunk_id is not None
                     or reference.source_field not in _METADATA_CITABLE_FIELDS
@@ -1452,7 +1460,7 @@ def _merge_citation(
     chunk_id = item.get("chunk_id")
     locator = item.get("locator")
     excerpt = item.get("excerpt")
-    if all(isinstance(value, str) for value in (chunk_id, locator, excerpt)):
+    if all(isinstance(value, str) for value in (chunk_id, locator, excerpt)) and excerpt.strip():
         if chunk_id not in {span.chunk_id for span in spans}:
             spans.append(EvidenceSpan(chunk_id=chunk_id, locator=locator, excerpt=excerpt))
     expanded = item.get("expanded_evidence")
@@ -1500,6 +1508,31 @@ def _merge_citation(
         if len(spans) >= 8:
             spans = spans[:7]
         spans.append(visual_span)
+    table = item.get("table_analysis")
+    if (
+        isinstance(table, dict)
+        and table.get("status") == "parser_generated_unverified"
+        and table.get("source") == "mineru_structured_table"
+        and isinstance(table.get("text"), str)
+        and table["text"].strip()
+        and isinstance(table.get("parser_version"), str)
+        and isinstance(chunk_id, str)
+        and isinstance(locator, str)
+        and not any(span.chunk_id == chunk_id for span in spans)
+    ):
+        if len(spans) >= 8:
+            spans = spans[:7]
+        spans.append(
+            EvidenceSpan(
+                chunk_id=chunk_id,
+                locator=locator,
+                excerpt="",
+                evidence_type="table_analysis",
+                table_text=table["text"][:1_800],
+                verification_status="parser_generated_unverified",
+                parser_version=table["parser_version"],
+            )
+        )
     fields: dict[str, Any] = {
         "source": source,
         "title": title,
@@ -1550,6 +1583,13 @@ def _collect_observed_quotes(
             values.append(
                 (visual.get("description"), chunk_id, "visual_analysis", "visual_description")
             )
+        table = item.get("table_analysis")
+        if (
+            isinstance(table, dict)
+            and table.get("status") == "parser_generated_unverified"
+            and table.get("source") == "mineru_structured_table"
+        ):
+            values.append((table.get("text"), chunk_id, "table_analysis", "table_text"))
         expanded = item.get("expanded_evidence")
         if isinstance(expanded, list):
             values.extend(
