@@ -11,7 +11,7 @@ import type {
 } from "@/lib/api/papers";
 import { normalizeArxiv, normalizeOpenAlex } from "@/lib/api/papers";
 
-type ServiceStatus = "checking" | "ready" | "unavailable";
+type ServiceStatus = "checking" | "ready" | "model_disabled" | "unavailable";
 type LibraryEntry = {
   id: string;
   source: "openalex" | "arxiv";
@@ -142,8 +142,14 @@ export function Workspace({
         if (!response.ok) throw new Error("unavailable");
         return response.json();
       })
-      .then((value: { status?: string }) =>
-        setServiceStatus(value.status === "ready" ? "ready" : "unavailable"),
+      .then((value: { status?: string; checks?: { llm?: string } }) =>
+        setServiceStatus(
+          value.status !== "ready"
+            ? "unavailable"
+            : value.checks?.llm === "disabled"
+              ? "model_disabled"
+              : "ready",
+        ),
       )
       .catch(() => setServiceStatus("unavailable"));
     return () => controller.abort();
@@ -626,8 +632,10 @@ export function Workspace({
           {serviceStatus === "checking"
             ? "连接检查中"
             : serviceStatus === "ready"
-              ? "后端已就绪"
-              : "后端未连接"}
+              ? "后端已连接 · 模型未验证"
+              : serviceStatus === "model_disabled"
+                ? "后端已连接 · 模型未启用"
+                : "后端未连接"}
         </div>
         <button className="signout-button" onClick={onSignOut} type="button">
           退出

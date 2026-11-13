@@ -172,7 +172,7 @@ database SHA-256 remained unchanged.
 
 A reproducible runner needs to enforce the manifest's source scope, preserve batch progress and
 provider usage only in an ignored local cache, and stop when the remaining authorized estimate
-cannot cover another attempt. Until a correct run completes, there is **no valid true candidate
+cannot cover another attempt. Before that runner completed, there was **no valid true candidate
 vector rerank comparison**. The existing BM25 and parent-vector proxy results above remain
 separate exploratory diagnostics, not MinerU chart-quality evidence or an independent gold set.
 
@@ -202,3 +202,36 @@ live retry is rejected if the reservation plus remaining transfer exceeds the su
 This is a local estimate gate, not a provider billing limit. It cannot reconstruct the unknown
 usage or vectors from the earlier one-off timed-out attempt, so no additional live call was made
 while completing this runner.
+
+## Correct source-scoped candidate-vector rerank (2026-11-13)
+
+After a new, explicit transfer authorization, the runner completed on the same isolated schema-23
+copy and frozen v27 manifest. Its preflight selected 2,221 candidate IDs across six chunk arms,
+824 new unique texts (690,259 UTF-8 bytes), and six queries (404 UTF-8 bytes), with
+`source_scope=exact_arxiv_id_per_task`. All 36 task/arm rankings contain only their task's source;
+every shortlist has at most 128 candidates. The local batch cache completed 14/14 batches.
+Provider-reported input was 170,342 tokens, estimated `$0.00340684` at the configured
+`$0.02`/million token price, versus the preflight UTF-8 byte upper estimate `$0.01381326` and
+the CLI `$0.02` estimate cap. These are not provider billing limits. The earlier invalid and
+timed-out attempts are separate; the timed-out attempt's charge remains unknown.
+
+| Chunk arm | BM25 MRR@8 / NDCG@5 | Candidate-vector MRR@8 / NDCG@5 | Full span coverage BM25 / vector |
+|---|---:|---:|---:|
+| 900 bytes, no overlap | .561 / .620 | .417 / .438 | .833 / .500 |
+| 900 bytes, max 10% overlap | .561 / .580 | .500 / .500 | .833 / .500 |
+| 1,200 bytes, no overlap | .533 / .586 | .500 / .500 | .833 / .500 |
+| 1,200 bytes, max 10% overlap | .538 / .573 | .500 / .500 | .833 / .500 |
+| 1,800 bytes, no overlap | .622 / .712 | .417 / .438 | 1.000 / .500 |
+| 1,800 bytes, max 10% overlap | .631 / .720 | .417 / .438 | 1.000 / .500 |
+
+The result is a true candidate-input embedding comparison within BM25 top-128, not the earlier
+parent-vector proxy or an all-corpus dense retrieval experiment. On these six single-reviewer
+selected-span tasks, vector reranking degraded every arm; the production default remains BM25
+with the existing 1,800-byte chunker. The corpus uses `pdfplumber-layout-v27`, so this is not a
+MinerU, chart, cross-encoder, or general user-query quality measurement. A separately reviewed,
+larger held-out set is still required for a production quality threshold or strategy selection.
+
+The ignored local report is `backend/.local/true-candidate-rerank-replay.json`, SHA-256
+`B7695763DAD43C060083B9582B975A3C999F6B4821D906FAD02030714204BC27`;
+`quality_claim_allowed=false`. Original user SQLite SHA-256 remains
+`C2A77E1E63CE999B4E9D2591B1CDD3D374CBD0EAA399A97652C999A9810811CC`.

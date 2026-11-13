@@ -111,7 +111,7 @@ async function installCommonMocks(page: Page) {
     route.fulfill({ json: [] }),
   );
   await page.route("**/api/status", (route) =>
-    route.fulfill({ json: { status: "ready" } }),
+    route.fulfill({ json: { status: "ready", checks: { llm: "configured" } } }),
   );
   await page.route("**/api/search?**", (route) =>
     route.fulfill({
@@ -533,7 +533,7 @@ test("shows personal citations with a private page locator and no public link", 
     }),
   );
   await page.goto("/");
-  await expect(page.getByRole("status")).toHaveText("后端已就绪");
+  await expect(page.getByRole("status")).toHaveText("后端已连接 · 模型未验证");
   await openAssistant(page);
   await page
     .getByLabel("你的研究问题")
@@ -552,6 +552,15 @@ test("shows personal citations with a private page locator and no public link", 
   await expect(
     page.getByRole("region", { name: "逐条主张与证据" }),
   ).toContainText("MinerU AI 图表解读 · 未核验");
+});
+
+test("distinguishes a disabled model from backend readiness", async ({ page }) => {
+  await installCommonMocks(page);
+  await page.route("**/api/status", (route) =>
+    route.fulfill({ json: { status: "ready", checks: { llm: "disabled" } } }),
+  );
+  await page.goto("/");
+  await expect(page.getByRole("status")).toHaveText("后端已连接 · 模型未启用");
 });
 
 test("shows submitted message before the agent responds", async ({ page }) => {
