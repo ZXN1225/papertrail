@@ -31,7 +31,7 @@ from app.retrieval.pdf_table_refinement import (
 PARSER_VERSION = "pdfplumber-layout-v27"
 MAX_PDF_BYTES = 40_000_000
 MAX_PDF_PAGES = 500
-MINERU_ADAPTER_VERSION = "papertrail-v11"
+MINERU_ADAPTER_VERSION = "papertrail-v12"
 MAX_PDF_TEXT_CHARS = 2_000_000
 MAX_PDF_ELEMENTS = 20_000
 
@@ -2136,6 +2136,11 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
             without_image_data(block.model_dump(mode="json", exclude={"image_base64"}))
             for block in page.blocks
         ]
+        figure_indices = [
+            index for index, block in enumerate(page.blocks) if block.type in {"image", "chart"}
+        ]
+        assigned_figure_captions: dict[int, list[str]] = {index: [] for index in figure_indices}
+        group_figure_captions: list[dict[str, Any]] = []
         table_indices = [index for index, block in enumerate(page.blocks) if block.type == "table"]
         positioned_tables = [
             index
@@ -2144,6 +2149,7 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
             and len(page.blocks[index].bbox) == 4
         ]
         assigned_captions: dict[int, list[str]] = {index: [] for index in table_indices}
+        reassigned_table_captions: set[int] = set()
         for origin in table_indices:
             content = block_data[origin].get("content")
             for item in content if isinstance(content, list) else []:
@@ -2153,6 +2159,34 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                 if not caption:
                     continue
                 caption_bbox = item.get("bbox")
+                if _MINERU_FIGURE_CAPTION.match(caption):
+                    reassigned_table_captions.add(origin)
+                    if isinstance(caption_bbox, list) and len(caption_bbox) == 4:
+                        candidates = [
+                            index
+                            for index in figure_indices
+                            if isinstance(page.blocks[index].bbox, (list, tuple))
+                            and len(page.blocks[index].bbox) == 4
+                            and (
+                                0 <= page.blocks[index].bbox[1] - caption_bbox[3] <= 0.08
+                                or 0 <= caption_bbox[1] - page.blocks[index].bbox[3] <= 0.08
+                            )
+                            and min(caption_bbox[2], page.blocks[index].bbox[2])
+                            > max(caption_bbox[0], page.blocks[index].bbox[0])
+                        ]
+                        if len(candidates) == 1:
+                            assigned_figure_captions[candidates[0]].append(caption)
+                        else:
+                            group_figure_captions.append(
+                                {
+                                    "origin": origin,
+                                    "text": caption,
+                                    "bbox": caption_bbox,
+                                    "candidate_indices": candidates,
+                                    "source": item,
+                                }
+                            )
+                    continue
                 if (
                     not isinstance(caption_bbox, list)
                     or len(caption_bbox) != 4
@@ -2168,11 +2202,6 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                     ]
                 )[1]
                 assigned_captions[target].append(caption)
-        figure_indices = [
-            index for index, block in enumerate(page.blocks) if block.type in {"image", "chart"}
-        ]
-        assigned_figure_captions: dict[int, list[str]] = {index: [] for index in figure_indices}
-        group_figure_captions: list[dict[str, Any]] = []
         for origin in figure_indices:
             content = block_data[origin].get("content")
             for item in content if isinstance(content, list) else []:
@@ -2439,6 +2468,14 @@ def parse_pdf_bytes_mineru(pdf_bytes: bytes, *, tier: str = "standard") -> dict[
                 )
             if element_type == "table":
                 element_warnings.append("mineru_table_cells_unverified")
+                if block_index in reassigned_table_captions:
+                    element_warnings.append("mineru_table_caption_reassigned_to_figure")
+                    warnings.append(
+                        {
+                            "page_number": page_number,
+                            "code": "mineru_table_caption_reassigned_to_figure",
+                        }
+                    )
             elif element_type == "figure":
                 element_warnings.append("mineru_figure_caption_unverified")
                 if image_analysis_enabled and block.type in {"image", "chart"}:

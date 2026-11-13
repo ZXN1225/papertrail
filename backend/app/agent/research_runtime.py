@@ -821,8 +821,8 @@ class ResearchRuntime:
                 "evidence_id": key,
                 "status": "parser_generated_unverified",
                 "instruction": (
-                    "Structured extraction only; check the source page before "
-                    "asserting exact values."
+                    "Structured extraction only. A parsed value may be reported "
+                    "as provisional with this caveat, never as a verified PDF fact."
                 ),
             }
             for key, item in bank.items()
@@ -903,6 +903,8 @@ class ResearchRuntime:
                 "titles and bibliographic "
                 "facts only. Cover each requested document/source or explicitly report "
                 "missing evidence. "
+                "For table_analysis, report a matching parsed cell only as a provisional "
+                "MinerU extraction with a source-page verification caveat. "
                 "For section-existence questions, inspect document_structure_matches "
                 "and cited excerpts. Never claim a section is absent if its heading or "
                 "text appears there. A heading proves presence, not section contents. "
@@ -930,6 +932,8 @@ class ResearchRuntime:
                 "item per zero-based claim_index. Reject unsupported numerical, "
                 "causal, comparative and "
                 "negative assertions. Metadata cannot substantiate findings. "
+                "A table_analysis citation can support only a claim explicitly phrased "
+                "as provisional parser output, not a verified PDF fact. "
                 "Interpretations/advice may "
                 "go beyond verbatim wording only when clearly labeled and reasonably "
                 "justified; reject "

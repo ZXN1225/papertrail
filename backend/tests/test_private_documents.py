@@ -13,6 +13,7 @@ from app.auth import create_account
 from app.config import Settings
 from app.main import create_app
 from app.private_documents import PrivateDocumentService, _extract_visual_evidence
+from app.retrieval.pdf_parser import MINERU_ADAPTER_VERSION
 from app.storage.repository import PaperStore
 
 
@@ -110,7 +111,7 @@ def test_personal_migration_preserves_existing_document_and_chunks(tmp_path) -> 
 
 def _fake_parse(_pdf_path: object) -> dict[str, object]:
     return {
-        "parser_version": "mineru-4.1.test-papertrail-v8",
+        "parser_version": f"mineru-4.1.test-{MINERU_ADAPTER_VERSION}",
         "elements": [
             {
                 "element_id": "TEST-private-e1",
@@ -300,7 +301,7 @@ def test_private_document_index_and_evidence_are_scoped_to_owner(tmp_path, monke
     indexed = service.get_document(owner, uploaded["id"])
     assert indexed is not None
     assert indexed["state"] == "indexed"
-    assert indexed["parser_version"] == "mineru-4.1.test-papertrail-v8"
+    assert indexed["parser_version"] == f"mineru-4.1.test-{MINERU_ADAPTER_VERSION}"
     assert indexed["chunker_version"] == "pdf-element-structure-token-upper-bound-v5"
     assert indexed["chunk_count"] == 3
 

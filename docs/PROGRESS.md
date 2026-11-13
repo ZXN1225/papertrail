@@ -2,6 +2,10 @@
 
 ## 2026-11-13 PR 收敛与剩余验收门
 
+- 收尾核查发现 MinerU advanced 解析会把结构化输出中误标为 `table_caption` 的 `Figure N` 文本并入表格 chunk，令表格检索证据混入图注。解析适配器 v12 现将其移到唯一几何相邻的 figure（图注在上/下方均支持）；不能唯一关联时保留独立图注并记录 warning。真实 MinerU 4.1.7 对本地 `TEST` 合成表格+柱图 PDF 重解析后，table 与 figure 文本分离；双向位置回归 2 passed。当前全后端 591 passed、Ruff check/format 通过，Compose 配置解析通过。未运行 provider。
+- v11→v12 隔离升级已验证：私有文档进入 `failed/reindex_required`，经现有重试路径和 MinerU 4.1.7 重新解析后恢复 `indexed`，写入 parser v12 的 7 个 chunk，表格行和 Figure 1 图注分离。此前一次失败由 smoke 脚本将解析根目录覆盖为相对路径，触发路径安全检查；修正为绝对隔离路径后通过。当前 worktree `.venv` 不含可选 MinerU，使用已有 MinerU 环境的解释器跑完整私有文档处理，故这不是容器运行时验收。Docker daemon 未启动，容器 build/重建 smoke 待完成。AI 辅助视觉抽样与 6/27 题 RAG 探索数据不构成人工金标；图表事实/漏检质量、独立 held-out 策略评测及私有语料真实模型闭环仍未完成。PR #46 CI 通过、Draft、未合并；本轮解析/测评收尾尚未开 PR。
+- 第二复核 Agent 对同一获准本机 PDF 的 64 页 contact sheet 做只读 AI 辅助抽查：9/9 个预测框定性重叠目标区域，零预测页未观察到明显大图漏检，第 64 页 logo 是非图表误检。检查未做正式 IoU、未复核图内事实，也不能排除小图漏检；报告在 ignored `.local/mineru-64page-contact-audit-20261113.md`，不能作为人工 gold 或召回率证明。
+
 - 真实模型合成数据页面验收暴露对话刷新后只恢复回答、丢失引用和逐条主张：schema 24 为每条助手消息保存本轮 `AgentResponse` 快照；用户所有权检查沿用会话查询，页面重开默认显示最近一轮证据，较早的回答可点“查看本轮证据”。旧消息没有可补录的引用快照，页面明确提示重新提问；清空/删除对话仍会删除快照。纯合成 TEST 表格在实际模型上返回正确的 7 和未核验 `table_analysis` 引用，刷新后 375px 页面保留来源卡且无横向溢出。原用户库的只读备份从 schema 22 升至 24 后消息行数不变、外键检查 0 错，原库 SHA-256 不变。全后端 589 passed、Web 全浏览器 75/75、生产构建/Ruff/改动文件 Prettier/OpenAPI 导出通过。合成解析不计为真实 MinerU 质量。
 - 用实际登录页面而非 mock API 完成 MinerU Table 4.8 的隔离库闭环烟测：本机确定性 TEST 模型触发 Plan/Coverage/Draft/Review，检索到第 40 页 `table_analysis` 行，页面在 1440px 和 375px 均显示“MinerU 表格解析 · 未核验”引用，且无横向溢出。原页图像可目视确认 Median 行 Pre 34.00 / Post 31.50 与检索行相符；这是 AI 辅助的单行抽查，不代表全部表格或真实 LLM 回答准确。测试无外部 provider 调用，脚本/截图/隔离库均在 ignored 目录；真实 MinerU 语料仍待实际模型闭环及完整质量验收。
 - 私有 MinerU 文档已有表格 row chunk 入库，但检索 SQL 原先全部排除，导致具体表格数值请求缺证据。现只对 MinerU 表格开放 BM25 候选，并把它们作为独立 `table_analysis` / `parser_generated_unverified` 证据；引用卡、逐条主张和工具说明均标明非原文精确引述，伪造 `source_field=excerpt` 的表格引用会被 Harness 拒绝。五项内置 Skills 同步表格证据边界并更新版本/内容哈希。真实 64 页隔离库中，Table 4.2 和 4.8 的限定文档查询首位均为对应表格行；未测表格单元格准确率，不把解析数字当已核实事实。本轮全后端 589 passed（1 条既有 warning）、Skills/ResearchRuntime 61 passed、Web typecheck/build 与浏览器 72/72 通过，Ruff check/format、OpenAPI 导出、pip-audit 与 pnpm audit 通过。

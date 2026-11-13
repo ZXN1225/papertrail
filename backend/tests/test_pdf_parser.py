@@ -355,7 +355,7 @@ def test_mineru_adapter_maps_structured_blocks_and_normalizes_page_bbox(monkeypa
 
     result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table())
 
-    assert result["parser_version"] == "mineru-4.1.test-papertrail-v11"
+    assert result["parser_version"] == "mineru-4.1.test-papertrail-v12"
     assert result["ocr_mode"] == "txt"
     assert result["image_analysis_enabled"] is False
     assert result["page_count"] == 1
@@ -412,6 +412,72 @@ def test_mineru_advanced_keeps_visual_analysis_out_of_source_exact_text(monkeypa
     } in result["warnings"]
     chunks = chunk_pdf_elements(result["elements"])
     assert [chunk.text for chunk in chunks] == ["Figure 1: TEST chart"]
+
+
+@pytest.mark.parametrize(
+    ("chart_bbox", "figure_caption_bbox"),
+    [
+        ([0.14, 0.40, 0.70, 0.65], [0.08, 0.34, 0.52, 0.36]),
+        ([0.14, 0.30, 0.70, 0.52], [0.08, 0.54, 0.52, 0.56]),
+    ],
+)
+def test_mineru_reassigns_figure_caption_mislabeled_as_table_caption(
+    monkeypatch, chart_bbox, figure_caption_bbox
+) -> None:
+    import types
+
+    class Block:
+        def __init__(self, kind: str, bbox: list[float], content: list[dict]) -> None:
+            self.type = kind
+            self.bbox = bbox
+            self.content = content
+
+        def model_dump(self, *, mode: str, exclude: set[str]) -> dict[str, object]:
+            return {"type": self.type, "bbox": self.bbox, "content": self.content}
+
+    table = Block(
+        "table",
+        [0.08, 0.18, 0.65, 0.30],
+        [
+            {
+                "type": "table_caption",
+                "bbox": [0.08, 0.15, 0.40, 0.17],
+                "content": "Table 1: TEST values",
+            },
+            {
+                "type": "table_body",
+                "bbox": [0.08, 0.18, 0.65, 0.30],
+                "content": "<table><tr><td>Red</td><td>7</td></tr></table>",
+            },
+            {
+                "type": "table_caption",
+                "bbox": figure_caption_bbox,
+                "content": "Figure 1: TEST bar chart",
+            },
+        ],
+    )
+    chart = Block(
+        "chart",
+        chart_bbox,
+        [{"type": "chart_body", "content": "Red: 7"}],
+    )
+    middle = SimpleNamespace(
+        pages=[SimpleNamespace(page_idx=0, blocks=[table, chart])],
+        metadata=SimpleNamespace(producer=SimpleNamespace(version="4.1.7")),
+    )
+    parser_module = types.ModuleType("mineru.parser")
+    parser_module.parse = lambda *_args, **_kwargs: SimpleNamespace(middle_json=middle)
+    mineru_module = types.ModuleType("mineru")
+    mineru_module.__path__ = []
+    monkeypatch.setitem(sys.modules, "mineru", mineru_module)
+    monkeypatch.setitem(sys.modules, "mineru.parser", parser_module)
+
+    result = parse_pdf_bytes_mineru(_synthetic_pdf_with_ruled_table(), tier="advanced")
+    table_element = next(row for row in result["elements"] if row["element_type"] == "table")
+    chart_element = next(row for row in result["elements"] if row["element_type"] == "figure")
+    assert "Table 1: TEST values" in table_element["text"]
+    assert "Figure 1" not in table_element["text"]
+    assert chart_element["text"] == "Figure 1: TEST bar chart"
 
 
 def test_mineru_adapter_reclassifies_prose_misidentified_as_equation(monkeypatch) -> None:
