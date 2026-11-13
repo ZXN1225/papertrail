@@ -4,6 +4,7 @@
 
 - 上线准备增加单机 Linux VPS 生产 Compose 覆盖层和 Caddy HTTPS 反向代理，沿用当前持久卷；新增启动/模型准备/验收/备份恢复手册。基础 Compose 现传递每日用户 Agent token 预算，CI 增加用占位值校验生产配置。基础与生产 Compose 本机 `config --quiet` 均通过，`git diff --check` 通过；本机 Docker daemon 不可用，因此容器 build/start 由远端 CI 复核。无服务器、域名与生产凭据，部署本身待接入信息。
 - 修正文档中过时的解析器和个人 PDF embedding 行为描述。生产默认 Agent LLM 必须配置 OpenAI endpoint 凭据；Embedding 保持关闭，BM25 可用。使用私有全文 Hybrid/Dense 需要额外 embedding 配置和授权索引；图表文本质量仍有未完成的人工事实核验限制。
+- 该提交触发 PR #46 CI：backend success；Web 在 Prettier `README.md` 单文件格式检查处失败，container 未运行。按远端日志只修复 README 表格排版，本机该文件 Prettier check 通过；修复后的远端 CI 尚待复跑。
 
 - MinerU 区域复核 Agent 对冻结 9 篇论文抽样 18 页（9 页有预测区域、9 页零预测页）逐图对照，粗略观察到正样本页 11 个可见图表/表格区域；本抽样未见明显零预测页漏检或明显误检。此前将 `2610.10204` p.2 的正文 Figure 1 交叉引用误判为漏检，复核后撤回：图本体在 p.3，MinerU 已识别。复核包、18 张 PNG、9 份 PDF 与解析报告的哈希均匹配，0 外部调用。此结果为 AI 辅助定性检查，不是人工复核、IoU/召回率或图表数值核验，`gold_standard=false`、`quality_claim_allowed=false`；图表事实/漏检总体质量仍未建立。
 - 产品真实 Agent 路径没有独立二阶段 reranker。`retrieve_paper_evidence` 暴露 BM25/Dense/Hybrid；个人文档有向量时可将 BM25 与 dense top-32 以 RRF 融合，无向量时回退 BM25。共享全文底层和评测代码存在 `bm25_dense_rerank`，但 Agent function schema 未开放该模式，因此用户对话不会调用它。当前 MinerU 六种 chunk 配置评测比较的是 BM25；现存六题候选向量 rerank 结果来自 pdfplumber v27 且低于对应 BM25，不能替代 MinerU 评测，故不接入生产默认。

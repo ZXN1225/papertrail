@@ -98,17 +98,17 @@ BM25 为默认全文检索。Dense 可选使用 OpenAI embeddings 与 cosine 相
 
 ## 技术栈
 
-| 层     | 技术                                                                      |
-| ------ | ------------------------------------------------------------------------- |
-| Web    | Next.js 16、React 19、TypeScript                                          |
-| API    | FastAPI、Pydantic、Uvicorn                                                |
-| Agent  | OpenAI Responses API function calling、受限 Agent Harness、服务端引用校验 |
-| MCP    | 只读 stdio MCP Server、固定工具注册表                                     |
-| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                    |
-| 数据源 | OpenAlex Works / Authors API、arXiv API、逐篇许可的本机 PDF 全文          |
-| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60                  |
+| 层     | 技术                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------ |
+| Web    | Next.js 16、React 19、TypeScript                                                           |
+| API    | FastAPI、Pydantic、Uvicorn                                                                 |
+| Agent  | OpenAI Responses API function calling、受限 Agent Harness、服务端引用校验                  |
+| MCP    | 只读 stdio MCP Server、固定工具注册表                                                      |
+| 数据   | SQLite、SQL 迁移、不可变元数据版本、来源快照与 SHA-256                                     |
+| 数据源 | OpenAlex Works / Authors API、arXiv API、逐篇许可的本机 PDF 全文                           |
+| 检索   | 自实现 Okapi BM25、可选 OpenAI Embeddings cosine、RRF@60                                   |
 | 解析   | MinerU 本机结构化解析（元素/章节/表格/图注 + 页级 bbox 与解析告警）；pdfplumber 可显式回退 |
-| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions            |
+| 测试   | pytest、Ruff、Prettier、TypeScript、Playwright、GitHub Actions                             |
 
 ## 检索策略与评测证据
 

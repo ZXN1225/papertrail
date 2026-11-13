@@ -7,6 +7,7 @@
 - 新增 `compose.production.yaml` 与 Caddy HTTPS 入口，使用已有 Web/API 容器及 SQLite/PDF/MinerU 持久卷；生产覆盖层要求域名、LLM key 和模型名，默认打开有限的用户日 token 预算。新增 `docs/deployment.md`，记录单 Linux VPS 启动、MinerU 模型安装、浏览器验收、备份恢复与已知单机限制；README 增加入口，解析器说明更新为 MinerU + pdfplumber 显式回退。
 - 修复基础 Compose 未传递 `AGENT_DAILY_USER_TOKEN_BUDGET` 的配置缺口，并修正文档关于 Agent 私有 PDF Hybrid 查询外发 embedding 的旧描述。
 - 本机 Docker Compose CLI 对基础栈和生产覆盖层 `config --quiet` 均通过；本机 Docker daemon 不可用，不能声称已本地 build/start。CI 已增加生产覆盖层解析步骤，远端结果待提交后确认。当前尚无 VPS、DNS 或生产凭据；不能在缺少这些接入信息时声称已部署上线。
+- PR #46 首轮更新 CI 的 backend 成功；Web 仅因 README Prettier 失败而中断，container 因依赖未运行。README 已按报错修复，等待下一轮 CI。
 - 生产包是单实例/单机部署，不提供 HA、对象存储、自动异地备份、GPU MinerU 部署或运营监控。实际启用 Dense/Hybrid 私有全文检索需由部署方另外配置 embedding provider 并对获准数据执行建索引；缺省 BM25 与 Agent/论文页面仍可运行。
 
 - 图表区域 AI 辅助抽查已完成：9 篇冻结许可 PDF 中，每篇抽 1 个有预测页和 1 个零预测页，共 18/18 页；粗略观察到 11 个可见图表/表格区域，未发现明显零预测页漏检或明显假阳性。`2610.10204` p.2 的正文图号引用经核对不是漏检，Figure 1 实体位于 p.3 且已检测。PNG、PDF、MinerU parse report 哈希均匹配，0 provider calls。仅定性 AI 辅助复核，不是人工金标；未评 IoU、全语料召回、表格数值或图表事实正确率，`quality_claim_allowed=false`。复核报告位于本机忽略目录 `backend/.local/mineru-frozen-nine-v1/chart-region-audit-v1/ai-visual-review.json`。
